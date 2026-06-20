@@ -15,7 +15,7 @@ Coordinate the agent workflow without influencing how each specialist does its j
 ## Inputs
 
 - User request.
-- Existing artifacts: refined spec, plan, implementation summary, review report, QA report.
+- Existing artifacts: refined spec, plan, implementation summary, review report, QA report, curation report.
 - Current workflow state.
 
 ## Output
@@ -38,8 +38,10 @@ Use this default flow:
 4. If implementation exists, send it to `reviewer`.
 5. If review passes or fixes are complete, send it to `qa`.
 6. If QA finds defects, route back to `planner` or `builder` depending on whether the defect is design-level or implementation-level.
+7. If the session produced reusable learning, mistakes, process improvements, or project knowledge, send the session transcript or summary to `curator`.
+
+Use `curator` only to produce candidates. Do not treat curator output as applied guidance until a human or follow-up agent explicitly accepts and applies it.
 
 ## Done Means
 
 The workflow has a clear next step, or the work is ready to accept.
-

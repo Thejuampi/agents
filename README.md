@@ -20,6 +20,7 @@ agents/
   builder.md
   reviewer.md
   qa.md
+  curator.md
   orchestrator.md
 commands/
   refine-this.md
@@ -27,6 +28,7 @@ commands/
   build-this.md
   review-this.md
   qa-this.md
+  curate-this.md
   orchestrate-this.md
 adapters/
   codex.md
@@ -42,6 +44,7 @@ AGENTS.md
 - `builder`: implements the plan with a focus on quality and maintainability.
 - `reviewer`: reviews design, data flow, component boundaries, risks, and coverage.
 - `qa`: performs black-box testing as a technical end user, without reading source code.
+- `curator`: reviews sessions and proposes learning candidates without persisting them automatically.
 - `orchestrator`: coordinates the workflow and delegates without influencing each agent's judgment.
 
 ## Suggested Commands
@@ -51,6 +54,7 @@ AGENTS.md
 - `/build-this`
 - `/review-this`
 - `/qa-this`
+- `/curate-this`
 - `/orchestrate-this`
 
 The `-this` suffix avoids collisions with native tool commands.
