@@ -1,17 +1,17 @@
 # Agent Playbook
 
-Repo personal para guardar agentes, prompts y flujos de trabajo reutilizables entre proyectos.
+A personal repository for reusable agents, prompts, and workflows used across projects.
 
-Principios:
+Principles:
 
 - Keep it simple.
 - Do not repeat yourself.
-- YAGNI: no scripts, generadores ni tooling hasta que duela mantenerlo a mano.
-- Un agente = un archivo Markdown canonico.
-- Los comandos apuntan a agentes; no duplican el prompt completo.
-- La compatibilidad con herramientas se documenta como instrucciones de instalacion, no como artefactos generados.
+- YAGNI: no scripts, generators, or tooling until manual maintenance becomes a real problem.
+- One agent = one canonical Markdown file.
+- Commands point to agents; they do not duplicate full prompts.
+- Tool compatibility is documented as setup guidance, not generated artifacts.
 
-## Estructura
+## Structure
 
 ```text
 agents/
@@ -35,16 +35,16 @@ adapters/
 AGENTS.md
 ```
 
-## Agentes
+## Agents
 
-- `refiner`: convierte pedidos vagos en especificaciones accionables sin leer archivos.
-- `planner`: explora el proyecto en modo lectura y produce un plan implementable.
-- `builder`: implementa el plan con foco en calidad y mantenibilidad.
-- `reviewer`: revisa diseno, flujo de datos, limites entre componentes, riesgos y cobertura.
-- `qa`: prueba black-box como usuario tecnico, sin leer codigo.
-- `orchestrator`: coordina el flujo y delega sin contaminar el criterio de cada agente.
+- `refiner`: turns vague requests into actionable specifications without reading files.
+- `planner`: explores the project in read-only mode and produces an implementable plan.
+- `builder`: implements the plan with a focus on quality and maintainability.
+- `reviewer`: reviews design, data flow, component boundaries, risks, and coverage.
+- `qa`: performs black-box testing as a technical end user, without reading source code.
+- `orchestrator`: coordinates the workflow and delegates without influencing each agent's judgment.
 
-## Comandos sugeridos
+## Suggested Commands
 
 - `/refine-this`
 - `/plan-this`
@@ -53,11 +53,10 @@ AGENTS.md
 - `/qa-this`
 - `/orchestrate-this`
 
-El sufijo `-this` evita colisiones con comandos nativos de herramientas.
+The `-this` suffix avoids collisions with native tool commands.
 
-## Uso
+## Usage
 
-Para usar este repo en otro proyecto, copia o referencia los archivos Markdown que necesites.
+To use this repo in another project, copy or reference the Markdown files you need.
 
-La fuente de verdad siempre esta en `agents/*.md`. Si una herramienta necesita frontmatter, TOML, JSON o una ruta especifica, la adaptacion se documenta en `adapters/`.
-
+The source of truth is always `agents/*.md`. If a tool needs frontmatter, TOML, JSON, or a specific path, document that adaptation in `adapters/`.
