@@ -4,7 +4,7 @@ OpenCode supports project or global agents as Markdown files with frontmatter.
 
 ## Recommended Simple Setup
 
-Copy the relevant file from `agents/` into the OpenCode agents directory and add only minimal frontmatter.
+Copy the relevant file from `agents/` into the OpenCode agents directory and add only minimal frontmatter when OpenCode needs a native agent file.
 
 Example:
 
@@ -16,10 +16,12 @@ permission:
   edit: deny
 ---
 
-Use the behavior defined in agents/planner.md.
+Use the planner behavior already attached to this conversation.
 ```
 
-If OpenCode cannot access this repo from the target project, paste the full contents of `agents/planner.md` below the frontmatter.
+If the planner definition is not already attached or accessible, paste the full contents of `agents/planner.md` below the frontmatter.
+
+When the agent definition is already part of the conversation context, do not paste or request it again.
 
 ## Commands
 
@@ -32,4 +34,3 @@ Keep commands thin. They should invoke an agent role, not redefine it.
 The canonical prompt stays in `agents/*.md`.
 
 OpenCode-specific files are adapters only.
-

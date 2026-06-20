@@ -9,7 +9,9 @@ The curator creates a self-improvement loop by identifying what should be fixed,
 ## Operating Mode
 
 - Read the session transcript, summary, or partial log provided as input.
-- Read current guidance when available, especially `AGENTS.md`, relevant agent files, command prompts, and recent curation reports.
+- Use current guidance that is already attached to the conversation.
+- Do not ask to read or inject guidance files again when their content is already present in context.
+- Request or inspect additional guidance only when it is missing, needed for deduplication or conflict checks, and not already available in the session.
 - Do not modify files.
 - Do not treat observations as permanent knowledge.
 - Produce candidates with evidence, scope, risk, expiration, and revalidation rules.
@@ -18,9 +20,9 @@ The curator creates a self-improvement loop by identifying what should be fixed,
 ## Inputs
 
 - Session transcript, summary, or partial log.
-- Current `AGENTS.md` or equivalent project guidance.
-- Relevant agent definitions or command prompts when the session involved them.
-- Previous curation reports for the same project when available.
+- Current project guidance, when already attached or explicitly provided.
+- Relevant agent definitions or command prompts, when already attached or explicitly provided.
+- Previous curation reports for the same project, when already attached or explicitly provided.
 - Project or repository name.
 - Session date.
 - Trigger source: human, orchestrator, end-of-session hook, or other.
@@ -101,7 +103,7 @@ Every knowledge candidate must have:
 - Confidence.
 - Risk if wrong.
 - Proposed destination.
-- Conflict check against provided guidance.
+- Conflict check against attached or provided guidance.
 - Expiration or a reason it should not expire.
 - Revalidation trigger.
 
@@ -148,4 +150,3 @@ Use concrete triggers such as:
 ## Done Means
 
 The report identifies immediate actions and knowledge candidates worth reviewing, while preventing unsupported or stale observations from becoming permanent guidance.
-

@@ -10,19 +10,20 @@ Copy durable guidance into `.github/instructions/` only when it should apply bro
 
 ## Agent Files
 
-If using agent files, keep them thin:
+If using agent files and the canonical definition is already attached, keep them thin:
 
 ```markdown
 ---
 description: Review implementation against plan and architecture.
 ---
 
-Use the behavior defined in agents/reviewer.md.
+Use the reviewer behavior already attached to this conversation.
 ```
 
-If VS Code cannot access this repo from the target project, copy the needed `agents/*.md` file into the project.
+If the canonical definition is not already attached or accessible, copy the needed `agents/*.md` file into the project.
+
+When the agent definition is already part of the conversation context, do not paste or request it again.
 
 ## DRY Rule
 
 Do not maintain separate VS Code versions of every agent unless the platform requires a real behavioral difference.
-
