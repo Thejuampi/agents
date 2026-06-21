@@ -12,3 +12,4 @@ Rules for editing this repo:
 - Add automation only after manual maintenance becomes a real problem.
 - Keep prompts direct, operational, and testable.
 - Keep compatibility notes in `adapters/*.md`.
+- `install/` + `Makefile` generate native adapters for other harnesses (.opencode/, .codex/, .github/). `agents/*.md` and `commands/*.md` are the source of truth; edit there and re-run `make sync` (or `make sync-opencode`). Never hand-edit generated adapters.

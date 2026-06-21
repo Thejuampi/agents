@@ -64,3 +64,36 @@ The `-this` suffix avoids collisions with native tool commands.
 To use this repo in another project, copy or reference the Markdown files you need.
 
 The source of truth is always `agents/*.md`. If a tool needs frontmatter, TOML, JSON, or a specific path, document that adaptation in `adapters/`.
+
+## Install / sync
+
+A Makefile converts this repo into the native format of each harness without
+duplicating content. The canonical files in `agents/` and `commands/` are the
+single source of truth; generated adapters only reference or copy them.
+
+```pwsh
+make install-opencode            # reference-only: .opencode/opencode.json + thin command files (this repo)
+make sync-opencode               # re-run after editing agents/ or commands/
+make install TARGET=C:/some/app  # copy-based: codex + vscode into that project (validated native surfaces)
+make sync TARGET=C:/some/app     # re-run to replicate edits to that project
+make uninstall TARGET=C:/some/app
+make install-claude TARGET=...   # opt-in / best-effort (not validated)
+make list
+make help
+```
+
+- **opencode** uses references (`{file:../agents/X.md}` and `@commands/X.md`), so
+  edits here take effect on the next OpenCode restart with no copy.
+- **codex** copies `agents/*.md` into `<target>/.codex/agents/*.toml` (TOML with
+  `developer_instructions`). Codex CLI has no custom slash-command surface, so
+  `commands/*.md` are not installed; `AGENTS.md` is owned by the target project.
+- **vscode** copies `commands/*.md` -> `.github/prompts/*.prompt.md` and
+  `agents/*.md` -> `.github/instructions/*.instructions.md` (with `applyTo`).
+  Best-effort: verify filenames against your Copilot version.
+- **claude** is opt-in/best-effort (not in the default `install` path).
+- Each generated file carries a header pointing back to its source; `make sync`
+  refreshes them.
+- For another OpenCode project to use this repo, add it as a `reference` (see
+  `adapters/opencode.md`) — no install needed there.
+- Adding a harness: drop a script in `install/` and a target in `Makefile`
+  (see `install/README.md`).

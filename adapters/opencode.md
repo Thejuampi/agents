@@ -2,35 +2,59 @@
 
 OpenCode supports project or global agents as Markdown files with frontmatter.
 
-## Recommended Simple Setup
+## Automated install (reference-only)
 
-Copy the relevant file from `agents/` into the OpenCode agents directory and add only minimal frontmatter when OpenCode needs a native agent file.
+Run once inside this repo:
 
-Example:
-
-```markdown
----
-description: Plan implementation work without modifying files.
-mode: subagent
-permission:
-  edit: deny
----
-
-Use the planner behavior already attached to this conversation.
+```pwsh
+make install-opencode
 ```
 
-If the planner definition is not already attached or accessible, paste the full contents of `agents/planner.md` below the frontmatter.
+This generates two things, both pure references (no content is copied):
 
-When the agent definition is already part of the conversation context, do not paste or request it again.
+- `.opencode/opencode.json` — one `agent` entry per `agents/*.md`, each with
+  `prompt: "{file:../agents/<name>.md}"`. OpenCode reads the canonical file at load
+  time and inlines it into the agent prompt. Agent `mode`/`permission` are derived
+  from a small table in `install/common.ps1` (`Get-OpenCodeAgentMeta`); edit there
+  to tune.
+- `.opencode/commands/<name>.md` — a thin file whose body is just
+  `@commands/<name>.md`. OpenCode inlines the canonical command text at execution
+  time.
 
-## Commands
+Re-run `make sync-opencode` after editing `agents/*.md` or `commands/*.md`.
+Generated files are gitignored; `agents/` and `commands/` remain the single source
+of truth. Put personal OpenCode customizations in a root `opencode.jsonc`
+(OpenCode deep-merges it with the generated `.opencode/opencode.json`); do not edit
+the generated file directly, since `sync-opencode` overwrites it.
 
-Use `commands/*.md` as the command text.
+Restart OpenCode after install or sync — config is loaded once at startup.
 
-Keep commands thin. They should invoke an agent role, not redefine it.
+The generated config does not add `AGENTS.md` to `instructions`: OpenCode already
+loads `AGENTS.md` as project rules, and listing it again would duplicate context.
+
+## Using this repo from another OpenCode project
+
+Do not copy anything. Add this repo as a reference in the other project's
+`opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "references": {
+    "agents-repo": {
+      "path": "C:/Users/Juan/Documents/agents",
+      "description": "Canonical agent definitions and commands"
+    }
+  }
+}
+```
+
+The other project can then `@`-reference files under the `agents-repo` alias.
+Edits made here are visible there on the next OpenCode restart.
 
 ## DRY Rule
 
 The canonical prompt stays in `agents/*.md`.
 
-OpenCode-specific files are adapters only.
+OpenCode-specific files are adapters only. The generated `.opencode/` files point
+at the canonical files; they never duplicate their content.

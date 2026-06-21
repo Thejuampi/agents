@@ -1,29 +1,34 @@
 # VS Code Adapter
 
-VS Code and GitHub Copilot can use prompt and instruction files.
+VS Code + GitHub Copilot use prompt files and instruction files under `.github/`.
 
-## Recommended Simple Setup
+## Automated install (copy + sync)
 
-Copy command prompts from `commands/` into `.github/prompts/` when you want slash-style reusable prompts in a project.
-
-Copy durable guidance into `.github/instructions/` only when it should apply broadly.
-
-## Agent Files
-
-If using agent files and the canonical definition is already attached, keep them thin:
-
-```markdown
----
-description: Review implementation against plan and architecture.
----
-
-Use the reviewer behavior already attached to this conversation.
+```pwsh
+make install-vscode TARGET=C:/code/myproject
+make sync-vscode  TARGET=C:/code/myproject   # re-run after editing agents/ or commands/
+make uninstall    TARGET=C:/code/myproject
 ```
 
-If the canonical definition is not already attached or accessible, copy the needed `agents/*.md` file into the project.
+Generates:
 
-When the agent definition is already part of the conversation context, do not paste or request it again.
+- `commands/*.md` -> `<target>/.github/prompts/<name>.prompt.md` (reusable chat prompts)
+- `agents/*.md`   -> `<target>/.github/instructions/<name>.instructions.md` with `applyTo: "**"`
+
+Re-running `sync-vscode` refreshes them from `agents/` and `commands/`. The canonical text stays in this repo; the `.github/` files are generated adapters.
+
+## Native surfaces
+
+- **Path-specific instructions**: `.github/instructions/NAME.instructions.md` (filename must end in `.instructions.md`), with frontmatter `applyTo: "<glob>"`. Verified against docs.github.com.
+- **Reusable prompts**: `.github/prompts/NAME.prompt.md`. This is the established convention; verify it matches your Copilot/VS Code version before relying on it.
+- **Repository-wide**: `.github/copilot-instructions.md` (single file; not generated here — the target project owns it).
+
+## Caveats
+
+- Copilot has **no native per-"agent" surface**. Mapping role behaviors (`agents/*.md`) to path-scoped instructions is a best-effort approximation.
+- `applyTo: "**"` injects every role definition into all Copilot requests, which can be heavy. Narrow `applyTo` per file (e.g. `"src/**"`) if you only want a role to apply in part of the repo, or trim the set of agents you install.
+- This adapter is **best-effort**: confirm the exact filenames and frontmatter against your installed Copilot version.
 
 ## DRY Rule
 
-Do not maintain separate VS Code versions of every agent unless the platform requires a real behavioral difference.
+The canonical prompt stays in `agents/*.md` and `commands/*.md`. VS Code-specific files are adapters only.
