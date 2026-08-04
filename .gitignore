@@ -2,4 +2,6 @@
 .opencode/opencode.json.bak
 .opencode/commands/
 .agents-sync/
+
+# E2E session artifacts
 .agents/
