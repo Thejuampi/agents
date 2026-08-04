@@ -39,7 +39,7 @@ Generated agents include Claude-native fields:
 - `model` (`opus` for orchestrator/planner/sensei; `sonnet` for builder/advisor/reviewer/…)
 - `permissionMode` where useful (`plan` for planner, `acceptEdits` for builder/orchestrator)
 
-Sensei and Refiner disallow repo tools so they stay context-only (or judgment-only).
+Sensei and Refiner disallow repo tools so they stay context-only (or judgment-only). Advisor may `Read`/`Grep`/`Glob` for **documentation only** (see `agents/advisor.md`); Write/Edit/Bash are disallowed.
 
 ## Invoking
 
