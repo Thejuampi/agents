@@ -237,9 +237,38 @@ At Stage 8 (retro), promote durable lessons into project docs / playbook if they
 
 - Only after Stage 3 exit: **P0-clean plan** (dual approve **or** empty P0 ledger), plus the **one-time P1+ sweep** above—or Juan’s **explicit waiver of named remaining P0s**.
 - Builders use mid-tier models when selectable.
-- Each builder receives: latest plan, its wave section only (plus global invariants), project conventions, and a **guarantee of exclusive workspace** (see isolation below).
+- Each builder receives: latest plan, its wave section only (plus global invariants), project conventions, a **resolved base commit SHA**, and a **guarantee of exclusive workspace** (see isolation below).
 - Each builder MUST implement code, docs, and **fast unit/local tests only** (see `agents/builder.md`). Builders MUST NOT run integration tests or any check expected to exceed ~10s—those conflict under parallelism.
 - Collect `build/wave-*.md` reports (including deferred slow checks).
+
+#### Wave base = exact commit (load-bearing)
+
+A provisioned worktree can be **clean**, on a **plausible branch name**, with **almost all files present**, and still be standing on the **wrong commit**. Verifying provenance is **not** verifying base.
+
+Two distinct failure classes (do not collapse them):
+
+| Failure | What happens | Typical cause |
+| --- | --- | --- |
+| **A — wrong tree origin** | Worktree created from default branch (`main` / `origin/main`) while the session works on a feature branch | Harness `isolation: "worktree"` defaults to **fresh from default branch**, not session `HEAD` |
+| **B — wrong dependency base** | Worktree at session tip, but the plan required a **predecessor wave merged** first | Orchestrator skipped the plan’s dependency row |
+
+**Effects of B that look green:** a wave that edits a function an earlier wave restructured writes into the old shape; merge then silently drops one side; **no test fails**; the defect ships.
+
+#### Dispatch checklist (mandatory order — every wave, every re-dispatch)
+
+Before spawning **any** builder (initial wave, fix round, or re-base), complete **all** steps **in order**. Skipping a step is an orchestration failure.
+
+| Step | Action | Fail closed when |
+| --- | --- | --- |
+| **1. Read dependency row** | Open the **latest** plan revision. Read that wave’s **Dependencies** (and any “must be merged” / “after Round N” language in the wave header). Binding language is law. | You cannot quote the dependency row in the session note |
+| **2. Resolve to one commit** | Map the row to a **single base SHA**: session branch tip if deps = none / parallel-safe; **post-merge integration SHA** if a predecessor “must be merged”; never “latest main” unless the plan says so | Predecessor not yet integrated, or SHA unknown |
+| **3. STEP 0 — verify exact commit** | On the workspace you will hand the builder: `git rev-parse HEAD` **equals** the resolved base SHA (or is a **descendant only if** the plan explicitly allows building atop additional integrated waves). Also: `git log --oneline -3` and **grep one symbol the dependency introduced** (or one symbol unique to the session branch if deps=none). | HEAD ≠ required base; required symbol missing; “files exist” without SHA match |
+| **4. Baseline cross-check** | Record fast-suite counts **on that base** (e.g. `cargo test --lib` pass/fail/ignore) and **pass those counts to the builder** as a cross-check. The builder’s control remains **its own delta** on the same base—not absolute counts as truth. | You did not measure on the same SHA you will dispatch |
+| **5. Spawn with base in the package** | Builder prompt MUST include: `expected_base_sha`, wave id, dependency quote, worktree path (if any), and baseline counts. | Package omits expected SHA |
+
+**STEP 0 is not optional ceremony.** Cheap wrong-base detection (tens of seconds) beats multi-hour / multi-million-token discovery after builders invent recovery `reset --hard` stories. Do **not** treat “builders fixed it with reset” as harness success.
+
+**Forbidden diagnostics:** claiming “early worktrees were fine, late ones raced” without **measuring creation-time commits** (oldest reflog entry per worktree). If you did not measure, you do not know.
 
 #### Workspace isolation (orchestrator-owned)
 
@@ -247,22 +276,45 @@ Parallel builders will stomp each other if they share a dirty tree, target dirs,
 
 Decision order (pick the lightest option that is safe):
 
-1. **Serialize** conflicting waves when they touch the same files, packages, or build artifacts—even if the plan called them independent. Prefer correctness over fake parallelism.
-2. **Parallelize only non-overlapping waves** (disjoint paths, no shared compile/test lock contention you cannot isolate). Cap at **3** concurrent builders.
-3. **Worktrees (allowed, caution required):** use only when true parallelization on the same repo is necessary and serialization would dominate. Commitments if you use them:
-   - Create with a clear naming scheme under the session (`e2e/<slug>/wt-wave-N` or git worktree path recorded in session notes).
-   - One builder per worktree; never share a worktree across builders.
-   - After each wave: merge/cherry-pick results back via a **single** integration step you control; resolve conflicts yourself (or a dedicated merge step)—not three builders fighting main.
-   - **Cleanup is mandatory** in the same session: remove worktrees, delete temp branches, drop leftover build dirs. Leftover worktrees are process debt. If you cannot clean up, do not create them—serialize instead.
+1. **Serialize** conflicting waves when they touch the same files, packages, or build artifacts—even if the plan called them independent. Prefer correctness over fake parallelism. Serialize also when the plan’s dependency row requires a predecessor **merged**.
+2. **Parallelize only non-overlapping waves** (disjoint paths, no shared compile/test lock contention you cannot isolate, **and** all share the **same resolved base SHA**). Cap at **3** concurrent builders.
+3. **Worktrees (allowed only with explicit base):** use when true parallelization on the same repo is necessary and serialization would dominate. **Base commit is an argument, not an assumption.**
+
+##### Harness `isolation: "worktree"` — do not trust off default branch
+
+Many harnesses (e.g. Claude Code) create agent worktrees from **`origin/<default>` / `main`**, not from the session branch tip. That behavior is **deterministic**, not a race: every worktree for a session off `main` can be born wrong.
+
+| Situation | Required practice |
+| --- | --- |
+| Session branch is **default** (`main` / `master`) **and** that is the intended base | Harness `isolation: "worktree"` may be used **only if** you still run STEP 0 and confirm HEAD equals the intended SHA |
+| Session works on a **non-default** branch (feature, integration, release) | **Do not** use harness `isolation: "worktree"` unless you have proven the harness pins worktrees to **session HEAD** (or equivalent) **and** STEP 0 passes. Default stance: **provision manually** |
+| Harness exposes `worktree.baseRef` / similar (`fresh` vs `head`) | Prefer **`head` / session HEAD** when available; still run STEP 0—settings drift is not proof |
+
+##### Manual worktree provision (preferred off-main)
+
+```text
+git worktree add -b <wt-branch> <path> <exact-base-sha>
+```
+
+Then spawn the builder with **isolation off** (or `cwd` set to `<path>` if the harness supports cwd without re-basing), exclusive to that path.
+
+Commitments if you use worktrees at all:
+
+- Create with a clear naming scheme under the session (`e2e/<slug>/wt-wave-N` or path recorded in session notes) **and** record `base_sha` + creation command.
+- One builder per worktree; never share a worktree across builders.
+- After each wave: merge/cherry-pick results back via a **single** integration step you control; resolve conflicts yourself (or a dedicated merge step)—not three builders fighting the integration branch.
+- **Cleanup is mandatory** in the same session: remove worktrees, delete temp branches, drop leftover build dirs. Leftover worktrees are process debt. If you cannot clean up, do not create them—serialize instead.
+
 4. Never assume “cargo/npm will be fine” with three processes on one `target/` or `node_modules` without isolation.
 
-Document the chosen strategy in the session summary (`parallel | serial | worktree`) and why.
+Document the chosen strategy in the session summary (`parallel | serial | worktree-manual | worktree-harness`) **and** every wave’s `expected_base_sha`.
 
 #### After builders finish (orchestrator)
 
 - Integrate all wave outputs into one coherent tree if worktrees/branches were used.
 - Run **deferred** integration / slow / full-suite checks **once**, serially, on the integrated tree (or schedule `qa` / reviewer with those commands). Do not ask builders to re-run them in parallel.
 - If integration tests fail, route fixes to the owning wave builder **serially** (or one builder at a time) on the integrated workspace.
+- Re-dispatch after integration uses the **new** integration SHA as base (dispatch checklist from step 1 again).
 
 ### Stage 5 — Implementation review loop (max 5 iterations)
 

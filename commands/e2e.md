@@ -24,6 +24,11 @@ Stage order (do not skip for speed):
 6 black-box QA (after Stage 5 approve or Juan named Stage 5 waiver; pre-probe; D2 package only; copy-only persist; you evaluate agent-green vs pipeline-continue) →
 7 final Sensei → 8 retro.
 
+Stage 4 hard rules (see agents/orchestrator.md — wave base / dispatch checklist):
+- Before every builder spawn: read plan **Dependencies** → resolve **one base SHA** → STEP 0 (`git rev-parse HEAD` + dependency symbol) → pass `expected_base_sha` + baseline counts.
+- Off default branch: do **not** trust harness `isolation: "worktree"` (often creates from `main`). Prefer `git worktree add -b <branch> <path> <exact-sha>` and isolation off / cwd.
+- "Files present" ≠ correct base. Wrong dependency base can merge-silent and still look green.
+
 Stage 6 hard rules (see agents/orchestrator.md + agents/qa.md + docs/findings.md):
 - Suites green ≠ Stage 6 success.
 - Package linter before spawn; no coaching / no fix-package attach.
