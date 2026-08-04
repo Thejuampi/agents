@@ -10,7 +10,7 @@ Installers only **reference** (opencode) or **copy + sync** (other harnesses); t
 install/
   common.ps1            shared helpers: enumerate agents/commands, parse descriptions, manifest
   opencode.ps1          reference-only, in-repo (the primary target)
-  codex.ps1             copy + sync -> <target>/.codex/agents/*.toml
+  codex.ps1             copy + sync -> project agents, or global agents + skills/prompts with -Global
   vscode.ps1            copy + sync -> <target>/.github/{prompts,instructions}
   claude.ps1            OPT-IN / best-effort -> <target>/.claude  (not validated)
   list.ps1              print discovered agents and commands
@@ -24,6 +24,7 @@ Each installer is also runnable directly, without `make`:
 ```pwsh
 pwsh -NoProfile -File install/opencode.ps1
 pwsh -NoProfile -File install/codex.ps1  -Target C:/code/myproject
+pwsh -NoProfile -File install/codex.ps1  -Global
 pwsh -NoProfile -File install/vscode.ps1 -Target C:/code/myproject
 ```
 
@@ -39,7 +40,7 @@ pwsh -NoProfile -File install/vscode.ps1 -Target C:/code/myproject
 | Harness  | Surface                                                                                          | Strategy   | Status        |
 | -------- | ------------------------------------------------------------------------------------------------ | ---------- | ------------- |
 | opencode | `.opencode/opencode.json` (`agent.*.prompt = {file:../agents/X.md}`) + `.opencode/commands/X.md` (`@commands/X.md`) | reference  | verified      |
-| codex    | `.codex/agents/<name>.toml` (`name`/`description`/`developer_instructions`/`sandbox_mode`)        | copy+sync  | docs-verified |
+| codex    | `.codex/agents/<name>.toml`; global install adds `~/.agents/skills/` and `~/.codex/prompts/`     | copy+sync  | docs-verified |
 | vscode   | `.github/prompts/<name>.prompt.md` (from `commands/`) + `.github/instructions/<name>.instructions.md` (from `agents/`, `applyTo`) | copy+sync  | best-effort*  |
 | claude   | `.claude/agents`, `.claude/commands`                                                             | copy+sync  | best-effort   |
 
@@ -49,7 +50,8 @@ pwsh -NoProfile -File install/vscode.ps1 -Target C:/code/myproject
 
 - Custom agents are **TOML** files, not Markdown. Each `agents/X.md` becomes `.codex/agents/X.toml` with the markdown body embedded in `developer_instructions` (triple-quoted literal string).
 - `sandbox_mode` is derived per agent: `workspace-write` for `builder` and `qa`, `read-only` otherwise. Edit `Get-CodexSandboxMode` in `codex.ps1` to tune.
-- Codex CLI ships **only built-in slash commands** (`/model`, `/plan`, `/agent`, …). There is no file-based custom command surface, so `commands/*.md` are not installed. To run a playbook command, paste the command text and ask Codex to spawn the matching custom agent.
+- `-Global` installs each command as a personal skill under `~/.agents/skills/X/`. Invoke it as `$X` or select it from the `/` menu in app, CLI, or IDE.
+- The global install also creates `~/.codex/prompts/X.md` for `/prompts:X` compatibility in CLI and IDE. Codex has deprecated this custom-prompt surface in favor of skills.
 - `AGENTS.md` is not copied; the target project owns its own.
 
 ### VS Code notes

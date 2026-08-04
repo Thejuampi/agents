@@ -9,6 +9,7 @@ Run from this repo, pointing at the project where you use Codex:
 ```pwsh
 make install-codex TARGET=C:/code/myproject
 make sync-codex  TARGET=C:/code/myproject   # re-run after editing agents/*.md
+make install-codex-global                  # personal agents + skills + legacy prompts
 make uninstall   TARGET=C:/code/myproject
 ```
 
@@ -31,15 +32,20 @@ Re-running `sync-codex` overwrites these files with the latest `agents/*.md` con
 
 - **Custom agents**: `.codex/agents/*.toml` (project) or `~/.codex/agents/*.toml` (personal). Required fields: `name`, `description`, `developer_instructions`. Optional: `sandbox_mode`, `model`, `model_reasoning_effort`, `nickname_candidates`, `mcp_servers`, `skills.config`.
 - **Project guidance**: `AGENTS.md` at the repo root (and nested directories), read hierarchically. The target project owns its own `AGENTS.md`; this installer does not copy ours.
-- **Slash commands**: Codex CLI ships only built-in slash commands (`/model`, `/plan`, `/agent`, `/init`, …). There is **no file-based custom command surface**, so `commands/*.md` are not installed.
+- **Skills**: the global install creates `~/.agents/skills/<name>/SKILL.md`. Skills work in app, CLI, and IDE; invoke them as `$<name>` or select them from the `/` menu.
+- **Custom prompts**: the global-only `~/.codex/prompts/*.md` surface exposes Markdown prompts as `/prompts:<name>` in CLI and IDE. Codex has deprecated this surface in favor of skills, but still supports it.
 
 ## Invoking playbook commands in Codex
 
-Since Codex has no custom slash commands, to run e.g. `/plan-this`, paste the prompt text from `commands/plan-this.md` and ask Codex to act as the matching custom agent (or to spawn it as a subagent):
+After `make install-codex-global` and a Codex restart, run this in any Codex surface:
 
 ```text
-Use the planner custom agent. Build a decision-complete implementation plan for ...
+$plan-this
 ```
+
+You can also type `/` and select **Plan This** from the skill list. In CLI and IDE, the legacy `/prompts:plan-this` form remains available. Bare custom slash names cannot be registered directly.
+
+The generated skill asks Codex to spawn the matching custom agent, wait for it, and return its result.
 
 ## sandbox_mode
 

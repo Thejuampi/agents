@@ -6,18 +6,23 @@ Primary:
   make sync-opencode               Same as install-opencode (idempotent; re-run after editing agents/ or commands/).
   make uninstall-opencode          Remove generated opencode adapters from this repo.
 
-Copy-based (validated native surfaces), into a target project:
+Copy-based into a target project:
   make install TARGET=<dir>        Install codex + vscode into <dir>.
-  make sync TARGET=<dir>           Same as install (re-run to replicate edits to clients).
+  make sync TARGET=<dir>           Same as install.
   make uninstall TARGET=<dir>      Remove generated files from <dir>.
 
-Per-harness:
-  make install-codex  TARGET=<dir>   -> <dir>/.codex/agents/*.toml          (custom agents; no command surface in Codex)
-  make install-vscode TARGET=<dir>   -> <dir>/.github/prompts/*.prompt.md   (from commands/)
-                                       <dir>/.github/instructions/*.instructions.md  (from agents/)
+Per-harness (project):
+  make install-codex TARGET=<dir>    -> <dir>/.codex/agents/*.toml
+  make install-vscode TARGET=<dir>   -> <dir>/.github/prompts + instructions
+  make install-claude TARGET=<dir>   -> <dir>/.claude/{skills,agents,commands}
+  make install-grok TARGET=<dir>     -> <dir>/.grok/skills
 
-Opt-in / best-effort (NOT in the default install path):
-  make install-claude TARGET=<dir>   -> <dir>/.claude/  (not validated; verify before relying on it)
+Personal (all projects on this machine):
+  make install-codex-global          -> ~/.codex/agents + ~/.agents/skills + ~/.codex/prompts
+  make install-claude-global         -> ~/.claude/skills + ~/.claude/agents + ~/.claude/commands
+  make install-grok-global           -> ~/.grok/skills (+ _playbook-agents refs)
+  make install-personal              -> codex-global + claude-global + grok-global  (recommended day-to-day)
+  make sync-personal                 -> same as install-personal
 
 Other:
   make list                        List discovered agents and commands.
@@ -28,17 +33,17 @@ Other:
 Variables:
   TARGET   Destination project for copy-based harnesses. Default: .
 
-Native surfaces (verified):
-  opencode  .opencode/opencode.json (agent.prompt = {file:../agents/X.md}) + .opencode/commands/X.md (@commands/X.md)
-  codex     .codex/agents/<name>.toml (name/description/developer_instructions/sandbox_mode); AGENTS.md owned by target; no custom slash commands
-  vscode    .github/prompts/<name>.prompt.md + .github/instructions/<name>.instructions.md (applyTo)
+Native surfaces:
+  opencode  .opencode/opencode.json + .opencode/commands/
+  codex     .codex/agents/*.toml; global also ~/.agents/skills
+  vscode    .github/prompts + .github/instructions
+  claude    .claude/skills/*/SKILL.md + .claude/agents/*.md (+ commands aliases)
+  grok      .grok/skills/*/SKILL.md
 
 Notes:
-  - opencode is reference-only: agents/commands stay the single source of truth.
-  - For OTHER opencode projects to use this repo, add it as a "reference" (see adapters/opencode.md).
-  - codex/vscode copy content because those harnesses cannot read outside the target repo.
-    Re-run `make sync TARGET=<dir>` after editing agents/*.md or commands/*.md.
-  - Each generated file carries a header pointing back to its source.
-  - Generated artifacts are gitignored; the canonical files in agents/ and commands/ are the source of truth.
+  - Canonical source of truth: agents/*.md and commands/*.md
+  - Re-run make sync-*-global after editing agents or commands
+  - First Claude install that creates ~/.claude/agents may need a Claude Code restart
+  - /e2e is the full multi-agent pipeline; see agents/orchestrator.md
 '@
 Write-Host $here
