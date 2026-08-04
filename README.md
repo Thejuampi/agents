@@ -57,8 +57,8 @@ flowchart TB
     S7["7 · Retro / curation"]
 
     S0 --> S1 --> S2 --> S3
-    S3 -->|both approve| S4
-    S3 -->|revise| S3
+    S3 -->|P0-clean or dual approve| S4
+    S3 -->|open P0 · revise| S3
     S4 --> S5
     S5 -->|approve| S6
     S5 -->|revise| S5
@@ -137,9 +137,6 @@ flowchart TB
 │   ├── advisor-r1.md …
 │   ├── p0-ledger.md
 │   └── LESSONS-LEARNED.md
-├── plan-review/
-│   ├── sensei-r1.md …
-│   └── advisor-r1.md …
 ├── build/
 │   └── wave-*-report.md
 ├── review/
@@ -148,6 +145,8 @@ flowchart TB
 ├── sensei-final.md
 └── retro.md
 ```
+
+Stage 3 exits when Sensei and Advisor both `approve` **or** the open **P0 ledger is empty** (P1/P2 may remain for a one-time pre-build sweep). From iteration **6+**, review is **delta-only / no boy scout** (P0 only).
 
 Always pass **latest** plan revision downstream. Stale `plan.v{k}` after `plan.v{k+1}` exists is a bug.
 
