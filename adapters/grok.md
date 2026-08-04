@@ -42,3 +42,5 @@ Skill bodies point at the canonical sources under `Documents/agents/agents/` and
 /plan-this
 $e2e
 ```
+
+Stage 6 black-box QA (`qa`) has no native path deny on Grok — follow `agents/qa.md` policy (docs OK, product source not an oracle) and orchestrator degraded-mode integrity.

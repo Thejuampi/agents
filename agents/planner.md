@@ -37,8 +37,8 @@ Return a plan the orchestrator can write as `plan.v0.md` (or higher) with at lea
 Decompose work into **waves**. Rules:
 
 - Each wave is a coherent unit of delivery (code + tests + docs for that unit).
-- Waves MUST be **fully independent**: no wave may require another wave’s incomplete work to build, test, or document. Parallel execution must be safe.
-- If true independence is impossible, split differently or declare a single wave—do not fake independence with hidden coupling.
+- Waves MUST be **fully independent** by default: no wave may require another wave’s incomplete work to build, test, or document. Parallel execution must be safe.
+- If true independence is impossible, **prefer** splitting differently or a single wave. If you must declare **serialized** successor waves (e.g. “Round 1 must be merged before Round 2”), that is allowed **only** when the dependency is **explicit, binding, and unmissable** (see Dependencies field)—never hidden in prose the orchestrator can skim past.
 - Cap practical parallel width at 3 for build scheduling, but you may define more waves if later waves still have zero dependency on incomplete siblings (orchestrator will serialize beyond 3).
 
 For each wave include:
@@ -49,10 +49,31 @@ For each wave include:
 | Title | Outcome-oriented name |
 | Scope | Modules / surfaces touched |
 | Tasks | Medium-sized outcome tasks (see Task Quality) |
-| Dependencies | Must be **none** across waves; list only external/repo facts |
+| Dependencies | **Binding dispatch law** for the orchestrator (see below) |
 | Documentation deliverables | Paths / doc updates **required** (never “optional”) |
 | Test methodology | See below |
 | Done when | Observable completion criteria |
+
+#### Dependencies field (binding)
+
+The orchestrator resolves this row to an **exact base commit** before spawning a builder. Write it so skimming cannot drop it.
+
+| Form | When | Example content |
+| --- | --- | --- |
+| **`none` (parallel-safe)** | Wave builds on session/repo tip with no sibling wave required | `none — parallel-safe with wave-1, wave-3` |
+| **Predecessor merged** | Wave must stand on integration of an earlier wave/round | `wave-1 must be **merged** into integration branch before dispatch; base = post-merge SHA (not wave-1 worktree tip alone)` |
+| **External only** | Needs a tag, fixture set, or published contract already on the base | `requires fixture set X already on base branch` |
+
+**MUST:**
+
+- Put merge / order constraints in this **Dependencies** cell **and** restate one line at the top of the wave section if the constraint is load-bearing.
+- Use the word **merged** (or equivalent integration) when “delivered in another worktree” is insufficient.
+- Prefer one serial wave over fake-independent waves that will corrupt each other’s function shapes on merge.
+
+**MUST NOT:**
+
+- Leave “Round N first” only in narrative paragraphs while Dependencies says `none`.
+- Assume the orchestrator will infer order from wave numbers alone.
 
 ### 3. Task Quality
 
