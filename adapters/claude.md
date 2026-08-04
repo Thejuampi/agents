@@ -41,6 +41,18 @@ Generated agents include Claude-native fields:
 
 Sensei and Refiner disallow repo tools so they stay context-only (or judgment-only).
 
+### Stage 6 `qa` frontmatter
+
+`Get-ClaudeAgentFrontmatter` for `qa` (in `install/common.ps1`):
+
+| Field | Value |
+| --- | --- |
+| `tools` | `Bash, Read, Grep, Glob` |
+| `disallowedTools` | `Write, Edit, NotebookEdit` |
+| `model` | `sonnet` |
+
+QA may read docs and drive the app via Bash; it must not write product files. Orchestrator **copy-only** persists `qa/plan.md` + `qa/findings.md` + provenance. Product-source oracle forbid remains policy in `agents/qa.md` (degraded detect if a path is opened anyway).
+
 ## Invoking
 
 ```text

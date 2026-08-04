@@ -56,7 +56,9 @@ function Get-OpenCodeAgentMeta {
     planner      = @{ mode = 'primary';  permission = [ordered]@{ edit = 'deny'; bash = 'ask' } }
     builder      = @{ mode = 'primary';  permission = [ordered]@{ edit = 'allow'; bash = 'allow' } }
     reviewer     = @{ mode = 'subagent'; permission = [ordered]@{ edit = 'deny'; bash = 'ask' } }
-    qa           = @{ mode = 'subagent'; permission = [ordered]@{ read = 'deny'; edit = 'deny'; bash = 'allow' } }
+    # Stage 6 black-box QA: docs must be readable (no read deny); product write denied; bash for CLI/app.
+    # Product-source path deny is policy in agents/qa.md when harness cannot express path-class deny.
+    qa           = @{ mode = 'subagent'; permission = [ordered]@{ edit = 'deny'; bash = 'allow' } }
     curator      = @{ mode = 'subagent'; permission = [ordered]@{ edit = 'deny'; bash = 'ask' } }
     sensei       = @{ mode = 'subagent'; permission = [ordered]@{ read = 'deny'; edit = 'deny'; bash = 'deny'; websearch = 'deny'; webfetch = 'deny' } }
     # Docs-only policy (agents/advisor.md): may read; no edit/bash/web exploration of implementation.
@@ -293,8 +295,11 @@ function Get-ClaudeAgentFrontmatter {
     }
     'qa' {
       @{
+        # Stage 6: may read docs + run app; must not write product or notebooks.
+        # Product-source oracle forbid is policy in agents/qa.md (degraded detect if needed).
         tools = 'Bash, Read, Grep, Glob'
         model = 'sonnet'
+        disallowedTools = 'Write, Edit, NotebookEdit'
       }
     }
     'curator' {

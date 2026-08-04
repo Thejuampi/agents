@@ -28,6 +28,7 @@ Re-running `sync-vscode` refreshes them from `agents/` and `commands/`. The cano
 - Copilot has **no native per-"agent" surface**. Mapping role behaviors (`agents/*.md`) to path-scoped instructions is a best-effort approximation.
 - `applyTo: "**"` injects every role definition into all Copilot requests, which can be heavy. Narrow `applyTo` per file (e.g. `"src/**"`) if you only want a role to apply in part of the repo, or trim the set of agents you install.
 - This adapter is **best-effort**: confirm the exact filenames and frontmatter against your installed Copilot version.
+- **Stage 6:** black-box policy + degraded source-citation fail; product-tree writes by QA are forbidden (session `qa/` only).
 
 ## DRY Rule
 

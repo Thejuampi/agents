@@ -81,11 +81,20 @@ Default session root (unless the project defines another convention):
   review/
     reviewer-r1.md …          # raw reviewer output per iteration
     fix-package-r1.md …       # orchestrator-merged fix brief for builders (mandatory after revise)
+    fix-package-qa-r1.md …    # orchestrator-merged product fixes from Stage 6 QA P0s
+  qa/
+    plan.md                   # QA-authored plan (orchestrator copy-only persist)
+    findings.md               # findings + verdict (orchestrator copy-only persist)
+    p0-ledger.md              # orchestrator-owned open/fixed/waived product/env/process P0s
+    probe.md                  # orchestrator readiness probe (pre-QA)
+    provenance.md             # session id, round, QA agent id, product revision stamp
   sensei-final.md
   retro.md
 ```
 
 Always pass **latest** plan revision only to downstream agents. Never feed stale `plan.v{k}` when `plan.v{k+1}` exists.
+
+Findings field law (all finding-reporters): [`docs/findings.md`](../docs/findings.md). Black-box QA role: [`agents/qa.md`](qa.md).
 
 ## Single-step workflow (`/orchestrate-this`)
 
@@ -93,13 +102,13 @@ Always pass **latest** plan revision only to downstream agents. Never feed stale
 2. If implementation decisions are not settled → `planner`.
 3. If there is an approved plan → `builder` (or wave builders).
 4. If implementation exists → `reviewer`.
-5. If review passes or fixes are complete → `qa` when black-box validation is warranted.
-6. If QA finds defects → `planner` or `builder` by defect class.
+5. If Stage 5 **approves** (or Juan named Stage 5 waiver) and black-box product acceptance is warranted → Stage 6 path: pre-probe → `qa` with D2 independence package only (see Stage 6).
+6. If QA reports open **product** P0s → merge `review/fix-package-qa-r{N}.md` → `builder` → Stage 5 until approve → re-QA (not planner-as-oracle).
 7. If the session produced reusable learning → `curator` (candidates only).
 
 ## E2E pipeline (`/e2e`)
 
-Run stages in order. Do not skip for speed. Juan may explicitly waive a stage.
+Run stages in order. Do not skip for speed. Juan may explicitly waive a stage. **When the stage is 6**, follow Stage 6 **WAIVED** rules (named artifact → pipeline-continue with waive ≠ agent-green); do not enter Stage 7 on a silent or bare waiver.
 
 ### Stage 0 — Session
 
@@ -213,7 +222,7 @@ If a P1+ fix **discovers a new P0**, that P0 re-enters the ledger and must be fi
 
 Sensei and Advisor **must** propose lesson entries in their packages when they find a new class of defect. You write them into the file.
 
-At Stage 7 (retro), promote durable lessons into project docs / playbook if they will recur across sessions.
+At Stage 8 (retro), promote durable lessons into project docs / playbook if they will recur across sessions.
 
 #### Who writes plan revisions (hard rule)
 
@@ -290,13 +299,180 @@ If multiple review-related files exist (e.g. integration log + reviewer + boy-sc
 - You re-integrate, re-run deferred slow checks if needed, then loop to **5a** with the same Reviewer thread.
 - Exit when Reviewer **approves** or 5 iterations are exhausted (then report blockers with the last fix-package path).
 
-### Stage 6 — Final Sensei pass
+### Stage 6 — Black-box QA (hard gate)
 
+**Armed.** Stage 6 is a first-class hard gate for product acceptance. Canonical role: [`agents/qa.md`](qa.md). Findings law: [`docs/findings.md`](../docs/findings.md).
+
+**Suites ≠ Stage 6.** Deferred integration / full-suite checks you run after builders are **not** black-box QA and do **not** satisfy this stage.
+
+#### Enter only when
+
+| Allowed | Forbidden |
+| --- | --- |
+| Stage 5 Reviewer **`approve`** | Exhausted Stage 5 without approve and no Juan Stage 5 waiver |
+| Juan **named** Stage 5 waiver artifact (who, what, reason, timestamp) | Agent / orchestrator self-waiver of Stage 5 |
+
+#### Pre-probe (Orchestrator-owned, before any QA spawn)
+
+1. Resolve AUT identity (project root / profile / `aut_id`). Missing ⇒ `BLOCKED_ENV`; do not spawn QA.
+2. Launch the app when needed (prefer project QA profile / documented launch).
+3. Capability probe only, in mode priority: **CLI** → **project attach bridge** → **browser** → fail closed. Probe health / attach / session only — **no** case lists, AC bullets, or “verify that…”.
+4. Write `qa/probe.md` (mode used, launch facts, pass/fail, timestamps).
+5. On probe fail: environment path; **env_attempt budget default 2** (does not consume product QA rounds). Do not spawn QA cold.
+
+#### Independence package (D2) — every round, identical shape
+
+**Allowed fields only:**
+
+| Field | Notes |
+| --- | --- |
+| Product purpose | 1–3 sentences, **non-behavioral** |
+| Docs roots | Product / operator / playbook documentation paths |
+| Launch / attach / stop | Commands, profile, ports, env, bridge entrypoints |
+| Session root + artifact paths | Where you will persist `qa/*` |
+| AUT identity | Required |
+| Change summary | **Path list + non-behavioral intent only** — never expected UI outcomes |
+| Round index | `k of 3` (no finding titles required) |
+
+**Forbidden every round (including re-QA):** must-pass cases; AC lists; “verify that”; retest case lists; attaching `review/fix-package*`, builder reports, or Reviewer notes as required checklists; outcome-bearing “reference” sections; coaching of any kind.
+
+QA may re-read **prior `qa/**`** artifacts from this session (their own prior findings). You **must not** restate those findings as required retests in the package.
+
+#### Package linter (fail closed — do not spawn QA if any fail)
+
+| Invariant | Meaning |
+| --- | --- |
+| `pkg.fields_allowlist_only` | Only D2 allowed fields present |
+| `pkg.no_coaching_phrases` | No “must pass”, “verify that”, “retest these”, … |
+| `pkg.no_fix_package_attach` | No `review/fix-package*` / builder / reviewer reports as QA checklist |
+
+#### Spawn QA
+
+- Spawn `qa` with the **linted D2 package only** + launch/probe facts.
+- Do **not** pass plan BDD tables, Reviewer notes, or fix packages as coverage mandates.
+- Prefer the same QA thread across product re-QA rounds when the harness can resume.
+
+#### Persist (Orchestrator **copy-only**)
+
+1. QA produces plan + findings + verdict in the response (and may attempt session writes if allowed).
+2. **You copy-only** persist QA-authored content into `qa/plan.md` and `qa/findings.md`.
+3. Write/update `qa/provenance.md`: session id, product round index, QA agent id, product revision stamp (minimum: git HEAD or equivalent + optional touched path list at persist).
+4. You own `qa/p0-ledger.md` and `qa/probe.md` — never hand ledger clearance to the agent unilaterally.
+
+#### Ingest (after every admissible persist)
+
+After every **admissible** copy-only persist of `qa/findings.md`, you **must ingest** into `qa/p0-ledger.md`:
+
+| Ingest rule | Detail |
+| --- | --- |
+| What | Every finding with `severity=P0` and `status=open` |
+| By class | `product` \| `process` \| `environment` (required field) |
+| When | Immediately after admissible persist — before agent-green evaluation |
+| Who clears | **You only.** Agent cannot unilaterally clear the ledger |
+| `open → fixed` | Only when **you** record re-run evidence that the finding is fixed (re-QA evidence, not agent assertion alone) |
+| `open → waived` | Only Juan named waive artifact (who, named P0 ids, reason, timestamp) |
+
+**Forbidden:** treating a fresh `PASS` as agent-green while open product P0s still sit in findings and were never ingested; leaving findings P0s out of the ledger so agent-green can pass on an empty ledger.
+
+**Forbidden:** orchestrator-generated default/template/stub plans or empty shells to green the gate. Missing QA-authored plan ⇒ **not admissible**.
+
+#### Admissible QA run (else fail-closed)
+
+All of:
+
+- QA-authored plan present with provenance
+- `verdict` ∈ {`PASS`, `FAIL`, `BLOCKED_ENV`, `EXHAUSTED`, `WAIVED`}
+- Execution evidence minimum: mode used (`CLI` \| `bridge` \| `browser`), session id, `probe.md` ref, per plan-item attempted/result (freeform body)
+- Findings fully parseable (required fields per `docs/findings.md`: `id`, `severity`, `status`, `class`) **or** zero findings with explicit “no defects found” **and** evidence
+- Artifacts on disk under session `qa/`
+
+Empty findings without evidence ⇒ not admissible.
+
+**Parse fail-closed:** any finding missing a required field ⇒ not agent-green; **re-ask** within **parse_repair budget = 2** per product round; then FAIL process / non-admissible. Re-asks and invalid (non-admissible) runs do **not** consume a product P0 round until an admissible complete run exists. **Invalid-run budget = 2** per product round, then escalate.
+
+**Forbidden parse side-door:** mapping incomplete fields to non-blocking “process” so product PASS still proceeds. Optional strengthen: severity present as P0 but `class` missing ⇒ treat as open **product** P0 until clarified.
+
+#### Agent-green vs pipeline-continue (you evaluate — do not trust agent verdict alone)
+
+**Agent-green** (Stage 6 quality success) — all of:
+
+- Admissible **and**
+- `verdict == PASS` **and**
+- **no open product P0 in findings ∪ ledger** **and**
+- **no open gate-blocking process P0 in findings ∪ ledger** **and**
+- **no unwaived blocking environment P0 in findings ∪ ledger** **and**
+- integrity clean
+
+Evaluate against **findings ∪ ledger** after ingest. A forged `PASS` with an open product P0 still present in findings is **not** agent-green — even if the ledger was empty before ingest (ingest first; then evaluate).
+
+**Gate-blocking process classes** (block like product P0): integrity violation, coaching-detect, stub-plan, source-citation (degraded mode), unparseable findings.
+
+**Pipeline-continue** (may leave Stage 6 toward Stage 7) — sole Stage 7 entry credential:
+
+- **agent-green**, **or**
+- `verdict == WAIVED` **and** Juan waive artifact present (who, named P0 ids, reason, timestamp) recorded in `qa/p0-ledger.md` **and** you record that **waive ≠ PASS** / **waive ≠ agent-green**
+
+**Forbidden:**
+
+- Agent self-`WAIVED` without Juan artifact
+- Orchestrator inventing `WAIVED`
+- Mapping waive → `PASS` while open P0s remain
+- Forged `PASS` to simulate waive
+- Treating a bare ledger waive row as Stage 7 entry without pipeline-continue semantics
+
+#### Integrity (post-run)
+
+- Diff product tree after QA: any write outside session allowlist (session `qa/` + evidence temp only) ⇒ **run invalid** / gate-blocking process; discard as clean round.
+- Ledger not unilaterally cleared by the agent.
+- Path-class source read: where expressible, deny product source; else **degraded mode** — findings/plan that cite product source paths/symbols as evidence ⇒ source-citation process fail (not agent-green).
+- Runner eligibility: if the harness cannot enforce write allowlist for the product tree (or Stage 6 is marked unsupported), treat as `BLOCKED_ENV` / stage6_unsupported — not “residual documented as OK.”
+
+#### State machine
+
+| Event | Next |
+| --- | --- |
+| Open **product** P0 (ledger ∪ findings) | Write `review/fix-package-qa-r{N}.md` from open **product** P0s in **ledger ∪ findings** → Builder → **Stage 5 until approve** (or Juan named Stage 5 waiver) → Stage 6 re-QA (product round++) |
+| Open environment P0 / `BLOCKED_ENV` | Env retry budget; not product PASS |
+| Gate-blocking process / integrity / coaching / stub | Invalid run; blocking process; repair budget then escalate |
+| Incomplete / non-admissible | Re-ask within parse_repair / invalid budgets; not product round burn until admissible |
+| **agent-green** or Juan **WAIVED** + artifact | **pipeline-continue** → Stage 7 (record `qa_pass_revision`) — **only** Stage 7 entry path |
+| After **3rd** full product QA round still open product P0 | `EXHAUSTED` → stop; escalate Juan |
+| Any **product-tree** write after pipeline-continue | **Invalidate** Stage 6 for that revision; Stage 5 if product changed → Stage 6 re-QA required |
+
+**Hard rules:**
+
+- Cap **3** full product QA rounds (initial + 2 re-QA). Env attempts and parse/invalid re-asks do **not** consume product rounds.
+- Re-QA package shape = **D2 only every round**; QA owns the plan; you check ledger transitions after the run.
+- Re-QA ledger: agent cannot unilaterally clear open rows; `open → fixed` only when you record re-run evidence that the finding is fixed.
+- **No trivial Stage 5 skip** after product changes for QA P0s. Only pure session-ledger bookkeeping (no product tree edit) skips Stage 5.
+- Stage 5 waiver = **Juan-only** with named artifact (same rule as Stage 6 waive).
+- Hard gate = **product P0** (+ gate-blocking process / unwaived env) evaluated on **findings ∪ ledger**. **P1** discretionary; **P2** optional — do not hard-block pipeline on P1/P2 alone.
+- QA `suggested_fix` is advisory for Builder only; QA does not patch product.
+- On pipeline-continue, record `qa_pass_revision` (product stamp from provenance) in the ledger.
+- **Any later product-tree write** (Builder, Sensei-driven craft, retro-driven edit, manual) **voids** Stage 6 pipeline-continue for that revision. Next: Stage 5 if product changed → Stage 6 re-QA **required**. If product rounds already `EXHAUSTED`, escalate Juan rather than ship on stale QA.
+- Stage 7 must not ship craft edits against a prior QA stamp without re-cert.
+- Post-PASS thrash: first invalidation → re-cert cycle allowed; second product-edit cycle after re-cert ⇒ Juan acknowledgment before further Sensei↔QA loops.
+
+#### Terminal non-success (no pipeline-continue)
+
+| State | Action |
+| --- | --- |
+| FAIL + open product P0 | Fix loop if product rounds remain |
+| BLOCKED_ENV | Env path / Juan |
+| EXHAUSTED | Stop; escalate Juan |
+| Integrity / coaching / stub / schema incomplete after repair budget | Invalid run; blocking process |
+| Incomplete fields after parse_repair budget | FAIL process / non-admissible |
+
+### Stage 7 — Final Sensei pass
+
+- **Single entry path:** enter **only** after Stage 6 **pipeline-continue** on the **same product revision** (`qa_pass_revision` still valid). Pipeline-continue already covers both agent-green and Juan **WAIVED** + named artifact (waive ≠ agent-green). There is **no** second limb that admits Stage 7 from a bare ledger waive row without pipeline-continue semantics.
+- If a whole-stage skip of Stage 6 is ever allowed: require the **same** Juan artifact shape (who, named P0 ids / stage, reason, timestamp), record it under pipeline-continue / ledger as **waive ≠ agent-green**, and treat that recording as the pipeline-continue credential — **never** a silent Stage 7 entry.
 - Same Sensei thread if available; otherwise a Sensei pass with full latest package.
 - Sensei still does **not** read files outside the change scope provided as text/diff summary by the orchestrator.
 - Apply or schedule any P0 bar-raising fixes before retro.
+- **Any product-tree craft edit voids Stage 6** — return to Stage 5 (if product changed) → Stage 6 re-QA before claiming ship-ready. Do not thrash Sensei↔QA without Juan ack after the first re-cert cycle.
 
-### Stage 7 — Retrospective / curation (critical)
+### Stage 8 — Retrospective / curation (critical)
 
 - Orchestrator leads; optionally spawn `curator` for structured candidates.
 - Write `retro.md` covering:
@@ -305,8 +481,10 @@ If multiple review-related files exist (e.g. integration log + reviewer + boy-sc
   - What to improve in process, agents, or project guidance
   - What we would change next time
   - Correctness risks still open
+  - Stage 6 outcome (agent-green / WAIVED / residual P1–P2 / env notes)
 - This stage is **not** optional decoration. Raise the bar; no shortcuts.
 - Curator output remains candidates until a human accepts persistence.
+- Product edits during retro **invalidate** Stage 6 the same as any other post-QA product write.
 
 ## Anticipatory feedback (enforce on reviewers)
 
@@ -317,4 +495,4 @@ When Sensei, Advisor, or Reviewer return shallow first-pass nits only, send them
 ## Done Means
 
 - `/orchestrate-this`: clear next step or ready to accept.
-- `/e2e`: refine → plan → plan review → build → build review → final Sensei → retro artifacts exist; correctness not traded for convenience.
+- `/e2e`: refine → plan → plan review → build → build review → **black-box QA (agent-green or Juan WAIVED + artifact)** → final Sensei → retro artifacts exist; correctness not traded for convenience; Stage 6 not skipped for suites-green or delivery speed.

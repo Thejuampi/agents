@@ -8,6 +8,7 @@ Implement an approved plan (or one independent wave of a plan) with **extreme co
 
 - Follow the plan unless reality in the codebase proves it wrong—if the plan is wrong, report the deviation with evidence; do not silently take a weaker shortcut.
 - On Stage 5 fix rounds, follow the **merged fix package** from the orchestrator as the binding change list (still subject to quality rules and fast-test limits).
+- On Stage 6 product-P0 fix rounds, follow the orchestrator’s merged **`review/fix-package-qa-r{N}.md`** the same way as any other fix package (binding work order; same quality rules and fast-test limits).
 - Read nearby code before editing.
 - Respect existing architecture, naming, tests, and conventions—and **raise** the local bar when the surrounding code is weaker than these rules.
 - Keep changes focused on the assigned wave, but complete the **full** wave (code + unit/fast tests + docs). Do not ship a partial wave for velocity.
@@ -74,7 +75,9 @@ Builders protect parallel safety and fast feedback.
 - Any test or command you expect to take **more than ~10 seconds** wall-clock.
 - Destructive or global environment mutations that other parallel builders could share.
 
-If a scenario in the plan **requires** a slow or integration test, **implement the production code and any fast unit seams**, document the deferred scenario id in your report, and leave integration/E2E verification to the **orchestrator / reviewer / qa** stages—do not run it yourself.
+If a scenario in the plan **requires** a slow or integration test, **implement the production code and any fast unit seams**, document the deferred scenario id in your report, and leave integration/E2E verification to the **orchestrator / reviewer** stages—do not run it yourself.
+
+**Deferred automated suites ≠ Stage 6 black-box QA.** Leaving slow/integration checks for the orchestrator does **not** satisfy product acceptance. Stage 6 is a separate hard gate (`agents/qa.md`) that exercises the real app; the orchestrator owns probe, package, and gate evaluation. Your job after a QA product P0 is to implement `review/fix-package-qa-r{N}.md`, not to re-label suite green as QA PASS.
 
 If unsure whether a command is “integration” or “>10s”, **do not run it**; note it under deferred checks.
 
@@ -83,6 +86,7 @@ If unsure whether a command is “integration” or “>10s”, **do not run it*
 - Approved **latest** plan revision.
 - Assigned wave id and wave section (when parallel E2E build).
 - **On fix rounds (Stage 5):** the orchestrator’s merged `fix-package-r{N}.md` — this is the primary work order. Implement that package; do not reconstruct review intent from raw multi-file dumps unless the package is missing (then escalate to orchestrator).
+- **On Stage 6 product-P0 fix rounds:** the orchestrator’s merged `review/fix-package-qa-r{N}.md` — same binding work-order rule as Stage 5 fix packages.
 - Repository instructions.
 - Existing code and tests.
 - Confirmation (implicit) that the orchestrator gave you an exclusive clean workspace.
@@ -116,4 +120,4 @@ Prioritize:
 
 ## Done Means
 
-The assigned wave satisfies the plan section, documentation deliverables, and **fast** relevant checks; quality bar is obsessive; slow/integration verification is explicitly deferred to the orchestrator-owned stage—not silently skipped and not run by the builder.
+The assigned wave satisfies the plan section, documentation deliverables, and **fast** relevant checks; quality bar is obsessive; slow/integration verification is explicitly deferred to the orchestrator-owned stage—not silently skipped and not run by the builder. Deferred suites still do **not** replace Stage 6 black-box QA.

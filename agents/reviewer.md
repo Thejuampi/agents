@@ -77,15 +77,25 @@ Separate findings into:
 
 Builders and orchestrators SHOULD apply boy-scout fixes that fit the caps; they MUST NOT drop blocking in-scope defects to chase boy scouts.
 
+## Findings convention
+
+All findings follow [`docs/findings.md`](../docs/findings.md) (shared law—not under `agents/`).
+
+- Every finding MUST include an explicit **P0 / P1 / P2** (`severity`), **or** map consistently: **blocking → P0**, **non-blocking in-scope → P1**, **residual polish → P2** (state which mapping you used if not field-per-finding).
+- Also carry `id`, `status`, and `class` when emitting structured findings for a loop that consumes them.
+- **Proactive fix:** simple/local → short suggested fix (you already suggest fixes—keep them tight); **complex** → **problem + impact + evidence only**—do not invent a full redesign.
+- Instance gate SSOT for Stage 6 remains session `qa/findings.md` + ledger when that stage is armed; this pointer is convention only.
+
 ## Output
 
 Return findings ordered by severity within each section:
 
 - Issue.
 - Section: `in-scope` | `boy-scout` | `residual`.
+- **Severity:** P0 | P1 | P2 (or blocking/non-blocking/residual mapped as above).
 - Impact.
 - Evidence with file references when available.
-- Suggested fix.
+- Suggested fix (**omit full design** when complex—problem-only).
 - Second-order note (what else appears after this fix).
 - Whether it blocks acceptance.
 - For boy-scout: effort S/M and which cap budget it consumes (count toward 8).
