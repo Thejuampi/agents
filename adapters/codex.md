@@ -68,3 +68,16 @@ Black-box QA is E2E **Stage 6**. Codex must either:
 ## DRY Rule
 
 The canonical prompt stays in `agents/*.md`. Codex-specific TOML files are adapters only.
+
+## Resume / session continuity
+
+| Field | Value |
+| --- | --- |
+| **Spawn path** | Orchestrator (main Codex session running `$e2e` / skill) spawns leaf **custom agents** from `~/.codex/agents/*.toml` or project `.codex/agents/*.toml` (generated from `agents/*.md`). Skills under `~/.agents/skills/` invoke those agents. |
+| **`resume_supported`** | **`false`** |
+| **Why** | Codex custom-agent spawn is documented for one-shot / new agent runs. This playbook does **not** document a stable API to resume a prior agent session by id. Do **not** invent one. |
+| **`session_ref`** | Unknown unless Codex surfaces a run id in your version; if visible, record it; else `none`. |
+| **Dead session** | Assume dead when a new agent invocation is required and no live resume handle exists. |
+| **When resume unsupported** | **`reconstituted`** per Global Continuity checklist (prior packages on disk) or **`cold_start_waived`** / **BLOCK**. Never silent cold start on a `depends_on` / Stage 5 edge. |
+
+Continuity law is orchestrator-owned; this section is harness honesty only.

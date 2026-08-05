@@ -70,3 +70,16 @@ The canonical prompt stays in `agents/*.md`.
 
 OpenCode-specific files are adapters only. The generated `.opencode/` files point
 at the canonical files; they never duplicate their content.
+
+## Resume / session continuity
+
+| Field | Value |
+| --- | --- |
+| **Spawn path** | OpenCode loads agents via generated `.opencode/opencode.json` entries that `{file:…}`-reference `agents/*.md`. Commands under `.opencode/commands/` reference `commands/*.md`. Orchestrator work is the main chat acting as orchestrator; leaves are OpenCode agents selected by name. |
+| **`resume_supported`** | **`false`** |
+| **Why** | No playbook-documented OpenCode API resumes a prior leaf agent session by id. Config is loaded at startup; agent prompts are re-inlined from files. Do **not** invent a resume API. |
+| **`session_ref`** | Unsupported / `none` unless a future OpenCode version exposes a documented handle (then update this adapter with evidence). |
+| **Dead session** | Treat every new agent selection as a new leaf unless the **same main chat** still holds context (main-thread continuity ≠ leaf resume). |
+| **When resume unsupported** | **`reconstituted`** from session artifacts under `.agents/workspace/tmp/e2e/<slug>/` when checklist green; else **`cold_start_waived`** or **BLOCK**. Silent cold start on dependent edges is forbidden. |
+
+See `agents/orchestrator.md` **Global Continuity**.

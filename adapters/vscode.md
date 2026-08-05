@@ -33,3 +33,16 @@ Re-running `sync-vscode` refreshes them from `agents/` and `commands/`. The cano
 ## DRY Rule
 
 The canonical prompt stays in `agents/*.md` and `commands/*.md`. VS Code-specific files are adapters only.
+
+## Resume / session continuity
+
+| Field | Value |
+| --- | --- |
+| **Spawn path** | Copilot/VS Code has **no native multi-agent Continuity surface**. Install maps `commands/*.md` → `.github/prompts/*.prompt.md` and `agents/*.md` → `.github/instructions/*.instructions.md`. “Spawning” a specialist is user/orchestrator-driven prompt selection, not a subagent runtime. |
+| **`resume_supported`** | **`false`** |
+| **Why** | There is no documented Copilot API to resume a prior specialist session by id. Role instructions are path-scoped context injection, not live agent chains. Do **not** invent resume APIs. |
+| **`session_ref`** | Unsupported / `none`. Chat thread ids (if any) are product-internal and not playbook Continuity roots unless promoted and recorded by the human/orchestrator. |
+| **Dead session** | Always treat a new chat/prompt invocation as a new leaf unless the operator re-attaches prior packages manually. |
+| **When resume unsupported** | **`reconstituted`** from e2e session artifacts on disk (checklist green) or **`cold_start_waived`** / **BLOCK**. Silent cold start on dependent edges is forbidden. |
+
+See `agents/orchestrator.md` **Global Continuity**. This adapter is best-effort for Continuity: prefer process reconstitution over claiming harness resume.

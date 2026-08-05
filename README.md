@@ -49,10 +49,10 @@ flowchart TB
     direction TB
     S0["0 · Session<br/>slug + artifact dir"]
     S1["1 · Refine<br/>refiner · max 8 questions · no repo reads"]
-    S2["2 · Plan<br/>planner → plan.v0.md<br/>independent waves · BDD · docs"]
-    S3["3 · Plan review<br/>P0 hard · 1–5 full · 6+ delta"]
-    S4["4 · Build<br/>≤3 builders · isolation owned here"]
-    S5["5 · Implementation review loop<br/>max 5 iterations"]
+    S2["2 · Plan<br/>planner → plan.v0.md<br/>depends_on modes · BDD · docs"]
+    S3["3 · Plan review<br/>P0 hard · 1–5 full · 6+ delta · same Sensei∥Advisor"]
+    S4["4 · Build<br/>topo · ≤3 Independent · Continuity + isolation · base SHA"]
+    S5["5 · Implementation review<br/>same Reviewer · resume builder chains"]
     S6["6 · Black-box QA<br/>probe · D2 package · P0 hard gate"]
     S7["7 · Final Sensei"]
     S8["8 · Retro / curation"]
@@ -82,7 +82,7 @@ flowchart TB
     direction LR
     RV["Reviewer<br/>same thread"]
     MERGE["Orchestrator merges<br/>fix-package-rN.md"]
-    BL["Builder implements<br/>merged package"]
+    BL["Builder resumes chain<br/>implements fix-package"]
     RV --> MERGE --> BL
   end
 
@@ -110,15 +110,21 @@ flowchart TB
 
 | Stage | Who runs | Output | Notes |
 | --- | --- | --- | --- |
-| **0 Session** | Orchestrator | `.agents/workspace/tmp/e2e/<slug>/` | One session root |
+| **0 Session** | Orchestrator | `.agents/workspace/tmp/e2e/<slug>/` | One session root · open `session-registry.md` |
 | **1 Refine** | `refiner` | `refine.md` | Max 8 questions · P0/P1/… · **no file reads** |
-| **2 Plan** | `planner` | `plan.v0.md` | Waves must be **parallel-safe** · BDD tables · **docs are deliverables** |
-| **3 Plan review** | `sensei` ∥ `advisor` | `plan.v1…vN.md` + `plan-review/*` | **P0 must fix**; iters 1–5 full; **6+ delta-only / no boy scout**; P1+ one pre-build sweep; **LESSONS-LEARNED** + predicted P0s; orchestrator applies revisions |
-| **4 Build** | `builder` × waves | `build/wave-*.md` | Max **3** concurrent · mid-tier model if available · **fast tests only (≤~10s)** · orchestrator owns isolation · **dispatch checklist + exact base SHA** · prefer **manual worktrees with commit** off default branch (harness `isolation: worktree` often births from `main`) · builder **STEP 0** verifies SHA |
-| **5 Code review** | `reviewer` → **orchestrator merge** → `builder` | `review/reviewer-rN.md` + **`review/fix-package-rN.md`** | Merge all review artifacts **before** builders fix · same reviewer thread · also used after Stage 6 product P0 fixes |
-| **6 Black-box QA** | Orchestrator probe → `qa` → orchestrator gate | `qa/plan.md`, `qa/findings.md`, `qa/p0-ledger.md`, `qa/probe.md`, `qa/provenance.md` | After Stage 5 **approve** (or Juan named Stage 5 waiver) · D2 package only · **copy-only** persist · **agent-green** vs **pipeline-continue** · product P0 → `fix-package-qa-rN` → Builder → Stage 5 → re-QA · cap 3 product rounds · P0 hard; P1 discretionary; P2 optional · suites ≠ Stage 6 · law: [`docs/findings.md`](docs/findings.md) · role: [`agents/qa.md`](agents/qa.md) |
-| **7 Final Sensei** | `sensei` | `sensei-final.md` | Same product revision Stage 6 certified · product edits invalidate QA |
+| **2 Plan** | `planner` | `plan.v0.md` | Every wave has **`depends_on`** · **Independent** (`[]`) and/or **Serial** (non-empty) · BDD · **docs are deliverables** |
+| **3 Plan review** | `sensei` ∥ `advisor` | `plan.v1…vN.md` + `plan-review/*` | **P0 must fix**; iters 1–5 full; **6+ delta-only / no boy scout**; P1+ one pre-build sweep; **LESSONS-LEARNED** + predicted P0s; **same Sensei∥Advisor chains**; orchestrator applies revisions |
+| **4 Build** | `builder` × waves | `build/wave-*.md` | **Topo schedule** · max **3** concurrent **Independent** · Serial = `same_session` resume · mid-tier · **fast tests only (≤~10s)** · Continuity **⊥** isolation · **dispatch checklist + exact base SHA** · prefer **manual worktrees with commit** off default branch (harness `isolation: worktree` often births from `main`) · builder **STEP 0** verifies SHA |
+| **5 Code review** | `reviewer` → **orchestrator merge** → `builder` | `review/reviewer-rN.md` + **`review/fix-package-rN.md`** | Merge **before** builders fix · **same Reviewer thread** · **MUST resume original builder chain** per owner · also used after Stage 6 product P0 fixes |
+| **6 Black-box QA** | Orchestrator probe → `qa` → orchestrator gate | `qa/plan.md`, `qa/findings.md`, `qa/p0-ledger.md`, `qa/probe.md`, `qa/provenance.md` | After Stage 5 **approve** (or Juan named Stage 5 waiver) · D2 package only · **copy-only** persist · **agent-green** vs **pipeline-continue** · product P0 → `fix-package-qa-rN` → Builder (resume chain) → Stage 5 → re-QA · cap 3 product rounds · P0 hard; P1 discretionary; P2 optional · suites ≠ Stage 6 · law: [`docs/findings.md`](docs/findings.md) · role: [`agents/qa.md`](agents/qa.md) · prefer same QA chain (Continuity) |
+| **7 Final Sensei** | `sensei` | `sensei-final.md` | Same product revision Stage 6 certified · prefer same Sensei chain · product edits invalidate QA |
 | **8 Retro** | Orchestrator (+ optional `curator`) | `retro.md` | Critical stage — raise the bar, no shortcuts |
+
+### Continuity (cross-stage)
+
+When task B depends on A, **reuse the same role-session** (resume when the harness can; else structured **reconstitute**). Closed outcomes: `resumed` \| `reconstituted` \| `cold_start_waived` \| else **BLOCK**. **Silent cold start is forbidden.** Registry: `session-registry.md`. Full law: [`agents/orchestrator.md`](agents/orchestrator.md) **Global Continuity**.
+
+**Continuity ⊥ isolation:** workspace isolation (worktrees, exclusive trees) does not create or erase Continuity chains; resume never skips STEP 0 / `expected_base_sha`.
 
 ### Identity rules (hard)
 
@@ -151,6 +157,7 @@ flowchart TB
 │   ├── advisor-r1.md …
 │   ├── p0-ledger.md
 │   └── LESSONS-LEARNED.md
+├── session-registry.md       # Continuity rows (orchestrator-owned)
 ├── build/
 │   └── wave-*-report.md
 ├── review/
@@ -191,7 +198,7 @@ Always pass **latest** plan revision downstream. Stale `plan.v{k}` after `plan.v
 | **planner** | Read-only exploration → decision-complete plan (waves, BDD, docs) — **v0 only** |
 | **sensei** | Cross-project bar-raiser; no file reads; anticipatory multi-pass; **predicted future P0s** |
 | **advisor** | Project history & **docs only**; P0-hard say-no; **predicted future P0s** from failure catalog |
-| **builder** | Obsessive quality (SOLID / KISS / DRY / YAGNI…); fast unit tests only; accepts Stage 5 **and** Stage 6 `fix-package-qa-rN` work orders |
+| **builder** | Obsessive quality (SOLID / KISS / DRY / YAGNI…); fast unit tests only; reports `continuity_mode`; accepts Stage 5 **and** Stage 6 `fix-package-qa-rN` work orders |
 | **reviewer** | Design + tests + boy-scout (capped); anticipatory multi-pass |
 | **qa** | Stage 6 black-box product acceptance (docs + live app; no product source oracle); findings-only; law in [`docs/findings.md`](docs/findings.md) |
 | **curator** | Session learnings as **candidates** only (no auto-persist) |
