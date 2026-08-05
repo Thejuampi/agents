@@ -56,6 +56,15 @@ Derived per agent in `install/codex.ps1` (`Get-CodexSandboxMode`):
 
 Edit that table to tune. Subagents inherit the parent session's sandbox unless overridden in the agent file.
 
+### Stage 6 `qa` eligibility (hard)
+
+Black-box QA is E2E **Stage 6**. Codex must either:
+
+1. **Enforce a write allowlist** so QA cannot mutate the product tree (session `qa/` + evidence temp only), **or**
+2. Mark the runner **`stage6_unsupported` / `BLOCKED_ENV`** for that session — do **not** treat “unsandboxable residual” as an acceptable PASS path.
+
+`workspace-write` for `qa` is **not** a license to patch product source. Product fixes go through Builder via `review/fix-package-qa-r{N}.md`. Docs read is allowed; product-source oracle is policy-forbidden (`agents/qa.md`). Prefer degraded-mode source-citation detect when path deny is inexpressible.
+
 ## DRY Rule
 
 The canonical prompt stays in `agents/*.md`. Codex-specific TOML files are adapters only.

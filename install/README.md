@@ -85,3 +85,23 @@ The manifest is gitignored.
 5. Document the harness setup in `adapters/<harness>.md`.
 
 Keep harness-specific metadata (e.g. opencode `mode`/`permission`, codex `sandbox_mode`) in the installer or a sidecar data file, never in `agents/*.md`. The canonical agent files stay harness-agnostic.
+
+## Stage 6 QA permissions / eligibility
+
+Black-box QA (`agents/qa.md`) is armed as E2E **Stage 6** after Wave-2. Installer metadata must match the path-class intent:
+
+| Harness | Docs read | Product write | Bash / app | Notes |
+| --- | --- | --- | --- | --- |
+| **OpenCode** (`Get-OpenCodeAgentMeta` → `qa`) | **allow** (no `read = 'deny'`) | `edit = 'deny'` | `bash = 'allow'` | Docs must be readable. Product-source path deny is policy in `agents/qa.md` when the harness cannot express path-class deny (degraded + source-citation detect). |
+| **Claude** (`Get-ClaudeAgentFrontmatter` → `qa`) | `tools: Bash, Read, Grep, Glob` | `disallowedTools: Write, Edit, NotebookEdit` | Bash allowed | Orchestrator copy-only persists `qa/*`. |
+| **Codex** | sandbox | intentional product write deny | yes | Stage 6 requires **enforce write allowlist** for the product tree **or** mark the runner `stage6_unsupported` / `BLOCKED_ENV`. Do not document “unsandboxable residual = OK.” |
+| **Grok / VS Code** | policy in `agents/qa.md` | policy forbid | policy | No native path deny → degraded mode + citation detect. |
+
+**Eligibility matrix labels** (orchestrator / adapters): `enforce_path_deny` \| `degraded` \| `stage6_unsupported`.
+
+After changing `install/common.ps1` agent meta, operators must re-sync and **restart** the harness (config is load-once):
+
+```pwsh
+make sync-personal      # Claude + Grok + Codex personal
+make sync-opencode      # in-repo OpenCode references
+```

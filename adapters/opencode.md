@@ -29,6 +29,18 @@ the generated file directly, since `sync-opencode` overwrites it.
 
 Restart OpenCode after install or sync — config is loaded once at startup.
 
+### Stage 6 `qa` permissions
+
+`Get-OpenCodeAgentMeta` for `qa` (in `install/common.ps1`):
+
+| Permission | Value | Why |
+| --- | --- | --- |
+| `edit` | `deny` | Product tree write forbidden; Orchestrator copy-only persists `qa/*` |
+| `bash` | `allow` | CLI / app / attach probe |
+| `read` | **not denied** | Docs and operator runbooks must be readable for black-box planning |
+
+There is **no** `read = 'deny'` on QA. Product-source path deny is policy in `agents/qa.md` (degraded + source-citation process fail when the harness cannot express path-class deny). Eligibility: prefer path deny when OpenCode supports it; else `degraded`.
+
 The generated config does not add `AGENTS.md` to `instructions`: OpenCode already
 loads `AGENTS.md` as project rules, and listing it again would duplicate context.
 

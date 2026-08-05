@@ -55,3 +55,5 @@ $e2e
 | **When resume fails** | Outcome is **`reconstituted`** (checklist green) or **`cold_start_waived`** / **BLOCK** — never label reconstituted work as `resumed`. |
 
 Orchestrator still owns Continuity law (`agents/orchestrator.md`); this adapter only states harness honesty.
+
+Stage 6 black-box QA (`qa`) has no native path deny on Grok — follow `agents/qa.md` policy (docs OK, product source not an oracle) and orchestrator degraded-mode integrity.

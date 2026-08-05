@@ -48,6 +48,7 @@ Decompose work into **waves**. Rules:
 - **Hidden coupling remains forbidden.** Do not claim Independent when build/test/docs require another incomplete wave. If a true serial edge exists, declare it in `depends_on`—do not fake independence.
 - Prefer Independent decomposition when it is honest; use Serial chains when correctness requires ordered ownership (and expect session continuity on those edges).
 - Cap concurrent Independent width at 3 for build scheduling; you may define more Independent waves (orchestrator serializes beyond 3). Serial waves are scheduled topologically, not in parallel with open predecessors.
+- If a predecessor “must be **merged**” before the next wave, say so in `depends_on` **and** the Dependencies binding prose (exact base SHA for orchestrator STEP 0)—never hide order only in narrative.
 
 For each wave include:
 
@@ -58,10 +59,32 @@ For each wave include:
 | Scope | Modules / surfaces touched |
 | Tasks | Medium-sized outcome tasks (see Task Quality) |
 | `depends_on` | **Required** array of wave ids. `[]` = Independent claim; `[wave-N, …]` = Serial predecessors. External/repo facts may be noted in prose, not as a substitute for this field. |
-| Continuity | Optional: `same_session` \| `new_session` (Serial default is `same_session`; `new_session` needs a reason). Independent roots are new chains unless soft-preferring the same builder. |
+| Continuity | Optional: `same_session` / `new_session` (Serial default is `same_session`; `new_session` needs a reason). Independent roots are new chains unless soft-preferring the same builder. |
+| Dependencies | **Binding dispatch law** for the orchestrator (see below)—maps to exact base commit / merge requirements for STEP 0 |
 | Documentation deliverables | Paths / doc updates **required** (never “optional”) |
 | Test methodology | See below |
 | Done when | Observable completion criteria |
+
+#### Dependencies field (binding)
+
+The orchestrator resolves this row to an **exact base commit** before spawning a builder. Write it so skimming cannot drop it.
+
+| Form | When | Example content |
+| --- | --- | --- |
+| **`none` (parallel-safe)** | Wave builds on session/repo tip with no sibling wave required | `none — parallel-safe with wave-1, wave-3` |
+| **Predecessor merged** | Wave must stand on integration of an earlier wave/round | `wave-1 must be **merged** into integration branch before dispatch; base = post-merge SHA (not wave-1 worktree tip alone)` |
+| **External only** | Needs a tag, fixture set, or published contract already on the base | `requires fixture set X already on base branch` |
+
+**MUST:**
+
+- Put merge / order constraints in this **Dependencies** cell **and** restate one line at the top of the wave section if the constraint is load-bearing.
+- Use the word **merged** (or equivalent integration) when “delivered in another worktree” is insufficient.
+- Prefer one serial wave over fake-independent waves that will corrupt each other’s function shapes on merge.
+
+**MUST NOT:**
+
+- Leave “Round N first” only in narrative paragraphs while Dependencies says `none`.
+- Assume the orchestrator will infer order from wave numbers alone.
 
 ### 3. Task Quality
 

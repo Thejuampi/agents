@@ -51,10 +51,11 @@ flowchart TB
     S1["1 · Refine<br/>refiner · max 8 questions · no repo reads"]
     S2["2 · Plan<br/>planner → plan.v0.md<br/>depends_on modes · BDD · docs"]
     S3["3 · Plan review<br/>P0 hard · 1–5 full · 6+ delta · same Sensei∥Advisor"]
-    S4["4 · Build<br/>topo · ≤3 Independent · Continuity + isolation"]
+    S4["4 · Build<br/>topo · ≤3 Independent · Continuity + isolation · base SHA"]
     S5["5 · Implementation review<br/>same Reviewer · resume builder chains"]
-    S6["6 · Final Sensei"]
-    S7["7 · Retro / curation"]
+    S6["6 · Black-box QA<br/>probe · D2 package · P0 hard gate"]
+    S7["7 · Final Sensei"]
+    S8["8 · Retro / curation"]
 
     S0 --> S1 --> S2 --> S3
     S3 -->|P0-clean or dual approve| S4
@@ -62,7 +63,10 @@ flowchart TB
     S4 --> S5
     S5 -->|approve| S6
     S5 -->|revise| S5
-    S6 --> S7
+    S6 -->|pipeline-continue| S7
+    S6 -->|product P0| BL_QA
+    BL_QA["Builder<br/>fix-package-qa-rN"] --> S5
+    S7 --> S8
   end
 
   subgraph PLAN_REV["Stage 3 · per iteration"]
@@ -82,15 +86,24 @@ flowchart TB
     RV --> MERGE --> BL
   end
 
+  subgraph QA_GATE["Stage 6 · black-box"]
+    direction LR
+    PROBE["Orchestrator<br/>pre-probe + package linter"]
+    QA["QA leaf<br/>own plan · findings"]
+    ORC_Q["Orchestrator<br/>copy-only persist · ingest<br/>agent-green = findings∪ledger"]
+    PROBE --> QA --> ORC_Q
+  end
+
   S3 -.-> PLAN_REV
   S5 -.-> CODE_REV
+  S6 -.-> QA_GATE
 
   classDef brain fill:#1a1a2e,stroke:#e94560,color:#eee
   classDef leaf fill:#16213e,stroke:#0f3460,color:#eee
   classDef gate fill:#0f3460,stroke:#e94560,color:#eee
   class MAIN brain
-  class SE,AD,RV,BL leaf
-  class ORC_P,MERGE gate
+  class SE,AD,RV,BL,BL_QA,QA leaf
+  class ORC_P,MERGE,PROBE,ORC_Q gate
 ```
 
 ### Stage map
@@ -101,10 +114,11 @@ flowchart TB
 | **1 Refine** | `refiner` | `refine.md` | Max 8 questions · P0/P1/… · **no file reads** |
 | **2 Plan** | `planner` | `plan.v0.md` | Every wave has **`depends_on`** · **Independent** (`[]`) and/or **Serial** (non-empty) · BDD · **docs are deliverables** |
 | **3 Plan review** | `sensei` ∥ `advisor` | `plan.v1…vN.md` + `plan-review/*` | **P0 must fix**; iters 1–5 full; **6+ delta-only / no boy scout**; P1+ one pre-build sweep; **LESSONS-LEARNED** + predicted P0s; **same Sensei∥Advisor chains**; orchestrator applies revisions |
-| **4 Build** | `builder` × waves | `build/wave-*.md` | **Topo schedule** · max **3** concurrent **Independent** · Serial = `same_session` resume · mid-tier · **fast tests only (≤~10s)** · Continuity **⊥** isolation (both orchestrator-owned) |
-| **5 Code review** | `reviewer` → **orchestrator merge** → `builder` | `review/reviewer-rN.md` + **`review/fix-package-rN.md`** | Merge **before** builders fix · **same Reviewer thread** · **MUST resume original builder chain** per owner |
-| **6 Final Sensei** | `sensei` | `sensei-final.md` | Prefer same Sensei chain · no out-of-scope file thrashing |
-| **7 Retro** | Orchestrator (+ optional `curator`) | `retro.md` | Critical stage — raise the bar, no shortcuts |
+| **4 Build** | `builder` × waves | `build/wave-*.md` | **Topo schedule** · max **3** concurrent **Independent** · Serial = `same_session` resume · mid-tier · **fast tests only (≤~10s)** · Continuity **⊥** isolation · **dispatch checklist + exact base SHA** · prefer **manual worktrees with commit** off default branch (harness `isolation: worktree` often births from `main`) · builder **STEP 0** verifies SHA |
+| **5 Code review** | `reviewer` → **orchestrator merge** → `builder` | `review/reviewer-rN.md` + **`review/fix-package-rN.md`** | Merge **before** builders fix · **same Reviewer thread** · **MUST resume original builder chain** per owner · also used after Stage 6 product P0 fixes |
+| **6 Black-box QA** | Orchestrator probe → `qa` → orchestrator gate | `qa/plan.md`, `qa/findings.md`, `qa/p0-ledger.md`, `qa/probe.md`, `qa/provenance.md` | After Stage 5 **approve** (or Juan named Stage 5 waiver) · D2 package only · **copy-only** persist · **agent-green** vs **pipeline-continue** · product P0 → `fix-package-qa-rN` → Builder (resume chain) → Stage 5 → re-QA · cap 3 product rounds · P0 hard; P1 discretionary; P2 optional · suites ≠ Stage 6 · law: [`docs/findings.md`](docs/findings.md) · role: [`agents/qa.md`](agents/qa.md) · prefer same QA chain (Continuity) |
+| **7 Final Sensei** | `sensei` | `sensei-final.md` | Same product revision Stage 6 certified · prefer same Sensei chain · product edits invalidate QA |
+| **8 Retro** | Orchestrator (+ optional `curator`) | `retro.md` | Critical stage — raise the bar, no shortcuts |
 
 ### Continuity (cross-stage)
 
@@ -147,8 +161,15 @@ When task B depends on A, **reuse the same role-session** (resume when the harne
 ├── build/
 │   └── wave-*-report.md
 ├── review/
-│   ├── reviewer-r1.md …      # raw review
-│   └── fix-package-r1.md …   # orchestrator-merged work order for builders
+│   ├── reviewer-r1.md …         # raw review
+│   ├── fix-package-r1.md …      # orchestrator-merged work order (Stage 5)
+│   └── fix-package-qa-r1.md …   # orchestrator-merged product fixes from Stage 6
+├── qa/
+│   ├── plan.md                  # QA-authored (orchestrator copy-only)
+│   ├── findings.md              # findings + verdict (copy-only)
+│   ├── p0-ledger.md             # orchestrator-owned
+│   ├── probe.md                 # orchestrator readiness probe
+│   └── provenance.md            # session / round / agent / product revision
 ├── sensei-final.md
 └── retro.md
 ```
@@ -177,9 +198,9 @@ Always pass **latest** plan revision downstream. Stale `plan.v{k}` after `plan.v
 | **planner** | Read-only exploration → decision-complete plan (waves, BDD, docs) — **v0 only** |
 | **sensei** | Cross-project bar-raiser; no file reads; anticipatory multi-pass; **predicted future P0s** |
 | **advisor** | Project history & **docs only**; P0-hard say-no; **predicted future P0s** from failure catalog |
-| **builder** | Obsessive quality (SOLID / KISS / DRY / YAGNI…); fast unit tests only; reports `continuity_mode` |
+| **builder** | Obsessive quality (SOLID / KISS / DRY / YAGNI…); fast unit tests only; reports `continuity_mode`; accepts Stage 5 **and** Stage 6 `fix-package-qa-rN` work orders |
 | **reviewer** | Design + tests + boy-scout (capped); anticipatory multi-pass |
-| **qa** | Black-box end-user validation without reading source |
+| **qa** | Stage 6 black-box product acceptance (docs + live app; no product source oracle); findings-only; law in [`docs/findings.md`](docs/findings.md) |
 | **curator** | Session learnings as **candidates** only (no auto-persist) |
 
 Canonical definitions: [`agents/`](agents/).
@@ -275,10 +296,12 @@ See [`AGENTS.md`](AGENTS.md).
           ├─► planner ──► plan.v0
           ├─► sensei ─┐
           ├─► advisor ┴─► orchestrator writes plan.vN+
-          ├─► builder  (waves / fix-package)
+          ├─► builder  (waves / fix-package / fix-package-qa)
           ├─► reviewer ─► orchestrator merges fix-package ─► builder
-          ├─► sensei (final)
-          └─► curator (optional candidates)
+          ├─► qa ─► orchestrator probe + D2 package + copy-only gate
+          │         (Stage 6 hard; product P0 → builder → Stage 5 → re-QA)
+          ├─► sensei (final, Stage 7 — same revision QA certified)
+          └─► curator (optional candidates; Stage 8 retro)
 ```
 
-Craft first. Nested brains last (never). Correctness over convenience — always.
+Craft first. Nested brains last (never). Correctness over convenience — always. Suites green ≠ Stage 6 black-box QA.

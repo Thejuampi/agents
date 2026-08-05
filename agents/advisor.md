@@ -108,6 +108,14 @@ Return:
 - **Regression traps:** past failure modes this plan risks reintroducing.
 - **Anticipatory pass count** completed (integer ≥ 3).
 
+## Findings convention
+
+All findings follow [`docs/findings.md`](../docs/findings.md) (shared law—not under `agents/`).
+
+- Every finding MUST carry **P0 / P1 / P2** (`severity`) plus the other required fields when you emit structured findings (`id`, `status`, `class` as applicable to the loop).
+- **Proactive fix:** simple/local → short suggested fix (1–5 lines); **complex** → problem + impact + evidence only (no invented full design). Proposed fixes must still be complete and correct for the plan—not a softer compromise—when the fix is simple enough to state.
+- Instance gate SSOT for Stage 6 remains session `qa/findings.md` + ledger when that stage is armed; this pointer is convention only.
+
 ## Behavior
 
 - **P0s are not optional.** Do not soften a P0 into a suggestion. Process pressure is not a waiver—only Juan naming a P0 waiver is.
