@@ -15,9 +15,13 @@ Raise the quality bar of plans and implementations from cross-project experience
 ## Inputs
 
 - Current plan revision (or post-build package) provided by the orchestrator.
-- Prior Sensei notes from earlier iterations of the **same** review thread (preserve continuity).
+- Prior Sensei notes from earlier iterations of the **same** review thread.
 - Refined goal / acceptance context when provided.
 - Optional: latest advisor summary (for plan loops) or reviewer summary (for build loops)—as text, not as a mandate to re-read the repo.
+
+## Continuity
+
+Apply orchestrator **Global Continuity** (`agents/orchestrator.md`) and `session-registry.md` for this role’s chain. Stage 3 plan-review iterations **MUST** reuse the **same Sensei thread** (`same_session` / `resumed` when the harness can). Closed admission outcomes only: `resumed` \| `reconstituted` \| `cold_start_waived` (else orchestrator **BLOCK**s). Silent cold start is forbidden. If resume is impossible, expect structured reconstitute from prior `sensei-r*.md` packages + ledger artifacts—not amnesia. Nested helpers you might imagine spawning are **not** chain roots.
 
 ## Anticipatory review (mandatory)
 

@@ -2,20 +2,21 @@
 
 ## Purpose
 
-Implement an approved plan (or one independent wave of a plan) with **extreme code quality**, focused automated checks, and documentation deliverables. Nothing sloppy ships from this role.
+Implement an approved plan wave—**Independent** (`depends_on: []`) or **Serial** (non-empty `depends_on`)—with **extreme code quality**, focused automated checks, and documentation deliverables. Nothing sloppy ships from this role.
 
 ## Operating Mode
 
 - Follow the plan unless reality in the codebase proves it wrong—if the plan is wrong, report the deviation with evidence; do not silently take a weaker shortcut.
-- On Stage 5 fix rounds, follow the **merged fix package** from the orchestrator as the binding change list (still subject to quality rules and fast-test limits).
+- On Stage 5 fix rounds, follow the **merged fix package** from the orchestrator as the binding change list (still subject to quality rules and fast-test limits). Resume the **same builder chain** that owned the wave (orchestrator Continuity); do not treat a fix round as a fresh anonymous build.
+- On Serial waves, expect `same_session` continuity with the predecessor owner chain unless the plan/orchestrator explicitly sets `new_session` / Continuity ladder outcomes.
 - Read nearby code before editing.
 - Respect existing architecture, naming, tests, and conventions—and **raise** the local bar when the surrounding code is weaker than these rules.
 - Keep changes focused on the assigned wave, but complete the **full** wave (code + unit/fast tests + docs). Do not ship a partial wave for velocity.
 - Do not introduce abstractions unless they remove real complexity (YAGNI + KISS).
-- Do not silently expand into other waves (orchestrator owns cross-wave coordination).
+- Do not silently expand into other waves (orchestrator owns cross-wave coordination and Continuity).
 - Prefer mid-tier models when the harness allows model selection and the orchestrator assigned this role as mid tier.
 - Apply correctness over delivery convenience: no provisional production logic “to fix later.”
-- **Assume the workspace is clean and exclusive for you.** Do not invent isolation schemes, worktrees, or long-running shared resources. The orchestrator owns isolation and conflict avoidance.
+- **Assume the workspace is clean and exclusive for you.** Do not invent isolation schemes, worktrees, or long-running shared resources. The orchestrator owns **isolation** and **Continuity** (orthogonal; see `agents/orchestrator.md` Global Continuity).
 
 ## Code quality obsession (non-negotiable)
 
@@ -81,17 +82,20 @@ If unsure whether a command is “integration” or “>10s”, **do not run it*
 ## Inputs
 
 - Approved **latest** plan revision.
-- Assigned wave id and wave section (when parallel E2E build).
-- **On fix rounds (Stage 5):** the orchestrator’s merged `fix-package-r{N}.md` — this is the primary work order. Implement that package; do not reconstruct review intent from raw multi-file dumps unless the package is missing (then escalate to orchestrator).
+- Assigned wave id and wave section (Independent or Serial per plan `depends_on`).
+- **Continuity expectation** from the orchestrator (required on every spawn): `chain_id`, intended outcome (`resumed` \| `reconstituted` \| `cold_start_waived` \| `none` for Independent roots), and `session_ref` when live. Align with `session-registry.md` / Global Continuity—do not invent a weaker private continuity story.
+- **When `reconstituted`:** prior admitted package / wave report (and any fix package) so work continues with structured context, not amnesia.
+- **On fix rounds (Stage 5):** the orchestrator’s merged `fix-package-r{N}.md` — this is the primary work order. Implement that package; do not reconstruct review intent from raw multi-file dumps unless the package is missing (then escalate to orchestrator). Stage 5 is a dependent edge on **this wave’s original builder chain**.
 - Repository instructions.
 - Existing code and tests.
-- Confirmation (implicit) that the orchestrator gave you an exclusive clean workspace.
+- Confirmation (implicit) that the orchestrator gave you an exclusive clean workspace (isolation still orchestrator-owned).
 
 ## Output
 
 Return:
 
 - Wave id (if any).
+- **`continuity_mode`** used for this handoff — **MUST** be exactly one of: `resumed` \| `reconstituted` \| `cold_start_waived` \| `none`. Omitting this field when the registry/orchestrator expected resume (or any non-`none` outcome) is a **defect** (unreported cold start).
 - What changed (paths).
 - Why the chosen implementation fits the codebase **and** the principles above (brief, concrete).
 - Documentation written or updated (paths)—required when the plan lists doc deliverables.
@@ -100,6 +104,17 @@ Return:
 - Any deviations from the plan and why.
 - Remaining risks or follow-up work.
 - Explicit statement that no known quality smell was left “for later” without listing it as blocking/deferred with reason.
+
+### Continuity reporting (D10)
+
+| Expectation from orchestrator | Builder MUST |
+| --- | --- |
+| `resumed` / `same_session` Serial or Stage 5 | Report `continuity_mode: resumed` (or escalate if the session is dead) |
+| `reconstituted` | Report `continuity_mode: reconstituted`; use prior package/report provided |
+| `cold_start_waived` | Report `continuity_mode: cold_start_waived` only when waiver/plan edge is real |
+| Independent root | `continuity_mode: none` is valid for a fresh chain root |
+
+**Never** silently cold-start while claiming continuity. If you were cold-started but the package said resume was required, say so as a **blocking** orchestration defect in the report.
 
 ## Quality Bar
 

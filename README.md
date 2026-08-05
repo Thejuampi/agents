@@ -49,10 +49,10 @@ flowchart TB
     direction TB
     S0["0 · Session<br/>slug + artifact dir"]
     S1["1 · Refine<br/>refiner · max 8 questions · no repo reads"]
-    S2["2 · Plan<br/>planner → plan.v0.md<br/>independent waves · BDD · docs"]
-    S3["3 · Plan review<br/>P0 hard · 1–5 full · 6+ delta"]
-    S4["4 · Build<br/>≤3 builders · isolation owned here"]
-    S5["5 · Implementation review loop<br/>max 5 iterations"]
+    S2["2 · Plan<br/>planner → plan.v0.md<br/>depends_on modes · BDD · docs"]
+    S3["3 · Plan review<br/>P0 hard · 1–5 full · 6+ delta · same Sensei∥Advisor"]
+    S4["4 · Build<br/>topo · ≤3 Independent · Continuity + isolation"]
+    S5["5 · Implementation review<br/>same Reviewer · resume builder chains"]
     S6["6 · Final Sensei"]
     S7["7 · Retro / curation"]
 
@@ -78,7 +78,7 @@ flowchart TB
     direction LR
     RV["Reviewer<br/>same thread"]
     MERGE["Orchestrator merges<br/>fix-package-rN.md"]
-    BL["Builder implements<br/>merged package"]
+    BL["Builder resumes chain<br/>implements fix-package"]
     RV --> MERGE --> BL
   end
 
@@ -97,14 +97,20 @@ flowchart TB
 
 | Stage | Who runs | Output | Notes |
 | --- | --- | --- | --- |
-| **0 Session** | Orchestrator | `.agents/workspace/tmp/e2e/<slug>/` | One session root |
+| **0 Session** | Orchestrator | `.agents/workspace/tmp/e2e/<slug>/` | One session root · open `session-registry.md` |
 | **1 Refine** | `refiner` | `refine.md` | Max 8 questions · P0/P1/… · **no file reads** |
-| **2 Plan** | `planner` | `plan.v0.md` | Waves must be **parallel-safe** · BDD tables · **docs are deliverables** |
-| **3 Plan review** | `sensei` ∥ `advisor` | `plan.v1…vN.md` + `plan-review/*` | **P0 must fix**; iters 1–5 full; **6+ delta-only / no boy scout**; P1+ one pre-build sweep; **LESSONS-LEARNED** + predicted P0s; orchestrator applies revisions |
-| **4 Build** | `builder` × waves | `build/wave-*.md` | Max **3** concurrent · mid-tier model if available · **fast tests only (≤~10s)** · orchestrator owns isolation / worktrees |
-| **5 Code review** | `reviewer` → **orchestrator merge** → `builder` | `review/reviewer-rN.md` + **`review/fix-package-rN.md`** | Merge all review artifacts **before** builders fix · same reviewer thread |
-| **6 Final Sensei** | `sensei` | `sensei-final.md` | No out-of-scope file thrashing |
+| **2 Plan** | `planner` | `plan.v0.md` | Every wave has **`depends_on`** · **Independent** (`[]`) and/or **Serial** (non-empty) · BDD · **docs are deliverables** |
+| **3 Plan review** | `sensei` ∥ `advisor` | `plan.v1…vN.md` + `plan-review/*` | **P0 must fix**; iters 1–5 full; **6+ delta-only / no boy scout**; P1+ one pre-build sweep; **LESSONS-LEARNED** + predicted P0s; **same Sensei∥Advisor chains**; orchestrator applies revisions |
+| **4 Build** | `builder` × waves | `build/wave-*.md` | **Topo schedule** · max **3** concurrent **Independent** · Serial = `same_session` resume · mid-tier · **fast tests only (≤~10s)** · Continuity **⊥** isolation (both orchestrator-owned) |
+| **5 Code review** | `reviewer` → **orchestrator merge** → `builder` | `review/reviewer-rN.md` + **`review/fix-package-rN.md`** | Merge **before** builders fix · **same Reviewer thread** · **MUST resume original builder chain** per owner |
+| **6 Final Sensei** | `sensei` | `sensei-final.md` | Prefer same Sensei chain · no out-of-scope file thrashing |
 | **7 Retro** | Orchestrator (+ optional `curator`) | `retro.md` | Critical stage — raise the bar, no shortcuts |
+
+### Continuity (cross-stage)
+
+When task B depends on A, **reuse the same role-session** (resume when the harness can; else structured **reconstitute**). Closed outcomes: `resumed` \| `reconstituted` \| `cold_start_waived` \| else **BLOCK**. **Silent cold start is forbidden.** Registry: `session-registry.md`. Full law: [`agents/orchestrator.md`](agents/orchestrator.md) **Global Continuity**.
+
+**Continuity ⊥ isolation:** workspace isolation (worktrees, exclusive trees) does not create or erase Continuity chains; resume never skips STEP 0 / `expected_base_sha`.
 
 ### Identity rules (hard)
 
@@ -137,6 +143,7 @@ flowchart TB
 │   ├── advisor-r1.md …
 │   ├── p0-ledger.md
 │   └── LESSONS-LEARNED.md
+├── session-registry.md       # Continuity rows (orchestrator-owned)
 ├── build/
 │   └── wave-*-report.md
 ├── review/
@@ -170,7 +177,7 @@ Always pass **latest** plan revision downstream. Stale `plan.v{k}` after `plan.v
 | **planner** | Read-only exploration → decision-complete plan (waves, BDD, docs) — **v0 only** |
 | **sensei** | Cross-project bar-raiser; no file reads; anticipatory multi-pass; **predicted future P0s** |
 | **advisor** | Project history & **docs only**; P0-hard say-no; **predicted future P0s** from failure catalog |
-| **builder** | Obsessive quality (SOLID / KISS / DRY / YAGNI…); fast unit tests only |
+| **builder** | Obsessive quality (SOLID / KISS / DRY / YAGNI…); fast unit tests only; reports `continuity_mode` |
 | **reviewer** | Design + tests + boy-scout (capped); anticipatory multi-pass |
 | **qa** | Black-box end-user validation without reading source |
 | **curator** | Session learnings as **candidates** only (no auto-persist) |

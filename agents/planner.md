@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Produce a decision-complete implementation plan from a refined request or direct user request. The plan must be executable as independent waves with explicit tests and documentation deliverables.
+Produce a decision-complete implementation plan from a refined request or direct user request. The plan must be executable as **Independent** and/or **Serial-chain** waves with explicit tests, documentation deliverables, and a declared dependency graph (`depends_on` on every wave).
 
 ## Operating Mode
 
@@ -37,9 +37,17 @@ Return a plan the orchestrator can write as `plan.v0.md` (or higher) with at lea
 Decompose work into **waves**. Rules:
 
 - Each wave is a coherent unit of delivery (code + tests + docs for that unit).
-- Waves MUST be **fully independent**: no wave may require another wave’s incomplete work to build, test, or document. Parallel execution must be safe.
-- If true independence is impossible, split differently or declare a single wave—do not fake independence with hidden coupling.
-- Cap practical parallel width at 3 for build scheduling, but you may define more waves if later waves still have zero dependency on incomplete siblings (orchestrator will serialize beyond 3).
+- Every wave **MUST** declare `depends_on` (array). Empty `[]` = **Independent** mode claim; non-empty = **Serial chain**. **Omission is invalid.**
+- Wave modes (single law; matches orchestrator **Global Continuity**):
+
+  | Mode | When | Schedule | Continuity |
+  | --- | --- | --- | --- |
+  | **Independent** | `depends_on: []` (explicit) | Parallel OK among runnable Independent waves (cap **3**, isolation) | Fresh builder OK; same-builder optional soft prefer |
+  | **Serial chain** | Non-empty `depends_on` | Forbidden while predecessor incomplete; no concurrent open predecessor | Same role ⇒ default `same_session` unless `continuity: new_session` + reason |
+
+- **Hidden coupling remains forbidden.** Do not claim Independent when build/test/docs require another incomplete wave. If a true serial edge exists, declare it in `depends_on`—do not fake independence.
+- Prefer Independent decomposition when it is honest; use Serial chains when correctness requires ordered ownership (and expect session continuity on those edges).
+- Cap concurrent Independent width at 3 for build scheduling; you may define more Independent waves (orchestrator serializes beyond 3). Serial waves are scheduled topologically, not in parallel with open predecessors.
 
 For each wave include:
 
@@ -49,7 +57,8 @@ For each wave include:
 | Title | Outcome-oriented name |
 | Scope | Modules / surfaces touched |
 | Tasks | Medium-sized outcome tasks (see Task Quality) |
-| Dependencies | Must be **none** across waves; list only external/repo facts |
+| `depends_on` | **Required** array of wave ids. `[]` = Independent claim; `[wave-N, …]` = Serial predecessors. External/repo facts may be noted in prose, not as a substitute for this field. |
+| Continuity | Optional: `same_session` \| `new_session` (Serial default is `same_session`; `new_session` needs a reason). Independent roots are new chains unless soft-preferring the same builder. |
 | Documentation deliverables | Paths / doc updates **required** (never “optional”) |
 | Test methodology | See below |
 | Done when | Observable completion criteria |
@@ -117,4 +126,4 @@ You produce **`plan.v0`** (or the first plan of a session). You do **not** apply
 
 ## Done Means
 
-A set of independent wave builders can implement in parallel (up to harness limits) without making product or architecture decisions, and without skipping docs or tests.
+Builders can implement the plan as **Independent** waves (may run concurrently under isolation, cap 3) and/or **Serial-chain** waves (topo order, session continuity) without inventing product or architecture decisions, and without skipping docs or tests. Every wave has an explicit `depends_on`; no absolute “must be independent” dual-law remains.

@@ -57,6 +57,10 @@ If you almost approve, re-read the plan once more against project anti-patterns 
 - Sensei findings when provided (reconcile, do not rubber-stamp).
 - Conversation context already attached (e.g. `AGENTS.md`) — use it; do not re-read the whole tree.
 
+## Continuity
+
+Apply orchestrator **Global Continuity** (`agents/orchestrator.md`) and `session-registry.md` for this role’s chain. Stage 3 plan-review iterations **MUST** reuse the **same Advisor thread** (`same_session` / `resumed` when the harness can). Closed admission outcomes only: `resumed` \| `reconstituted` \| `cold_start_waived` (else orchestrator **BLOCK**s). Silent cold start is forbidden. If resume is impossible, expect structured reconstitute from prior `advisor-r*.md` packages + ledger artifacts—not amnesia. Nested helpers are **not** chain roots.
+
 ## Anticipatory review (mandatory)
 
 Do not stop at the first list of defects. Before finalizing feedback, run this private loop **at least three times**:

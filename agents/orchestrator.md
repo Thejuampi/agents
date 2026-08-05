@@ -76,6 +76,7 @@ Default session root (unless the project defines another convention):
     advisor-r1.md …
     p0-ledger.md            # open / fixed / waived P0s
     LESSONS-LEARNED.md      # planning/review failure data for this session
+  session-registry.md       # continuity rows (orchestrator-owned; see Global Continuity)
   build/
     wave-1-report.md …
   review/
@@ -86,6 +87,118 @@ Default session root (unless the project defines another convention):
 ```
 
 Always pass **latest** plan revision only to downstream agents. Never feed stale `plan.v{k}` when `plan.v{k+1}` exists.
+
+## Global Continuity (cross-stage law)
+
+When task **B** depends on task **A**, the orchestrator **must not** cold-start an amnesiac specialist for B. Reuse the same **role-session** that owns A (resume when possible; structured reconstitute otherwise). **Silent cold start on a dependent edge is an orchestration defect.**
+
+This section is the single Continuity law for the whole pipeline. Stage 3 / Stage 4 / Stage 5 operational notes **point here**; they do not redefine outcomes.
+
+### Scope and ownership
+
+| Rule | Detail |
+| --- | --- |
+| **Per-role chains** | Continuity is **per role + ownership chain**. Builder ≠ Reviewer ≠ Sensei ≠ Advisor ≠ QA. A builder `session_ref` is never valid for a reviewer spawn (and vice versa). |
+| **Orchestrator-scheduled only** | Continuity applies to specialists the orchestrator spawns as waves/tasks. Nested tool helpers, sub-tools, and ad-hoc helpers are **not** chain roots unless promoted to an orchestrator-scheduled wave/task. |
+| **Role firewall** | Wrong role for a `session_ref` = **hard error**. Cross-role resume is forbidden. |
+| **Continuity ⊥ isolation** | Continuity and workspace isolation are **orthogonal**; both are orchestrator-owned. Resume never skips STEP 0 / `expected_base_sha`. Isolation never invents a new continuity chain. |
+| **Runtime inference ban** | Never grep the repo or “guess” continuity from file presence. Plan fields + `session-registry.md` only. |
+
+### Wave modes (single law)
+
+| Mode | When | Schedule | Continuity |
+| --- | --- | --- | --- |
+| **Independent** | `depends_on: []` (**explicit** empty array; omission is **invalid**) | Parallel OK among currently runnable Independent waves (cap **3**, with isolation) | Fresh builder OK; same-builder optional soft prefer |
+| **Serial chain** | Non-empty `depends_on` | **Forbidden** while any predecessor on that edge is incomplete; **hard error** if scheduled concurrent with an open predecessor | Same role ⇒ default `same_session` unless plan sets `continuity: new_session` + reason |
+
+Hidden coupling remains forbidden: do not fake independence with undeclared cross-wave file or semantic coupling.
+
+### Continuity outcomes (exhaustive admission)
+
+| Outcome | When | May start work on B? |
+| --- | --- | --- |
+| `resumed` | Live `session_ref`, same role, same `chain_id`; re-bind OK | **Yes** |
+| `reconstituted` | Session dead **and** all reconstitution checklist items green | **Yes** |
+| `cold_start_waived` | Checklist fails **and** Juan explicit waiver **or** plan edge `cold_start_allowed: true` + reason | **Yes** |
+| *(else)* | — | **BLOCK** — no spawn; no invented outcome labels |
+
+**Bridge (adapter honesty):** `resumed` is admitted only when the active harness adapter has `resume_supported: true` **and** a live `session_ref` re-binds successfully. If `resume_supported` is false/unknown, the best Continuity outcome is `reconstituted` (checklist green) or `cold_start_waived` / **BLOCK** — never label reconstituted work as `resumed`.
+
+**Silent cold start forbidden.** Reconstitute is a structured admission event, not a free-text log line.
+
+### Reconstitution checklist (all required)
+
+Before admitting `reconstituted`, every item must be green:
+
+1. `chain_id` + parent **completed/admitted** record in the registry  
+2. Last admitted package/handoff (content or id) available to the specialist  
+3. `expected_base_sha` + worktree identity match when applicable  
+4. Role match (registry `role` = specialist being spawned)  
+5. Dependency graph still admits the edge (parent complete; plan `depends_on` still valid)
+
+If any item fails and there is no `cold_start_waived` path → **BLOCK**.
+
+### Resume re-bind
+
+On `resumed` **or** `reconstituted`: verify `worktree_path`/cwd and `expected_base_sha` match the registry (and plan dependency base when set). Mismatch → treat the session as **dead** for this edge → run reconstitution checklist or **BLOCK**. Continuity never substitutes for builder STEP 0; both gates run.
+
+### Chain root
+
+The chain root is the registry row where `role=R`, the owning wave/task, `status=completed`, and the orchestrator **admitted** the handoff package. Not tests-green-only, not abandoned, not a sibling spawn.
+
+| Case | Treatment |
+| --- | --- |
+| Parent completed + admitted | Root for dependent B (same role) |
+| Failed / abandoned | Resume same session for **repair of A**, or plan rewrite — **not** a root for dependent B |
+| Stage 5 fix for wave W | Resume the same `chain_id` that produced the rejected package for W |
+
+### Registry (`session-registry.md`)
+
+Orchestrator-owned file under the session root. Minimum fields per row:
+
+```text
+chain_id
+wave_id / task_id
+role                  # builder | reviewer | sensei | advisor | qa | …
+parent_wave_id        # null if root
+session_ref           # harness-native or none
+harness
+worktree_path         # if used
+expected_base_sha     # when dependency base applies
+last_package_id       # or content hash of admitted package
+status                # open | completed | failed | abandoned
+continuity_outcome    # resumed | reconstituted | cold_start_waived | none
+updated_at
+```
+
+Operational (mandatory):
+
+```text
+BEFORE spawn:
+  1. Read session-registry.md
+  2. If depends_on non-empty: require parent status=completed (admitted) + row
+  3. Resolve continuity: resumed | reconstituted | cold_start_waived only (else BLOCK)
+  4. Write intent row status=open BEFORE specialist starts
+AFTER return:
+  5. Set completed|failed|abandoned + continuity_outcome + last_package_id + updated_at
+NEVER: silent cold start; infer continuity by grepping repo; skip base_sha/STEP 0
+```
+
+Missing parent completion or missing registry row on a `depends_on` edge ⇒ **BLOCK**, not cold start.
+
+### Soft reset
+
+When context budget forces a mid-chain restart: same `chain_id`, new `session_ref`, outcome = `reconstituted` (checklist still required). Soft reset is **not** a new chain and not a silent cold start.
+
+### Audit event
+
+On every **dependent** start (non-empty `depends_on`), record a structured event with one of `resumed | reconstituted | cold_start_waived`, plus `chain_id`, parent/child wave ids, role, and `expected_base_sha` when applicable. Independent roots may log `continuity_outcome: none`.
+
+### Examples (role-chain continuity)
+
+- **Sensei∥Advisor (Stage 3):** same Sensei thread and same Advisor thread every plan-review iteration; if resume is impossible, reconstitute from `sensei-r*.md`, `advisor-r*.md`, `p0-ledger.md`, and `LESSONS-LEARNED.md` under this law.
+- **Reviewer (Stage 5a):** same Reviewer thread across fix iterations.
+- **Builder (Stage 4 / 5c):** Independent waves may start fresh; Serial `depends_on` edges and Stage 5 fixes **MUST** resume (or reconstitute) the original wave owner chain.
 
 ## Single-step workflow (`/orchestrate-this`)
 
@@ -126,7 +239,16 @@ Run stages in order. Do not skip for speed. Juan may explicitly waive a stage.
 - Orchestrator writes `plan.v0.md` following `agents/planner.md` structure (waves, BDD, docs deliverable).
 - Plan requirements (non-negotiable):
   - Tasks grouped into **waves**.
-  - Waves are **fully independent** (safe to execute in parallel; no hidden cross-wave dependencies).
+  - Every wave **MUST** declare `depends_on` (array; empty `[]` = Independent mode claim; non-empty = Serial chain). Omission is **invalid**.
+  - Wave modes (see **Global Continuity**):
+
+    | Mode | `depends_on` | Schedule | Continuity default |
+    | --- | --- | --- | --- |
+    | **Independent** | `[]` (explicit) | Parallel OK (cap 3, isolation) | Fresh builder OK |
+    | **Serial chain** | non-empty | Topo order; no concurrent open predecessor | `same_session` for same role |
+
+  - Hidden coupling remains forbidden (do not claim Independent when work requires another incomplete wave).
+  - Optional per-wave `continuity: same_session | new_session` (Serial default is `same_session`; `new_session` needs a reason).
   - **Documentation is always part of the deliverable** (which docs change or are added, per wave).
   - Each wave has a **BDD-style scenario table** and testing methodology (see planner).
 
@@ -161,8 +283,10 @@ Write under the session `plan-review/`:
 
 #### Continuity
 
-- Reuse the **same** Sensei thread and the **same** Advisor thread every iteration (resume / continue; do not spawn amnesiac replacements when the harness can resume).
-- If resume is impossible: reconstitute from `sensei-r*.md`, `advisor-r*.md`, `p0-ledger.md`, and `LESSONS-LEARNED.md`—not from memory.
+Apply **Global Continuity** (above). Stage 3 examples of that law:
+
+- Reuse the **same** Sensei thread and the **same** Advisor thread every iteration (`resumed` when the harness can; never silent cold start).
+- If resume is impossible: `reconstituted` from `sensei-r*.md`, `advisor-r*.md`, `p0-ledger.md`, and `LESSONS-LEARNED.md`—not from memory—only when the reconstitution checklist is green; else **BLOCK** or obtain `cold_start_waived`.
 
 #### Phase A — Full review (iterations 1–5)
 
@@ -224,36 +348,43 @@ At Stage 7 (retro), promote durable lessons into project docs / playbook if they
 
 **MUST NOT** re-delegate plan revision to the planner, builder, Sensei, or Advisor. The planner already did Stage 2; re-spawning it to “apply corrections” is an orchestration failure (extra cost, lost continuity, weaker ownership of review synthesis).
 
-### Stage 4 — Build (parallel waves, max 3)
+### Stage 4 — Build (topo / modes; max 3 concurrent Independent)
 
 - Only after Stage 3 exit: **P0-clean plan** (dual approve **or** empty P0 ledger), plus the **one-time P1+ sweep** above—or Juan’s **explicit waiver of named remaining P0s**.
 - Builders use mid-tier models when selectable.
-- Each builder receives: latest plan, its wave section only (plus global invariants), project conventions, and a **guarantee of exclusive workspace** (see isolation below).
-- Each builder MUST implement code, docs, and **fast unit/local tests only** (see `agents/builder.md`). Builders MUST NOT run integration tests or any check expected to exceed ~10s—those conflict under parallelism.
-- Collect `build/wave-*.md` reports (including deferred slow checks).
+- **Schedule by mode** (see **Global Continuity**):
+  - Resolve a topological order from each wave’s `depends_on`.
+  - **Serial edges:** do not start B until every predecessor is **completed/admitted** in `session-registry.md`. Scheduling B concurrent with an open predecessor on a `depends_on` edge is a **hard error**.
+  - **Independent waves** (`depends_on: []`): may run in parallel when isolation allows. Cap **3** concurrent Independent builders.
+  - Parallelism is **never** automatic for Serial chains; `parallel: false` / non-empty `depends_on` forces serial ownership.
+- **Registry R/W (mandatory):** before every builder spawn, read `session-registry.md`; resolve continuity outcome; write intent row `status=open`. After return, set `completed|failed|abandoned` + `continuity_outcome` + `last_package_id`. On Serial edges, **resume** the original builder `chain_id` when the harness can (`resumed`); else reconstitute or **BLOCK** per Global Continuity. Do not invent a new chain for B while A’s owner is still the right root.
+- Each builder receives: latest plan, its wave section only (plus global invariants), project conventions, **continuity expectation** (`chain_id`, outcome target, prior package when reconstituted), `expected_base_sha` when applicable, and a **guarantee of exclusive workspace** (see isolation below). Continuity does **not** skip STEP 0 / base_sha verification.
+- Each builder MUST implement code, docs, and **fast unit/local tests only** (see `agents/builder.md`). Builders MUST NOT run integration tests or any check expected to exceed ~10s—those conflict under parallelism and are orchestrator-owned.
+- Collect `build/wave-*.md` reports (including deferred slow checks and reported `continuity_mode`).
 
-#### Workspace isolation (orchestrator-owned)
+#### Workspace isolation (orchestrator-owned; orthogonal to Continuity)
 
-Parallel builders will stomp each other if they share a dirty tree, target dirs, ports, DBs, or long test suites. **Builders must not solve this.** You must.
+Parallel Independent builders will stomp each other if they share a dirty tree, target dirs, ports, DBs, or long test suites. **Builders must not solve this.** You must. Isolation strategy does **not** create or erase continuity chains—**Global Continuity** still applies.
 
 Decision order (pick the lightest option that is safe):
 
-1. **Serialize** conflicting waves when they touch the same files, packages, or build artifacts—even if the plan called them independent. Prefer correctness over fake parallelism.
-2. **Parallelize only non-overlapping waves** (disjoint paths, no shared compile/test lock contention you cannot isolate). Cap at **3** concurrent builders.
+1. **Serialize** conflicting waves when they touch the same files, packages, or build artifacts—even if the plan called them Independent. Prefer correctness over fake parallelism. Serial `depends_on` edges are already serialized by Continuity.
+2. **Parallelize only currently runnable Independent waves** (disjoint paths, no shared compile/test lock contention you cannot isolate). Cap at **3** concurrent builders.
 3. **Worktrees (allowed, caution required):** use only when true parallelization on the same repo is necessary and serialization would dominate. Commitments if you use them:
-   - Create with a clear naming scheme under the session (`e2e/<slug>/wt-wave-N` or git worktree path recorded in session notes).
+   - Create with a clear naming scheme under the session (`e2e/<slug>/wt-wave-N` or git worktree path recorded in session notes **and** `session-registry.md` `worktree_path`).
    - One builder per worktree; never share a worktree across builders.
    - After each wave: merge/cherry-pick results back via a **single** integration step you control; resolve conflicts yourself (or a dedicated merge step)—not three builders fighting main.
    - **Cleanup is mandatory** in the same session: remove worktrees, delete temp branches, drop leftover build dirs. Leftover worktrees are process debt. If you cannot clean up, do not create them—serialize instead.
+   - On resume/reconstitute, re-bind to the registered worktree + `expected_base_sha` (see Global Continuity re-bind).
 4. Never assume “cargo/npm will be fine” with three processes on one `target/` or `node_modules` without isolation.
 
-Document the chosen strategy in the session summary (`parallel | serial | worktree`) and why.
+Document the chosen strategy in the session summary (`parallel | serial | worktree` + continuity outcomes) and why.
 
 #### After builders finish (orchestrator)
 
 - Integrate all wave outputs into one coherent tree if worktrees/branches were used.
 - Run **deferred** integration / slow / full-suite checks **once**, serially, on the integrated tree (or schedule `qa` / reviewer with those commands). Do not ask builders to re-run them in parallel.
-- If integration tests fail, route fixes to the owning wave builder **serially** (or one builder at a time) on the integrated workspace.
+- If integration tests fail, route fixes to the owning wave builder **serially** (or one builder at a time) on the integrated workspace—**resume** that wave’s original chain (Stage 5c).
 
 ### Stage 5 — Implementation review loop (max 5 iterations)
 
@@ -285,14 +416,19 @@ If multiple review-related files exist (e.g. integration log + reviewer + boy-sc
 
 #### 5c — Builder implements the merged package
 
-- Route `fix-package-r{N}.md` (+ latest plan, exclusive workspace) to the responsible wave builder(s). Prefer **serial** fixes on the integrated tree when waves share code; parallel only if packages are path-disjoint and isolation rules allow.
-- Builder implements the package fully for their wave (code + docs + fast tests); reports what was done vs deferred.
+- Route `fix-package-r{N}.md` (+ latest plan, exclusive workspace) to the responsible wave builder(s).
+- **MUST resume the original wave builder chain** (`chain_id` that produced the wave’s admitted build package). Stage 5 is a dependent edge on that owner—apply **Global Continuity** (`resumed` preferred; `reconstituted` only if checklist green; `cold_start_waived` only with explicit waiver). Spawning a new amnesiac builder for a wave that already has a chain is an **orchestration defect**.
+- Multi-owner fix packages: **one resume per owner** (each wave’s original builder chain). Do not collapse multiple owners into one cold session.
+- New session only via the Continuity ladder (`reconstituted` / `cold_start_waived`)—never silent cold start.
+- Prefer **serial** fixes on the integrated tree when waves share code; parallel only if packages are path-disjoint, isolation rules allow, **and** each owner is resumed on its own chain.
+- Builder implements the package fully for their wave (code + docs + fast tests); reports what was done vs deferred and **`continuity_mode`**.
 - You re-integrate, re-run deferred slow checks if needed, then loop to **5a** with the same Reviewer thread.
 - Exit when Reviewer **approves** or 5 iterations are exhausted (then report blockers with the last fix-package path).
 
 ### Stage 6 — Final Sensei pass
 
-- Same Sensei thread if available; otherwise a Sensei pass with full latest package.
+- Apply **Global Continuity**: same Sensei `chain_id` when possible (`resumed` \| `reconstituted` \| `cold_start_waived` \| BLOCK). The full latest package is the reconstitute payload when the thread is dead—not a free cold start.
+- Same Sensei thread if available; otherwise a Sensei pass with full latest package under the Continuity ladder above.
 - Sensei still does **not** read files outside the change scope provided as text/diff summary by the orchestrator.
 - Apply or schedule any P0 bar-raising fixes before retro.
 

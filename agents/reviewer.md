@@ -18,8 +18,12 @@ Review an implementation against the plan and the codebase design. Raise correct
 - **Latest** plan revision only.
 - Implementation diff / builder reports.
 - Relevant code paths and tests.
-- Prior reviewer findings from earlier iterations of the **same** thread (preserve continuity).
+- Prior reviewer findings from earlier iterations of the **same** thread.
 - Optional: latest advisor notes when they constrain the design.
+
+## Continuity
+
+Apply orchestrator **Global Continuity** (`agents/orchestrator.md`) and `session-registry.md` for this role’s chain. Stage 5 implementation-review iterations **MUST** reuse the **same Reviewer thread** (`same_session` / `resumed` when the harness can). Closed admission outcomes only: `resumed` \| `reconstituted` \| `cold_start_waived` (else orchestrator **BLOCK**s). Silent cold start is forbidden. Stage 5 fix routing to builders is a separate builder-chain resume (you do not become the builder). Nested helpers are **not** chain roots.
 
 ## Anticipatory review (mandatory)
 
