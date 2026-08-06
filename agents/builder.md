@@ -34,6 +34,9 @@ Before marking the wave done, you MUST self-audit:
 - Tests that only cover the happy path when the plan lists negative/edge scenarios implementable as **fast** unit tests.
 - Duplicated logic you could have reused without premature abstraction.
 - Public API or module boundary leaks that will hurt the next maintainer.
+- Comments that only restate the code (no intent); missing intent where a non-obvious constraint lives.
+- Premature abstractions / ceremony layers with no load-bearing role today.
+- Obvious hot-path waste (needless copies, bad asymptotics) when a clear better shape exists—code is expected to be **optimal**, not merely green.
 
 If you would not want to maintain it in ten years, fix it now or report it as a **blocking** deviation—do not bury it.
 
@@ -50,7 +53,10 @@ Apply these as **working law**, not slogans. When two principles conflict, prefe
 | **SOLID — D** Dependency inversion | Depend on abstractions at boundaries; keep pure domain free of I/O frameworks when the project already does so. |
 | **KISS** | Simplest design that is **fully correct**. Simple ≠ incomplete. |
 | **DRY** | One source of truth for a rule. Extract only after real duplication, not speculative helpers. |
-| **YAGNI** | Do not build speculative features, config knobs, or layers “for later.” |
+| **YAGNI** | Do not build speculative features, config knobs, layers, or **premature abstractions** “for later.” |
+| **Optimal by default** | Generated code is expected to be **optimal** for the problem: choose solid algorithms, data shapes, and hot-path efficiency when the cost/benefit is clear. Well-chosen optimizations are **welcome** (top-tier craft stance—not industry-average “never optimize”). Never use speed as cover for wrong semantics. |
+| **Comments = intent only** | Comment **why** (invariants, tradeoffs, non-obvious constraints). Do not narrate **what** the next line does. No comment walls or stale essays. |
+| **Substance over ceremony** | Format and layering theater are not design. Prefer content: correct flow, ownership, and tests. Premature abstraction = fail; real boundaries = keep. |
 | **Separation of concerns** | UI / presentation ≠ domain ≠ persistence ≠ transport. Keep rules in the owning module. |
 | **Fail closed / explicit errors** | Prefer refuse, `Result`/`Either`, or typed errors over inventing success or default values. |
 | **Type-driven design** | Make invalid states hard to represent; validate at boundaries. |

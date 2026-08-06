@@ -11,6 +11,7 @@ Review an implementation against the plan and the codebase design. Raise correct
 - Do not spend attention on pure style nits unless they hide a deeper problem or violate project rules.
 - Use project tooling for mechanical checks such as formatting, typing, linting, null-safety, or static analysis.
 - Prefer **correctness over delivery convenience**. Compiles + green happy path is not acceptance.
+- These rules **expand** the review bar; they do **not** replace your judgment, anticipatory passes, boy-scout budget, or plan compliance.
 
 ## Inputs
 
@@ -127,7 +128,51 @@ Inspect:
 - Would a future maintainer understand this change in ten years’ terms?
 - Were docs updated as required?
 - While on that path: is there a bounded boy-scout cleanup that clearly improves durability?
+- **Optimality** and the craft rules below (intent-only comments, substance over ceremony, no premature abstraction).
+
+## Craft bar (expansion — always apply)
+
+These are **additional** review expectations, not a ceiling on rigor. Raise them as findings when the diff fails them; do not soft-pass “good enough for an agent.”
+
+### Generated code is expected to be optimal
+
+| Expect | Reject / challenge |
+| --- | --- |
+| Hot paths, algorithms, allocations, I/O, and data structures fit the problem with **competent performance and clarity** | Lazy defaults, needless copies, quadratic work on known-hot loops, “we’ll optimize later” when the right shape is already clear |
+| Optimizations that a strong engineer would ship **now** when the cost/benefit is obvious | Demanding micro-benches for every line **or** blocking a correct local optimization as “premature” by default |
+| Correctness first: wrong-but-fast still fails | Using “optimal” as cover for incomplete semantics or missing fail-closed paths |
+
+**Stance (project):** this playbook assumes **top-tier** craft, not industry-average caution. In general industry rhetoric “premature optimization is evil”; **here, well-chosen optimizations in code that knows what it is doing are excellent.** Flag only optimizations that are **wrong**, **unmeasured noise on cold paths with real cost**, or **obscure correctness**. Do **not** ding builders for smart, local efficiency when the intent is clear.
+
+### Comments convey intent only
+
+| Keep / require | Reject as findings |
+| --- | --- |
+| Comments that explain **why**, invariants, non-obvious constraints, tradeoffs, safety | Narrating **what** the next line does (`// increment i`) |
+| Sparse comments where the code cannot carry the decision | Comment walls, changelog-in-comments, “AI essay” preambles |
+| Delete or rewrite comments that lie or drift from the code | Leaving stale comments as green |
+
+**Rule:** if a comment does not convey intent a future maintainer would miss from names and structure alone, it should not exist (or should be rewritten until it does).
+
+### Format is ceremony; content is substance
+
+| Substance (review hard) | Ceremony (do not treat as design success) |
+| --- | --- |
+| Correct data flow, right ownership, honest errors, tests that pin behavior | Layers, wrappers, “clean architecture” scaffolding with no load-bearing role |
+| One clear implementation of a rule (DRY after real duplication) | Premature abstractions, generic frameworks “for later,” indirection for its own sake |
+| Names and types that encode meaning | Formatting theater, file sprawl, or pattern cosplay without payoff |
+
+**YAGNI on structure:** premature **abstractions** = bad. Prefer the smallest complete and correct shape. If the builder introduced interfaces, factories, middleware, or config knobs without a second real use or a forced boundary, flag as over-engineering (in-scope when on the change path).
+
+**Not a free pass for sloppiness:** substance includes optimality and durability—not “fewer files at any cost.”
+
+### Quick sniff (add to anticipatory passes)
+
+1. Would I keep this optimization / structure if I had to maintain it for ten years?
+2. Does every new abstraction pay rent **today**?
+3. Do comments only answer *why*, never *what*?
+4. Is anything slow, copy-heavy, or allocation-heavy on an obvious hot path without reason?
 
 ## Done Means
 
-The builder knows exactly what must change before acceptance (in-scope + any blocking boy-scouts), optional adjacent cleanups stay inside the caps, and feedback is anticipatory enough to avoid five rounds of one-nit-at-a-time review.
+The builder knows exactly what must change before acceptance (in-scope + any blocking boy-scouts), optional adjacent cleanups stay inside the caps, feedback is anticipatory enough to avoid five rounds of one-nit-at-a-time review, and the craft bar (optimal code, intent-only comments, substance over ceremony / no premature abstraction) was applied as an **expansion** of judgment—not a substitute for correctness or plan compliance.
