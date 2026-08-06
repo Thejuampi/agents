@@ -33,6 +33,8 @@ make sync-personal
 | --- | --- |
 | `/e2e` | Claude Code, Grok |
 | `$e2e` | Codex / Grok skill menu |
+| `/e2e-resume` | Claude Code, Grok — continue a stopped `/e2e` session |
+| `$e2e-resume` | Codex / Grok skill menu |
 | `/plan-this`, `/build-this`, … | single-role shortcuts |
 
 ---
@@ -141,7 +143,7 @@ When task B depends on A, **reuse the same role-session** (resume when the harne
     ├── builder / reviewer / curator / qa
     │
     ✗  NEVER spawn orchestrator
-    ✗  NEVER re-invoke /e2e from inside the run
+    ✗  NEVER re-invoke /e2e or /e2e-resume from inside the run (either direction)
     ✗  NEVER ask planner to write plan.v1+
 ```
 
@@ -158,6 +160,7 @@ When task B depends on A, **reuse the same role-session** (resume when the harne
 │   ├── p0-ledger.md
 │   └── LESSONS-LEARNED.md
 ├── session-registry.md       # Continuity rows (orchestrator-owned)
+├── resume-assessment-r1.md … # /e2e-resume state reconstruction packages
 ├── build/
 │   └── wave-*-report.md
 ├── review/
@@ -177,6 +180,10 @@ When task B depends on A, **reuse the same role-session** (resume when the harne
 Stage 3 exits when Sensei and Advisor both `approve` **or** the open **P0 ledger is empty** (P1/P2 may remain for a one-time pre-build sweep). From iteration **6+**, review is **delta-only / no boy scout** (P0 only).
 
 Always pass **latest** plan revision downstream. Stale `plan.v{k}` after `plan.v{k+1}` exists is a bug.
+
+### `/e2e-resume` — continue a stopped session
+
+If `/e2e` stops before Stage 8 retro (crash, context loss, new conversation, manual pause), run **`/e2e-resume`** instead of restarting. It reassesses which stages actually completed from session artifacts + `session-registry.md` — never from file presence alone — reconciles any mid-flight registry rows, then re-enters the pipeline at the earliest incomplete stage. Reaching Stage 4 build does not mean Stage 5 review, Stage 6 QA, Stage 7 Sensei, or Stage 8 retro can be skipped: each still runs if it did not already close per its own exit criteria. Full procedure: [`agents/orchestrator.md`](agents/orchestrator.md) § **E2E Resume**.
 
 ### Model tiers (when the harness allows)
 
@@ -212,6 +219,7 @@ Canonical definitions: [`agents/`](agents/).
 | Command | Effect |
 | --- | --- |
 | **`/e2e`** | Full pipeline — main agent **is** the orchestrator |
+| **`/e2e-resume`** | Reassess a stopped `/e2e` session and continue from the earliest incomplete stage — main agent **is** the orchestrator |
 | `/orchestrate-this` | Single next-step routing only |
 | `/refine-this` | Refiner only |
 | `/plan-this` | Planner only |
