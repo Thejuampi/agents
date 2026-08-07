@@ -190,9 +190,11 @@ If `/e2e` stops before Stage 8 retro (crash, context loss, new conversation, man
 | Role | Tier |
 | --- | --- |
 | Orchestrator, Planner, Sensei | Highest (Opus / Sol / Grok max) |
-| Builder, Advisor | Mid (Sonnet / Terra) when available |
-| Reviewer | High preferred for correctness-critical work |
+| Reviewer, QA, Refiner | High — Stage 5/6 correctness gates (Reviewer, QA) and one-shot session-scoping (Refiner) |
+| Builder, Advisor, Curator | Mid (Sonnet / Terra) when available |
 | One model only | Use that model for every role — do not invent a weaker path |
+
+`qa`'s row closes a pre-existing documentation gap; `refiner`'s and `curator`'s rows resolve this repo's own previously-documented "Mid or high" range. Full rationale: [`agents/orchestrator.md`](agents/orchestrator.md) § Model tier map.
 
 ---
 

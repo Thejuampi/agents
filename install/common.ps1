@@ -1,5 +1,26 @@
 param()
 
+<#
+  install/common.ps1 — shared generation primitives for every harness installer
+  (install/claude.ps1, grok.ps1, codex.ps1, opencode.ps1, vscode.ps1).
+
+  Get-RoleMeta is the single source of truth for model tier / effort / permission
+  metadata across all five harnesses (D4/D14, plan.v3.md section 1.4a). Its output
+  schema is FROZEN as of wave-1's merge: exactly these seven keys, no more, no
+  fewer —
+      tier, effortLevel, capabilityIntent, pathPolicy, claudeColor, claudeMaxTurns, opencodeTaskPolicy
+  Adding, removing, or renaming a key is a schema amendment, not a sibling edit:
+  it goes through the orchestrator (never a wave's own builder) via the amendment
+  protocol in plan.v3.md section 1.4a, which also updates the frozen key list
+  below and in install/common.tests.ps1's executable frozen-key-list test (I25).
+
+  `verify-sync` (Makefile target, install/verify-sync.ps1) is expected to report
+  DRIFT for the entire span between task 1.1 and task 7.6a/7.6b landing — that is
+  by design (the generator is meant to diverge from already-installed harnesses
+  mid-rollout). No wave 2-6 may treat a non-zero verify-sync exit as a wave-level
+  gate; it is a wave-7-only gate.
+#>
+
 function Get-AgentFiles {
   param([string]$Repo)
   $d = Join-Path $Repo 'agents'
@@ -47,6 +68,59 @@ function Get-DisplayAgentName {
   if ([string]::IsNullOrWhiteSpace($Name)) { return 'agent' }
   if ($Name.Length -le 2) { return $Name.ToUpper() }
   return $Name.Substring(0, 1).ToUpper() + $Name.Substring(1)
+}
+
+$script:RoleMetaFrozenKeys = @('tier', 'effortLevel', 'capabilityIntent', 'pathPolicy', 'claudeColor', 'claudeMaxTurns', 'opencodeTaskPolicy')
+
+function Get-EffortLevelForTier {
+  param([string]$Tier)
+  # Single derivation function (D4) — effort is never hand-picked per role;
+  # it is always a pure function of tier.
+  switch ($Tier) {
+    'Highest' { return 'max' }
+    'High'    { return 'high' }
+    'Mid'     { return 'medium' }
+    default   { throw "Get-EffortLevelForTier: unknown tier '$Tier' (expected Highest|High|Mid)" }
+  }
+}
+
+function Get-RoleMeta {
+  [CmdletBinding()]  # enables -WarningVariable for W1-N01's silent-fallthrough test
+  param([string]$Name)
+  # tier / capabilityIntent / pathPolicy / opencodeTaskPolicy: frozen per the
+  # patched tables in README.md "Model tiers" and agents/orchestrator.md "Model
+  # tier map" (task 1.0b), and the full field spec in plan.v3.md section 1.4a.
+  $table = @{
+    orchestrator = @{ tier = 'Highest'; capabilityIntent = 'dispatch';        pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'orchestrator' }
+    planner      = @{ tier = 'Highest'; capabilityIntent = 'shellReadOnly';   pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf' }
+    sensei       = @{ tier = 'Highest'; capabilityIntent = 'noRepoAccess';    pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf' }
+    reviewer     = @{ tier = 'High';    capabilityIntent = 'shellReadOnly';   pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf' }
+    qa           = @{ tier = 'High';    capabilityIntent = 'shellReadOnly';   pathPolicy = 'noProductSource'; opencodeTaskPolicy = 'leaf' }
+    refiner      = @{ tier = 'High';    capabilityIntent = 'noRepoAccess';    pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf' }
+    advisor      = @{ tier = 'Mid';     capabilityIntent = 'docsReadOnly';    pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf' }
+    builder      = @{ tier = 'Mid';     capabilityIntent = 'shellEdit';       pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf' }
+    curator      = @{ tier = 'Mid';     capabilityIntent = 'curatorReadOnly'; pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf' }
+  }
+  if ($table.ContainsKey($Name)) {
+    $row = $table[$Name]
+  }
+  else {
+    Write-Warning "Get-RoleMeta: unknown role '$Name' — no frozen row for it; returning a conservative default (Mid tier, noRepoAccess, unrestricted path, leaf task policy). Add a real row (via the amendment protocol) before shipping a 10th role."
+    $row = @{ tier = 'Mid'; capabilityIntent = 'noRepoAccess'; pathPolicy = 'unrestricted'; opencodeTaskPolicy = 'leaf' }
+  }
+  # claudeColor / claudeMaxTurns: schema slots only. Wave-1 owns the frozen key
+  # set; wave-2 (task 2.7) assigns the real per-role color palette and the
+  # sensei/refiner maxTurns runaway guard once Claude frontmatter generation
+  # consumes them. Left $null here rather than guessed (D5 — no false precision).
+  return [ordered]@{
+    tier               = $row.tier
+    effortLevel        = Get-EffortLevelForTier -Tier $row.tier
+    capabilityIntent   = $row.capabilityIntent
+    pathPolicy         = $row.pathPolicy
+    claudeColor        = $null
+    claudeMaxTurns     = $null
+    opencodeTaskPolicy = $row.opencodeTaskPolicy
+  }
 }
 
 function Get-OpenCodeAgentMeta {
@@ -172,13 +246,45 @@ function Get-CommandTask {
   return $content.Trim()
 }
 
+function Get-CommandArgumentHint {
+  param([string]$Path)
+  # Returns $null when absent (I4) — callers must skip the frontmatter key
+  # entirely rather than emit an empty `argument-hint:` line.
+  $content = Get-Content -Raw -LiteralPath $Path
+  $match = [regex]::Match($content, '(?m)^Argument-Hint:\s*(.+)$')
+  if ($match.Success) { return $match.Groups[1].Value.Trim() }
+  return $null
+}
+
+$script:SkillDescriptionMaxLength = 1024
+
 function Get-CommandSkillDescription {
+  [CmdletBinding()]  # enables -WarningVariable for W1-E01's truncation-warning test
   param([string]$Path, [string]$CommandName, [string]$AgentName)
   $content = Get-Content -Raw -LiteralPath $Path
   $skillDescMatch = [regex]::Match($content, '(?m)^Skill-Description:\s*(.+)$')
-  if ($skillDescMatch.Success) { return $skillDescMatch.Groups[1].Value.Trim() }
-  $display = Get-DisplayAgentName -Name $AgentName
-  return "Delegate the current request to the $display custom agent. Use when the user invokes `$$CommandName or asks to run the $CommandName workflow."
+  if ($skillDescMatch.Success) {
+    $desc = $skillDescMatch.Groups[1].Value.Trim()
+  }
+  else {
+    # Fallback (F-13): lead with what the skill does, not the mechanism, and
+    # never embed a harness-specific invocation sigil (e.g. Codex's `$name`).
+    # Command names follow a `<verb>-this` convention, so the verb itself
+    # doubles as the trigger word — no task-specific text is available here.
+    $display = Get-DisplayAgentName -Name $AgentName
+    $verb = (($CommandName -replace '-this$', '') -replace '-', ' ').Trim()
+    if (-not $verb) { $verb = $CommandName }
+    $verbCap = if ($verb.Length -le 3) { $verb.ToUpper() } else { $verb.Substring(0, 1).ToUpper() + $verb.Substring(1) }
+    $desc = "$verbCap the current request as the $display specialist. Use when the user asks to $verb, wants the $display role, or runs /$CommandName."
+  }
+  if ($desc.Length -gt $script:SkillDescriptionMaxLength) {
+    $truncated = $desc.Substring(0, $script:SkillDescriptionMaxLength)
+    $lastSpace = $truncated.LastIndexOf(' ')
+    if ($lastSpace -gt 0) { $truncated = $truncated.Substring(0, $lastSpace) }
+    Write-Warning "Get-CommandSkillDescription: '$CommandName' description is $($desc.Length) chars (max $($script:SkillDescriptionMaxLength)); truncated at a word boundary to $($truncated.Length) chars."
+    $desc = $truncated
+  }
+  return $desc
 }
 
 function New-PlaybookSkillMarkdown {
@@ -188,26 +294,38 @@ function New-PlaybookSkillMarkdown {
     [string]$Task,
     [string]$SkillDescription,
     [string]$SyncCommand,
-    [string]$Repo
+    [string]$Repo,
+    [switch]$Global,
+    [System.Collections.Specialized.OrderedDictionary]$ExtraFrontmatter
   )
-  $agentsSourceDir = Join-Path $Repo 'agents'
-  $agentSourcePath = Join-Path $agentsSourceDir "$AgentName.md"
   $generated = "<!-- generated by ``$SyncCommand``; source: commands/$CommandName.md. Do not edit here; edit the source and re-run ``$SyncCommand`` -->"
+
+  # Roles are named, never located by this build machine's absolute repo path
+  # (F-2/I1): a personal/-Global install isn't tied to one repo checkout and a
+  # baked path breaks silently if the repo moves. -Global installs get pure
+  # name-based guidance; in-repo installs may additionally point at a
+  # repo-relative `agents/<role>.md` fallback for harnesses with no named-agent
+  # concept. {0} is substituted with the role name by each call site below.
+  $roleFallbackHint = if ($Global) {
+    "ask which project's canonical ``agents/{0}.md`` to load (a personal/global install is not tied to one specific repo checkout)"
+  }
+  else {
+    "load the canonical role definition at ``agents/{0}.md`` (repo-relative) in this project"
+  }
 
   if ($CommandName -eq 'e2e' -or $CommandName -eq 'e2e-resume') {
     # Main session IS the orchestrator — never nest another orchestrator (context loss).
     # Applies to both the fresh pipeline (/e2e) and re-entry into a stopped session (/e2e-resume):
     # both run in the main conversation under the same identity rule.
+    $orchestratorHint = ($roleFallbackHint -f 'orchestrator')
     $skillBody = @"
 # /$CommandName — main agent is the Orchestrator
 
 **YOU** run this pipeline in the **current** conversation. Do **not** spawn an ``orchestrator`` subagent, do not fork a second E2E brain, and do not re-invoke ``/e2e`` or ``/e2e-resume``.
 
-1. Load and follow the orchestrator playbook yourself:
-   - ``$agentSourcePath``
-   - Specialists directory: ``$agentsSourceDir``
+1. Load and follow the orchestrator playbook yourself: role ``orchestrator`` — if this harness has no named-agent concept, $orchestratorHint.
 2. Execute the task guidance below as that Orchestrator (full E2E pipeline, resuming from the reconstructed state when invoked as /e2e-resume).
-3. Spawn **only** leaf specialists when needed: ``refiner``, ``planner``, ``sensei``, ``advisor``, ``builder``, ``reviewer``, ``curator``, ``qa``.
+3. Spawn **only** leaf specialists when needed: ``refiner``, ``planner``, ``sensei``, ``advisor``, ``builder``, ``reviewer``, ``curator``, ``qa`` — same name-based lookup rule as above, substituting each specialist's name.
 4. Preserve the same Sensei/Advisor/Reviewer threads across review iterations (resume; do not reset).
 5. Apply Correctness over delivery convenience; you write plan revisions after v0 yourself.
 
@@ -217,25 +335,32 @@ $Task
 "@
   }
   else {
+    $agentHint = ($roleFallbackHint -f $AgentName)
     $skillBody = @"
 Spawn the ``$AgentName`` custom agent / subagent to handle the current request when the harness supports named agents.
 Give it the relevant conversation and repository context plus this task guidance:
 
 $Task
 
-If the harness cannot spawn a named ``$AgentName`` agent, **you** must load and follow the canonical agent file and execute that role yourself:
-- Agent source: ``$agentSourcePath``
-- Related agents directory: ``$agentsSourceDir``
+If the harness cannot spawn a named ``$AgentName`` agent, **you** must $agentHint and execute that role yourself.
 
 When you are already acting as orchestrator (e.g. mid-``/e2e``), do **not** spawn another orchestrator — only leaf specialists (refiner, planner, sensei, advisor, builder, reviewer, curator, qa). Preserve the same Sensei/Advisor/Reviewer threads across review iterations (resume; do not reset). Wait for each specialist step to finish before applying its output; do not redo specialist work with weaker judgment.
 
 Apply Correctness over delivery convenience when the target project defines it: complete and durable work over velocity shortcuts.
 "@
   }
-  return "---`n" +
-         "name: $CommandName`n" +
-         "description: $SkillDescription`n" +
-         "---`n`n" +
+
+  # D2: name/description always first; -ExtraFrontmatter (Claude's argument-hint,
+  # disable-model-invocation, etc. — wired up starting wave-2) appends after, in
+  # caller-supplied order. Install-PlaybookSkillsTo enforces the agentskills.io
+  # six-field ceiling for every non-Claude caller before this function ever runs.
+  $fmLines = @('---', "name: $CommandName", "description: $SkillDescription")
+  if ($ExtraFrontmatter) {
+    foreach ($k in $ExtraFrontmatter.Keys) { $fmLines += "$($k): $($ExtraFrontmatter[$k])" }
+  }
+  $fmLines += '---'
+
+  return ($fmLines -join "`n") + "`n`n" +
          $generated + "`n`n" +
          $skillBody + "`n"
 }
@@ -330,13 +455,35 @@ function Get-ClaudeAgentFrontmatter {
   return ($lines -join "`n")
 }
 
+$script:AgentSkillsIoFrontmatterFields = @('name', 'description', 'license', 'compatibility', 'metadata', 'allowed-tools')
+
+function Get-DefaultSkillFrontmatter {
+  # D2 per-harness default. Claude may grow extra keys (argument-hint,
+  # disable-model-invocation, ...) starting wave-2 task 2.5; every other harness
+  # is pinned to the agentskills.io six-field subset so packaging/upload never
+  # hard-errors on an unknown key. Wave-1 ships no per-role extra values yet —
+  # {} is already a valid subset of the six-field spec for every harness.
+  param([string]$HarnessLabel)
+  return [ordered]@{}
+}
+
 function Install-PlaybookSkillsTo {
   param(
     [string]$SkillsRoot,
     [string]$Repo,
     [string]$SyncCommand,
-    [string]$HarnessLabel
+    [string]$HarnessLabel,
+    [switch]$Global,
+    [System.Collections.Specialized.OrderedDictionary]$ExtraFrontmatter
   )
+  if ($null -eq $ExtraFrontmatter) { $ExtraFrontmatter = Get-DefaultSkillFrontmatter -HarnessLabel $HarnessLabel }
+  if ($HarnessLabel -ne 'claude') {
+    foreach ($k in $ExtraFrontmatter.Keys) {
+      if ($script:AgentSkillsIoFrontmatterFields -notcontains $k) {
+        throw "Install-PlaybookSkillsTo: '$HarnessLabel' extra frontmatter key '$k' is outside the agentskills.io six-field spec ($($script:AgentSkillsIoFrontmatterFields -join ', ')) — see plan.v3.md D2/I3."
+      }
+    }
+  }
   New-Item -ItemType Directory -Path $SkillsRoot -Force | Out-Null
   $genFiles = @()
   foreach ($c in (Get-CommandFiles -Repo $Repo)) {
@@ -353,7 +500,9 @@ function Install-PlaybookSkillsTo {
       -Task $task `
       -SkillDescription $skillDesc `
       -SyncCommand $SyncCommand `
-      -Repo $Repo
+      -Repo $Repo `
+      -Global:$Global `
+      -ExtraFrontmatter $ExtraFrontmatter
 
     $skillDir = Join-Path $SkillsRoot $c.Name
     New-Item -ItemType Directory -Path $skillDir -Force | Out-Null

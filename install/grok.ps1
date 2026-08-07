@@ -27,7 +27,8 @@ $genFiles = Install-PlaybookSkillsTo `
   -SkillsRoot $SkillsRoot `
   -Repo $Repo `
   -SyncCommand $syncCommand `
-  -HarnessLabel 'grok'
+  -HarnessLabel 'grok' `
+  -Global:$Global
 
 # Optional: copy agent markdown under skills/_agents for local reference (not auto-loaded by Grok)
 $agentsRef = Join-Path $SkillsRoot '_playbook-agents'

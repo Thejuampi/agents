@@ -2,7 +2,8 @@
 
 Use `agents/orchestrator.md`.
 
-Skill-Description: Run the full multi-agent E2E pipeline as the MAIN agent acting as Orchestrator (do not spawn a nested orchestrator): refine, plan Independent and/or Serial waves (depends_on + BDD + docs), Sensei+Advisor plan review, topo-scheduled builders (max 3 concurrent Independent; Serial same_session resume; exact base SHA / STEP 0), session-registry Continuity, implementation review, black-box QA hard gate (Stage 6), final Sensei, retro. Use when the user runs /e2e or $e2e, or asks for the full end-to-end agent workflow from idea to retrospective.
+Skill-Description: Run the full multi-agent E2E pipeline as the MAIN agent acting as Orchestrator (do not spawn a nested orchestrator): refine, plan Independent and/or Serial waves (depends_on + BDD + docs), Sensei+Advisor plan review, topo-scheduled builders (max 3 concurrent Independent; Serial same_session resume; exact base SHA / STEP 0), session-registry Continuity, implementation review, black-box QA hard gate (Stage 6), final Sensei, retro. Use when the user runs /e2e, or asks for the full end-to-end agent workflow from idea to retrospective.
+Argument-Hint: [session-slug]
 
 Prompt:
 
