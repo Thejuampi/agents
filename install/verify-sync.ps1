@@ -70,7 +70,11 @@ function Build-ClaudeGlobalExpectedTree {
     $task = Get-CommandTask -Path $c.Path
     $agentForDesc = if ($agent) { $agent } else { 'agent' }
     $skillDesc = Get-CommandSkillDescription -Path $c.Path -CommandName $c.Name -AgentName $agentForDesc
-    $agentsSourceDir = Join-Path $Repo 'agents'
+    # Mirrors install/claude.ps1's wave-2 fix (F-2/D3, disclosed by wave-1,
+    # fixed wave-2): name the role, never bake this machine's absolute repo
+    # path into a generated artifact. This mirror is a -Global build, so the
+    # role-fallback hint always uses the -Global phrasing.
+    $roleHint = "ask which project's canonical ``agents/$agentForDesc.md`` to load (a personal/global install is not tied to one specific repo checkout)"
     $cmdBody = @"
 ---
 description: $skillDesc
@@ -80,12 +84,38 @@ $header
 
 $task
 
-Load specialist prompts from ``$agentsSourceDir`` as needed. Prefer the installed skill ``/$($c.Name)`` and subagents under the Claude agents directory when available.
+Load the ``$agentForDesc`` specialist by name (Claude subagent or skill) when available; otherwise $roleHint. Prefer the installed skill ``/$($c.Name)`` and subagents under the Claude agents directory when available.
 "@
     Set-Content -LiteralPath (Join-Path $cmdsDir "$($c.Name).md") -Value $cmdBody -Encoding utf8 -NoNewline
   }
 
   Install-PlaybookSkillsTo -SkillsRoot $skillsRoot -Repo $Repo -SyncCommand $syncCommand -HarnessLabel 'claude' -Global | Out-Null
+
+  # Mirrors install/claude.ps1's wave-2 task 2.5 post-patch: e2e/e2e-resume
+  # alone get argument-hint + disable-model-invocation, regenerated
+  # individually over the uniform-frontmatter copy Install-PlaybookSkillsTo
+  # just wrote (see install/claude.ps1 for the full rationale).
+  foreach ($cmdName in @('e2e', 'e2e-resume')) {
+    $cmdPath = Join-Path $Repo "commands\$cmdName.md"
+    if (-not (Test-Path -LiteralPath $cmdPath)) { continue }
+    $agent = Get-CommandAgent -Path $cmdPath
+    $task = Get-CommandTask -Path $cmdPath
+    $skillDesc = Get-CommandSkillDescription -Path $cmdPath -CommandName $cmdName -AgentName $agent
+    $argHint = Get-CommandArgumentHint -Path $cmdPath
+    $extraFrontmatter = [ordered]@{}
+    if ($argHint) { $extraFrontmatter['argument-hint'] = $argHint }
+    $extraFrontmatter['disable-model-invocation'] = 'true'
+    $skill = New-PlaybookSkillMarkdown `
+      -CommandName $cmdName `
+      -AgentName $agent `
+      -Task $task `
+      -SkillDescription $skillDesc `
+      -SyncCommand $syncCommand `
+      -Repo $Repo `
+      -Global `
+      -ExtraFrontmatter $extraFrontmatter
+    Set-Content -LiteralPath (Join-Path $skillsRoot "$cmdName\SKILL.md") -Value $skill -Encoding utf8 -NoNewline
+  }
 }
 
 function Build-GrokGlobalExpectedTree {

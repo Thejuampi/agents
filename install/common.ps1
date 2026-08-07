@@ -90,16 +90,25 @@ function Get-RoleMeta {
   # tier / capabilityIntent / pathPolicy / opencodeTaskPolicy: frozen per the
   # patched tables in README.md "Model tiers" and agents/orchestrator.md "Model
   # tier map" (task 1.0b), and the full field spec in plan.v3.md section 1.4a.
+  # claudeColor / claudeMaxTurns values below are wave-2's assignment (task 2.7,
+  # plan.v3.md 1.4a: "schema slots owned by wave-1, values assigned once by
+  # wave-2's builder and left as-is after merge" — a named carve-out on top of
+  # the file-level "wave-1 only" row, scoped to exactly these two fields).
+  # Colors are a cosmetic per-role UI hint (9 distinct values for operator
+  # legibility across concurrent transcripts); Claude Code has no documented
+  # strict enum for this field, so an unrecognized name is inert, not fatal.
+  # maxTurns is a runaway-guard ceiling; only sensei/refiner (zero tool access,
+  # single-turn judgment/output roles) get a value — see Get-ClaudeAgentFrontmatter.
   $table = @{
-    orchestrator = @{ tier = 'Highest'; capabilityIntent = 'dispatch';        pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'orchestrator' }
-    planner      = @{ tier = 'Highest'; capabilityIntent = 'shellReadOnly';   pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf' }
-    sensei       = @{ tier = 'Highest'; capabilityIntent = 'noRepoAccess';    pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf' }
-    reviewer     = @{ tier = 'High';    capabilityIntent = 'shellReadOnly';   pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf' }
-    qa           = @{ tier = 'High';    capabilityIntent = 'shellReadOnly';   pathPolicy = 'noProductSource'; opencodeTaskPolicy = 'leaf' }
-    refiner      = @{ tier = 'High';    capabilityIntent = 'noRepoAccess';    pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf' }
-    advisor      = @{ tier = 'Mid';     capabilityIntent = 'docsReadOnly';    pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf' }
-    builder      = @{ tier = 'Mid';     capabilityIntent = 'shellEdit';       pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf' }
-    curator      = @{ tier = 'Mid';     capabilityIntent = 'curatorReadOnly'; pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf' }
+    orchestrator = @{ tier = 'Highest'; capabilityIntent = 'dispatch';        pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'orchestrator'; claudeColor = 'red';    claudeMaxTurns = $null }
+    planner      = @{ tier = 'Highest'; capabilityIntent = 'shellReadOnly';   pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf';         claudeColor = 'blue';   claudeMaxTurns = $null }
+    sensei       = @{ tier = 'Highest'; capabilityIntent = 'noRepoAccess';    pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf';         claudeColor = 'purple'; claudeMaxTurns = 4 }
+    reviewer     = @{ tier = 'High';    capabilityIntent = 'shellReadOnly';   pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf';         claudeColor = 'yellow'; claudeMaxTurns = $null }
+    qa           = @{ tier = 'High';    capabilityIntent = 'shellReadOnly';   pathPolicy = 'noProductSource'; opencodeTaskPolicy = 'leaf';         claudeColor = 'orange'; claudeMaxTurns = $null }
+    refiner      = @{ tier = 'High';    capabilityIntent = 'noRepoAccess';    pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf';         claudeColor = 'pink';   claudeMaxTurns = 4 }
+    advisor      = @{ tier = 'Mid';     capabilityIntent = 'docsReadOnly';    pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf';         claudeColor = 'cyan';   claudeMaxTurns = $null }
+    builder      = @{ tier = 'Mid';     capabilityIntent = 'shellEdit';       pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf';         claudeColor = 'green';  claudeMaxTurns = $null }
+    curator      = @{ tier = 'Mid';     capabilityIntent = 'curatorReadOnly'; pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf';         claudeColor = 'gray';   claudeMaxTurns = $null }
   }
   if ($table.ContainsKey($Name)) {
     $row = $table[$Name]
@@ -108,17 +117,16 @@ function Get-RoleMeta {
     Write-Warning "Get-RoleMeta: unknown role '$Name' — no frozen row for it; returning a conservative default (Mid tier, noRepoAccess, unrestricted path, leaf task policy). Add a real row (via the amendment protocol) before shipping a 10th role."
     $row = @{ tier = 'Mid'; capabilityIntent = 'noRepoAccess'; pathPolicy = 'unrestricted'; opencodeTaskPolicy = 'leaf' }
   }
-  # claudeColor / claudeMaxTurns: schema slots only. Wave-1 owns the frozen key
-  # set; wave-2 (task 2.7) assigns the real per-role color palette and the
-  # sensei/refiner maxTurns runaway guard once Claude frontmatter generation
-  # consumes them. Left $null here rather than guessed (D5 — no false precision).
+  # claudeColor / claudeMaxTurns: populated per-role above by wave-2 (task 2.7);
+  # $row won't have these keys for the unknown-role fallback path, which
+  # resolves to $null here exactly like the other conservative defaults.
   return [ordered]@{
     tier               = $row.tier
     effortLevel        = Get-EffortLevelForTier -Tier $row.tier
     capabilityIntent   = $row.capabilityIntent
     pathPolicy         = $row.pathPolicy
-    claudeColor        = $null
-    claudeMaxTurns     = $null
+    claudeColor        = $row.claudeColor
+    claudeMaxTurns     = $row.claudeMaxTurns
     opencodeTaskPolicy = $row.opencodeTaskPolicy
   }
 }
@@ -367,27 +375,64 @@ Apply Correctness over delivery convenience when the target project defines it: 
 
 function Get-ClaudeAgentFrontmatter {
   param([string]$Name, [string]$Description)
-  # tools / model tuned for Claude Code subagent frontmatter
+  # tools / model tuned for Claude Code subagent frontmatter. Every grant below
+  # is hand-authored and commented per plan.v3.md wave-2's doc deliverable
+  # ("inline comments for every tool-restriction decision") — none of it is
+  # mechanically derived from Get-RoleMeta's capabilityIntent; that pure-
+  # function rule is wave-4/5's (VS Code / OpenCode), not Claude's.
+  #
+  # F-15 (task 2.3): PowerShell is on by default on Windows without Git Bash,
+  # and this repo's own installers are pwsh — Bash alone leaves a role
+  # shell-less on such a machine. Added alongside Bash for builder/qa/reviewer/
+  # planner. orchestrator is deliberately excluded from this policy (see its
+  # case below — 2.4' carve-out). sensei/refiner/advisor/curator have no shell
+  # need under their own agents/*.md contracts and get neither.
+  $roleMeta = Get-RoleMeta -Name $Name
+
   $meta = switch ($Name) {
     'orchestrator' {
+      # 2.4' orchestrator carve-out (plan.v3.md 1.4a; widened I26): the
+      # orchestrator's tool grant is hand-authored and FIXED, never derived
+      # from capabilityIntent ('dispatch') the way a general per-role policy
+      # would. Deriving it (or layering F-15's PowerShell-parity policy onto
+      # it) would drift the grant away from the exact, audited literal this
+      # carve-out exists to pin. This literal reproduces this session's own
+      # live-loaded Claude agent registry grant (Agent, Read, Write, Edit,
+      # Grep, Glob, Bash, Skill; no SendMessage) with Agent removed — a
+      # spawned orchestrator subagent must be able to return a recommendation
+      # to the parent, never dispatch further work itself (README "NEVER spawn
+      # orchestrator"). SendMessage stays absent too. See the wave-2 report
+      # for the before/after diff against the live grant.
       @{
-        tools = 'Agent, Read, Write, Edit, Grep, Glob, Bash, Skill'
+        tools = 'Read, Write, Edit, Grep, Glob, Bash, Skill'
         model = 'opus'
         permissionMode = 'acceptEdits'
       }
     }
     'planner' {
       @{
-        tools = 'Read, Grep, Glob, Bash'
+        tools = 'Read, Grep, Glob, Bash, PowerShell'
         model = 'opus'
         permissionMode = 'plan'
       }
     }
     'sensei' {
+      # F-4 close (task 2.1): `tools: ''` used to skip the `tools:` line
+      # entirely (empty string is falsy in the emitter below), which Claude
+      # Code resolves as "inherits every tool" — silently defeating the
+      # disallowedTools denylist that sat next to it, which itself omitted
+      # Agent/Skill/SendMessage/PowerShell/TaskStop/... (any tool a background
+      # subagent retains that this file's authors hadn't enumerated). Fixed
+      # here with an explicit, non-empty ALLOWLIST instead of a denylist that
+      # would need to be kept in sync with every new tool Anthropic ships:
+      # agents/sensei.md forbids all tool use ("Do not spawn tools. Do not
+      # read files."), so TodoWrite — the one harmless bookkeeping tool — is
+      # the entire grant; everything else is excluded by omission, fail-closed
+      # against future tool additions too.
       @{
-        tools = ''  # no tools — judgment from provided context only
+        tools = 'TodoWrite'
         model = 'opus'
-        disallowedTools = 'Read, Write, Edit, Bash, Grep, Glob, WebFetch, WebSearch'
+        maxTurns = $roleMeta.claudeMaxTurns
       }
     }
     'advisor' {
@@ -401,7 +446,7 @@ function Get-ClaudeAgentFrontmatter {
     }
     'builder' {
       @{
-        tools = 'Read, Write, Edit, Grep, Glob, Bash'
+        tools = 'Read, Write, Edit, Grep, Glob, Bash, PowerShell'
         model = 'sonnet'
         permissionMode = 'acceptEdits'
         # Note: long/integration tests are policy-forbidden in builder.md (orchestrator runs them).
@@ -409,22 +454,27 @@ function Get-ClaudeAgentFrontmatter {
     }
     'reviewer' {
       @{
-        tools = 'Read, Grep, Glob, Bash'
+        tools = 'Read, Grep, Glob, Bash, PowerShell'
         model = 'sonnet'
       }
     }
     'refiner' {
+      # F-4 close (task 2.1): same failure mode and same fix as sensei above —
+      # agents/refiner.md forbids all tool use ("Do not read files. Do not
+      # inspect the repository. Do not browse the web."). Explicit
+      # TodoWrite-only allowlist replaces the empty-tools + partial-denylist
+      # pattern.
       @{
-        tools = ''
+        tools = 'TodoWrite'
         model = 'sonnet'
-        disallowedTools = 'Read, Write, Edit, Bash, Grep, Glob, WebFetch, WebSearch'
+        maxTurns = $roleMeta.claudeMaxTurns
       }
     }
     'qa' {
       @{
         # Stage 6: may read docs + run app; must not write product or notebooks.
         # Product-source oracle forbid is policy in agents/qa.md (degraded detect if needed).
-        tools = 'Bash, Read, Grep, Glob'
+        tools = 'Bash, Read, Grep, Glob, PowerShell'
         model = 'sonnet'
         disallowedTools = 'Write, Edit, NotebookEdit'
       }
@@ -450,7 +500,21 @@ function Get-ClaudeAgentFrontmatter {
   if ($meta.tools) { $lines += "tools: $($meta.tools)" }
   if ($meta.disallowedTools) { $lines += "disallowedTools: $($meta.disallowedTools)" }
   if ($meta.model) { $lines += "model: $($meta.model)" }
+  # effort (task 2.2, D4/D5): sourced from Get-RoleMeta's tier-derived
+  # effortLevel for every role. Declared as a DEFAULT, not a verified optimum —
+  # this repo has no eval harness, so claiming a tuned value would be false
+  # precision (D5); override manually once real-run evidence justifies a
+  # different value (an effort sweep, not carried-over guesswork).
+  if ($roleMeta.effortLevel) { $lines += "effort: $($roleMeta.effortLevel)" }
   if ($meta.permissionMode) { $lines += "permissionMode: $($meta.permissionMode)" }
+  # color (task 2.7): cosmetic per-role UI hint for operator legibility across
+  # 9 concurrent transcripts — Claude Code documents no strict enum for this
+  # field, so an unrecognized value is inert rather than an error.
+  if ($roleMeta.claudeColor) { $lines += "color: $($roleMeta.claudeColor)" }
+  # maxTurns (task 2.7): cheap runaway guard, sensei/refiner only — both are
+  # zero-tool, single-turn judgment/output roles, so a low ceiling catches a
+  # hung/looping session without constraining legitimate use.
+  if ($meta.maxTurns) { $lines += "maxTurns: $($meta.maxTurns)" }
   $lines += '---'
   return ($lines -join "`n")
 }
