@@ -53,7 +53,8 @@ $skillFiles = Install-PlaybookSkillsTo `
   -SkillsRoot $SkillsRoot `
   -Repo $Repo `
   -SyncCommand $syncCommand `
-  -HarnessLabel 'claude'
+  -HarnessLabel 'claude' `
+  -Global:$Global
 $genFiles += $skillFiles
 
 # Legacy/compat command markdown (same slash names)

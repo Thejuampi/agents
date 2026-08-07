@@ -2,7 +2,8 @@
 
 Use `agents/orchestrator.md`.
 
-Skill-Description: Resume a stopped `/e2e` session. Reassesses real stage completion from artifacts and the registry (not file presence alone), reconciles mid-flight registry rows, then continues Stage 0-8 from the earliest incomplete stage — never skipping Stage 5 review, Stage 6 QA, Stage 7 Sensei, or Stage 8 retro just because later-looking artifacts already exist. Use when the user runs /e2e-resume or $e2e-resume, or asks to continue or resume an interrupted E2E run.
+Skill-Description: Resume a stopped `/e2e` session. Reassesses real stage completion from artifacts and the registry (not file presence alone), reconciles mid-flight registry rows, then continues Stage 0-8 from the earliest incomplete stage — never skipping Stage 5 review, Stage 6 QA, Stage 7 Sensei, or Stage 8 retro just because later-looking artifacts already exist. Use when the user runs /e2e-resume, or asks to continue or resume an interrupted E2E run.
+Argument-Hint: [session-slug]
 
 Prompt:
 

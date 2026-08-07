@@ -5,7 +5,7 @@ PS := pwsh -NoProfile -File
 .PHONY: install-codex sync-codex install-codex-global sync-codex-global install-vscode sync-vscode
 .PHONY: install-claude sync-claude install-claude-global sync-claude-global
 .PHONY: install-grok sync-grok install-grok-global sync-grok-global
-.PHONY: install-personal sync-personal
+.PHONY: install-personal sync-personal verify-sync
 .PHONY: install sync uninstall all clean
 
 help:
@@ -51,6 +51,12 @@ install-grok-global sync-grok-global:
 # Personal harnesses used day-to-day (Codex + Claude Code + Grok)
 install-personal sync-personal: install-codex-global install-claude-global install-grok-global
 	@echo "Personal install complete: codex + claude + grok skills/agents."
+
+# Drift detector (D12): regenerates the personal projections into a temp root
+# and diffs them against ~/.claude, ~/.grok, ~/.codex, ~/.agents (read-only).
+# Exits non-zero on drift. Not a wave-level gate (see install/common.ps1 header).
+verify-sync:
+	@$(PS) install/verify-sync.ps1
 
 uninstall:
 	@$(PS) install/uninstall.ps1 -Target "$(TARGET)"

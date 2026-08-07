@@ -30,15 +30,17 @@ If you were spawned *as* `orchestrator` by a parent that should have run e2e its
 
 ### Model tier map (when the harness allows selection)
 
-| Role | Tier | Examples (when available) |
+| Role | Tier | Rationale / examples (when available) |
 | --- | --- | --- |
 | Orchestrator | Highest | Claude Opus, GPT high / “Sol”-class, Grok max |
 | Planner | Highest | same |
 | Sensei | Highest | same |
+| Reviewer | High | Stage 5 correctness gate on Builder's output; Claude Sonnet (high effort), GPT high / “Sol”-class |
+| QA | High | **Genuine pre-existing doc gap, now closed.** Stage 6's hard gate on product acceptance — same weight class as Reviewer's Stage 5 gate |
+| Refiner | High | **This plan's own judgment call**, resolving the prior "Mid or high" range: Refiner's synchronous, one-shot Q&A shapes the entire session's scope, and nothing later structurally re-checks that scoping the way Reviewer/QA structurally re-check Builder's output |
 | Advisor | Mid | Claude Sonnet, GPT mid / “Terra”-class |
 | Builder | Mid | same mid tier |
-| Reviewer | Highest when reviewing correctness-critical work; otherwise mid+ | prefer high if only one review pass |
-| Refiner / Curator | Mid or high | mid is acceptable |
+| Curator | Mid | **This plan's own judgment call**, resolving the prior "Mid or high" range: human-gated acceptance (Stage 8 — output stays candidates until accepted) is a *stronger* correction mechanism than a peer gate, not the absence of one, so Mid is the conservative floor of the range, not an invented uplift |
 
 If the harness cannot select models, note the limitation once and continue with the default model for all roles.
 

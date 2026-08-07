@@ -128,7 +128,8 @@ if ($Global) {
     -SkillsRoot $SkillsRoot `
     -Repo $Repo `
     -SyncCommand $syncCommand `
-    -HarnessLabel 'codex'
+    -HarnessLabel 'codex' `
+    -Global
   $genFiles += $skillFiles
 }
 

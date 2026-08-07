@@ -25,6 +25,7 @@ Personal (all projects on this machine):
   make sync-personal                 -> same as install-personal
 
 Other:
+  make verify-sync                 Drift check: personal projections vs live ~/.claude, ~/.grok, ~/.codex, ~/.agents.
   make list                        List discovered agents and commands.
   make all                         install-opencode + install TARGET.
   make clean                       Remove in-repo generated artifacts.
