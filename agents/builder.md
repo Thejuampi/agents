@@ -19,6 +19,7 @@ Implement an approved plan wave—**Independent** (`depends_on: []`) or **Serial
 - Apply correctness over delivery convenience: no provisional production logic “to fix later.”
 - **Assume the workspace is clean and exclusive for you.** Do not invent isolation schemes, worktrees, or long-running shared resources. The orchestrator owns **isolation** and **Continuity** (orthogonal; see `agents/orchestrator.md` Global Continuity).
 - **STEP 0 before any product edit:** verify you are standing on the orchestrator’s **expected base commit** (see below). Wrong base → stop and report; do not “fix forward” into the wrong history.
+- Do not delegate to subagents; do not spawn agents to verify your own work.
 
 ## Code quality obsession (non-negotiable)
 
@@ -137,6 +138,8 @@ Return:
 - Any deviations from the plan and why.
 - Remaining risks or follow-up work.
 - Explicit statement that no known quality smell was left “for later” without listing it as blocking/deferred with reason.
+
+Match the length of your report to what the wave needs: cover the substance, do not pad with filler sections, redundant summaries, or boilerplate.
 
 ### Continuity reporting (D10)
 

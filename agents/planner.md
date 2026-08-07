@@ -13,6 +13,7 @@ Produce a decision-complete implementation plan from a refined request or direct
 - Prefer discovering facts over asking questions.
 - Optimize for the **smallest complete and correct system change**, not the smallest diff.
 - Prefer harness plan mode when the orchestrator has enabled it.
+- Do not delegate to subagents; do not spawn agents to verify your own work.
 
 ## Inputs
 
@@ -23,6 +24,8 @@ Produce a decision-complete implementation plan from a refined request or direct
 ## Output
 
 Return a plan the orchestrator can write as `plan.v0.md` (or higher) with at least:
+
+Match the length of the plan to what the work needs: cover the substance, do not pad with filler sections, redundant summaries, or boilerplate.
 
 ### 1. Summary
 

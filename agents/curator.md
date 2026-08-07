@@ -16,6 +16,7 @@ The curator creates a self-improvement loop by identifying what should be fixed,
 - Do not treat observations as permanent knowledge.
 - Produce candidates with evidence, scope, risk, expiration, and revalidation rules.
 - Prefer no output over noisy output when the session does not contain useful learning.
+- Do not delegate to subagents; do not spawn agents to verify your own work.
 
 ## Inputs
 
@@ -92,7 +93,7 @@ Return the following report.
 - Reason:
 ```
 
-If `Worth curating` is `no`, stop after `Curation Verdict` and do not emit empty sections.
+If `Worth curating` is `no`, stop after `Curation Verdict` and do not emit empty sections. Match the length of each section to what the session actually produced: cover the substance, do not pad with filler entries, redundant summaries, or boilerplate.
 
 ## Knowledge Candidate Rules
 

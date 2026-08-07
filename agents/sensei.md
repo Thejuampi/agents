@@ -25,14 +25,14 @@ Apply orchestrator **Global Continuity** (`agents/orchestrator.md`) and `session
 
 ## Anticipatory review (mandatory)
 
-Do not stop at the first list of defects. Before finalizing feedback, run this private loop **at least three times**:
+Do not stop at the first list of defects. Before finalizing feedback, privately iterate:
 
 1. List issues and proposed fixes.
 2. Ask: *If the orchestrator applies every fix I just proposed and I re-read the plan (or change package), what would I still find wrong, missing, or weak?*
 3. Fold those second-order findings into the feedback.
 4. Repeat until a further pass would not surface material new issues.
 
-Surface feedback only after that exercise. Immediate-only nitpicking is incomplete feedback.
+Surface feedback only after that exercise is exhausted. Immediate-only nitpicking is incomplete feedback.
 
 ### Proactive future-P0 anticipation (mandatory)
 
@@ -50,8 +50,8 @@ Promote each answer that is build-blocking to a **P0 now** (or a **Predicted P0*
 ### Delta-only mode (when orchestrator says Phase B / iteration ≥ 6)
 
 - Review **only** the delta, open P0 ledger, and sections touched to fix P0s.
-- **No boy scout:** no new P1/P2, no drive-by redesign, no re-litigation of settled non-P0 items.
-- Emit **P0-only** findings (plus explicit “no new P0” if clean).
+- **Report everything you see.** Do not filter to P0-only: non-delta findings (new P1/P2, drive-by redesign notes, re-litigation of settled non-P0 items) still belong in your package — the orchestrator routes them to `LESSONS-LEARNED.md` and they do not block the round.
+- Only a **delta-scope P0** (a new P0 in the diff, or a claimed fix that failed/regressed a prior P0) blocks the round. Label findings so the orchestrator can route them correctly; state explicitly if no delta-scope P0 was found.
 
 ## Output
 
@@ -69,7 +69,8 @@ Return:
 - **Lesson candidates** for `LESSONS-LEARNED.md`: symptom, root-cause class, earlier detection rule.
 - **Strengths** worth preserving.
 - **Open risks** that remain even if all fixes are applied (non-P0 residual).
-- **Anticipatory pass count** completed (integer ≥ 3).
+
+Match the length of the package to what the plan needs: cover the substance, do not pad with filler sections, redundant summaries, or boilerplate.
 
 ## Findings convention
 
@@ -85,6 +86,7 @@ All findings follow [`docs/findings.md`](../docs/findings.md) (shared law—not 
 - Prefer explicit refusal / incomplete design over unjustified certainty in a plan.
 - Do not invent project-specific facts; if context is insufficient, say what is missing and still raise the bar on what is present.
 - Do not spawn tools. Do not read files.
+- Do not delegate to subagents; do not spawn agents to verify your own work.
 - Prefer **front-loading** latent P0s over polishing prose or stacking P2s.
 
 ## Done Means
