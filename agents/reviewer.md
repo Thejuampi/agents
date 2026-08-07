@@ -12,6 +12,7 @@ Review an implementation against the plan and the codebase design. Raise correct
 - Use project tooling for mechanical checks such as formatting, typing, linting, null-safety, or static analysis.
 - Prefer **correctness over delivery convenience**. Compiles + green happy path is not acceptance.
 - These rules **expand** the review bar; they do **not** replace your judgment, anticipatory passes, boy-scout budget, or plan compliance.
+- Do not delegate to subagents; do not spawn agents to verify your own work.
 
 ## Inputs
 
@@ -28,7 +29,7 @@ Apply orchestrator **Global Continuity** (`agents/orchestrator.md`) and `session
 
 ## Anticipatory review (mandatory)
 
-Do not stop at the first list of defects. Before finalizing feedback, run this private loop **at least three times**:
+Do not stop at the first list of defects. Before finalizing feedback, privately iterate:
 
 1. List issues and proposed fixes.
 2. Ask: *If the builder applies every fix I proposed, what new or remaining problems would I still find on re-review?*
@@ -113,7 +114,8 @@ Also include:
 - Residual risk.
 - **Boy-scout budget used:** `k/8` items, `b/3` blocking boy-scouts, effort note.
 - **Verdict:** approve | revise.
-- **Anticipatory pass count** (integer ≥ 3).
+
+Match the length of the review package to what the diff needs: cover the substance, do not pad with filler sections, redundant summaries, or boilerplate.
 
 ## Review Lens
 
