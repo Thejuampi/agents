@@ -6,12 +6,12 @@ Coordinate multi-agent work. For `/e2e`, run the full end-to-end pipeline **as t
 
 ## Identity (critical for `/e2e`)
 
-When `/e2e` (or `$e2e`) is invoked, **the agent that received the skill is the Orchestrator**.
+When `/e2e` (or `$e2e`) — or `/e2e-resume` (or `$e2e-resume`, see **E2E Resume** below) — is invoked, **the agent that received the skill is the Orchestrator**.
 
 | Allowed | Forbidden |
 | --- | --- |
 | Main session loads this file and runs the E2E pipeline | Spawning an `orchestrator` subagent “to run e2e” |
-| Spawning **leaf** specialists (refiner, planner, sensei, advisor, builder, reviewer, curator, qa) | Nested orchestrators, second e2e brains, re-invoking `/e2e` from inside the run |
+| Spawning **leaf** specialists (refiner, planner, sensei, advisor, builder, reviewer, curator, qa) | Nested orchestrators, second e2e brains, re-invoking `/e2e` or `/e2e-resume` from inside the run (either direction) |
 | One continuous orchestrator context for the whole session | Handing the pipeline to a child that never saw Juan’s prior turns |
 
 Nested orchestrators **drop high-value context** and create competing control planes. Do not do it “for cleanliness” or “to free the main thread.”
@@ -77,6 +77,7 @@ Default session root (unless the project defines another convention):
     p0-ledger.md            # open / fixed / waived P0s
     LESSONS-LEARNED.md      # planning/review failure data for this session
   session-registry.md       # continuity rows (orchestrator-owned; see Global Continuity)
+  resume-assessment-r1.md … # /e2e-resume state reconstruction packages (see E2E Resume)
   build/
     wave-1-report.md …
   review/
@@ -658,6 +659,7 @@ Evaluate against **findings ∪ ledger** after ingest. A forged `PASS` with an o
 - Same Sensei thread if available; otherwise a Sensei pass with full latest package under the Continuity ladder above.
 - Sensei still does **not** read files outside the change scope provided as text/diff summary by the orchestrator.
 - Apply or schedule any P0 bar-raising fixes before retro.
+- **`sensei-final.md` must record the product revision it was run against** (same form as `qa/provenance.md`'s stamp — git HEAD or equivalent). Resume's exit check (below) compares this recorded stamp to `qa_pass_revision`, not to the file's mere existence.
 - **Any product-tree craft edit voids Stage 6** — return to Stage 5 (if product changed) → Stage 6 re-QA before claiming ship-ready. Do not thrash Sensei↔QA without Juan ack after the first re-cert cycle.
 
 ### Stage 8 — Retrospective / curation (critical)
@@ -674,6 +676,91 @@ Evaluate against **findings ∪ ledger** after ingest. A forged `PASS` with an o
 - Curator output remains candidates until a human accepts persistence.
 - Product edits during retro **invalidate** Stage 6 the same as any other post-QA product write.
 
+## E2E Resume (`/e2e-resume`)
+
+### Purpose
+
+Continue a `/e2e` session that stopped before Stage 8 retro finished — crash, context loss, a new conversation, a manual pause, or an interrupted specialist spawn. `/e2e-resume` reconstructs what the session actually **completed** (not what it merely produced files for), then re-enters the Stage 0–8 sequence at the earliest stage that is not genuinely done. It never treats the pipeline as finished because build artifacts, a plan file, or a stray QA note exists on disk.
+
+### Identity (same hard rule as `/e2e`)
+
+Whoever receives `/e2e-resume` **is** the Orchestrator for the rest of this session — the same Identity table as `/e2e` above applies: spawn only leaf specialists, never a nested orchestrator, never re-invoke `/e2e` or `/e2e-resume` from inside the run. Resuming is still one continuous orchestrator context; it is not a reason to hand off to a fresh child.
+
+### Session selection
+
+| Case | Action |
+| --- | --- |
+| Juan names a slug / session path | Use it |
+| Exactly one `<slug>` under `.agents/workspace/tmp/e2e/` | Use it |
+| Multiple sessions exist | List each (slug, artifacts present, apparent last stage) and ask Juan which one — never guess |
+| No session directory exists | Nothing to resume; tell Juan to run `/e2e` instead — do not fabricate a session |
+
+### Resume Assessment (mandatory before touching any stage)
+
+Before continuing, write `resume-assessment-r{N}.md` under the session root (`N` increments per `/e2e-resume` invocation on this session — never overwrite a prior assessment).
+
+#### 1. Artifact inventory
+
+List every file present under the session root with its stage bucket and mtime order. This is raw evidence, not a verdict.
+
+#### 2. Per-stage exit verification (evidence, not presence)
+
+A stage counts as **done** only when its actual exit criteria from Stage 0–8 above are met — never from a file merely existing.
+
+| Stage | File existing is not enough — verify |
+| --- | --- |
+| 0 Session | Session dir **and** `session-registry.md` exist |
+| 1 Refine | `refine.md` has goal, in/out of scope, acceptance sketch — not a stub or partial Q&A |
+| 2 Plan | Latest `plan.v{k}.md` has every wave with an explicit `depends_on`, BDD tables, and doc deliverables |
+| 3 Plan review | `plan-review/p0-ledger.md` has **zero open P0** (dual approve or empty ledger) **and** the one-time pre-build P1+ sweep was applied |
+| 4 Build | `session-registry.md` shows **every** planned wave row `status=completed` — not just `build/wave-*.md` existing; a row can be `open`/`failed`/`abandoned` while a report file from a partial run still sits on disk |
+| 5 Implementation review | Latest `review/reviewer-r{N}.md` verdict is `approve`, **and** every item in the matching `fix-package-r{N}.md` was implemented (registry rows `completed`) |
+| 6 Black-box QA | `qa/p0-ledger.md` reflects **agent-green** or a Juan-named `WAIVED` artifact — pipeline-continue, per the state machine above. Passing test suites or a clean build is **never** substitute evidence — Stage 6 exists precisely because those are insufficient |
+| 7 Final Sensei | `sensei-final.md` exists **for the same `qa_pass_revision`** Stage 6 certified — a pass predating later product edits does not count |
+| 8 Retro | `retro.md` exists and covers the whole session, not just the pre-interruption portion |
+
+**Deviation default (fail-closed):** a row whose literal evidence can't exist for this session's actual shape (e.g. a later plan revision descopes to zero waves so no `depends_on`/BDD table exists; an implementation predates the plan so no wave row or `fix-package-r{N}.md` was ever opened) is **not** vacuously done. Treat it as done only if the session's own artifacts **name the deviation and its accepted-as-is scope explicitly** (e.g. a plan revision's own "what's accepted as-is" section, a registry deviation note) — an unexplained absence of the expected evidence defaults to **not done**, same as a stub or partial artifact.
+
+#### 3. Registry reconciliation
+
+Any `session-registry.md` row with `status=open` at resume time was mid-flight when the session stopped — its outcome is unknown, not silently `completed`. Append (do not rewrite history):
+
+- Mark it `abandoned` with a note (`resumed by /e2e-resume r{N}`).
+- Treat the owning wave/role as **not done**; it re-enters the Continuity ladder below before any further work proceeds on it.
+
+#### 4. Determine the resume point
+
+The resume point is the **earliest** stage that fails its exit check in the table above. Resume there — do not skip ahead because a later stage has partial artifacts, and do not skip stages between the resume point and wherever build/code progress happens to have reached. A wave that shipped code with no Stage 5 review behind it is not "ahead," it is unreviewed.
+
+#### 5. Report before continuing
+
+Summarize the assessment to Juan (resume point, open items, registry rows reconciled) before resuming work. Only block on Juan's input when the assessment is genuinely ambiguous (contradictory artifacts, missing `expected_base_sha`, a worktree that no longer exists, more than one plausible session) — otherwise proceed.
+
+### Continuity on resume
+
+Treat every specialist chain as if the orchestrator process itself restarted — a `session_ref` from before the interruption is very likely dead. Apply **Global Continuity**'s admission ladder per role, same as any other dependent edge:
+
+- Attempt `resumed` only if the harness proves a live `session_ref` re-binds.
+- Otherwise `reconstituted` from that role's last admitted package (`sensei-r*.md`, `advisor-r*.md`, `reviewer-r*.md`, `qa/*`, builder/wave reports) when the reconstitution checklist is green.
+- Otherwise `cold_start_waived` (Juan's explicit waiver only) or **BLOCK** — never a silent cold start.
+
+Re-run **STEP 0** / `expected_base_sha` verification for any wave whose build resumes — a worktree or workspace left over from before the interruption may have been cleaned, reset, or hand-edited since. Trusting old workspace state without re-verifying is the same failure class Stage 4's dispatch checklist already forbids.
+
+### Continue the pipeline
+
+From the resume point, follow the Stage 0–8 sequence and rules already defined above — this section adds only the re-entry procedure; it does not redefine any stage's rules (P0 gates, dispatch checklist, Stage 6 gate evaluation, etc. all still apply exactly as written).
+
+**Non-negotiable before declaring the session done** — record this checklist's result in `retro.md`:
+
+- [ ] Stage 5 reached Reviewer `approve` (or a Juan-named Stage 5 waiver)
+- [ ] Stage 6 reached **agent-green** or Juan `WAIVED` + artifact (pipeline-continue) — code existing, or suites passing, is never a substitute
+- [ ] Stage 7 final Sensei pass exists for the **same** product revision Stage 6 certified
+- [ ] `retro.md` exists, covers the full session, and includes a **Resume history** subsection: when the session stopped, what each `/e2e-resume` invocation found, what it reconciled
+
+### Repeated resume
+
+`/e2e-resume` may run more than once on the same session. Each run appends its own `resume-assessment-r{N}.md`; never overwrite a prior one. `session-registry.md` and the P0 ledgers stay append-only, per Global Continuity.
+
 ## Anticipatory feedback (enforce on reviewers)
 
 When Sensei, Advisor, or Reviewer return shallow first-pass nits only, send them back **in the same thread** with:
@@ -684,3 +771,4 @@ When Sensei, Advisor, or Reviewer return shallow first-pass nits only, send them
 
 - `/orchestrate-this`: clear next step or ready to accept.
 - `/e2e`: refine → plan → plan review → build → build review → **black-box QA (agent-green or Juan WAIVED + artifact)** → final Sensei → retro artifacts exist; correctness not traded for convenience; Stage 6 not skipped for suites-green or delivery speed.
+- `/e2e-resume`: same end state as `/e2e` above, reached by honest reassessment of a stopped session — no stage between the resume point and Stage 8 silently skipped because earlier progress looked far along.

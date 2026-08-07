@@ -45,5 +45,6 @@ Notes:
   - Re-run make sync-*-global after editing agents or commands
   - First Claude install that creates ~/.claude/agents may need a Claude Code restart
   - /e2e is the full multi-agent pipeline; see agents/orchestrator.md
+  - /e2e-resume continues a stopped /e2e session; see agents/orchestrator.md (E2E Resume)
 '@
 Write-Host $here
