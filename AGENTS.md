@@ -17,3 +17,4 @@ Rules for editing this repo:
 - Run **`make verify-sync`** before trusting a projection: it diffs the personal harness projections against the live `~/.claude`, `~/.grok`, `~/.codex`, `~/.agents` trees (read-only) and reports drift.
 - `/e2e` session artifacts live under `.agents/workspace/tmp/e2e/<slug>/` (including `plan-review/p0-ledger.md`, `LESSONS-LEARNED.md`, and orchestrator-owned **`session-registry.md`** for Continuity). Do not treat harness-internal task logs as the only review record.
 - Continuity law (wave modes, resume/reconstitute ladder, registry R/W) lives in `agents/orchestrator.md` **Global Continuity**. Dependent edges must not silent cold-start; adapters document harness resume honesty only.
+- Adapter capability claims must cite the harness's own docs with a retrieval date; when a capability is undocumented, say `unverified`, do not guess. See `docs/harness-research.md` (bibliography) and `docs/harness-conformance.md` (per-claim status ledger).
