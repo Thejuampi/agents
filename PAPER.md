@@ -35,7 +35,7 @@ before matching. An agent describing the gate is not using it.
 0.7 to 0.9 seconds per verdict. It reads what the pattern cannot: whether
 "falta" means "I have work left" or "it was missing and I fixed it".
 
-## 2. Confidence as a router, not a judge
+## 2. Routing by confidence
 
 Every pattern carries a confidence. A class written `ask:` condemns on its own;
 a class written `ask?:` only raises a doubt and hands the message to the model.

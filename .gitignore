@@ -3,3 +3,7 @@
 __pycache__/
 judge-log.jsonl
 judge-log.jsonl.stamp
+paper.aux
+paper.log
+paper.out
+paper.tex

@@ -1,0 +1,28 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+
+\title{A self-labeling gate for premature agent stops}
+\author{Juan Lescano}
+\date{August 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A coding agent with standing permission still stops early: it names the next
+step instead of taking it, offers a menu instead of picking, or asks the user to
+run what it could run itself. We describe a Stop-hook gate that catches those
+stops with three lanes of increasing cost, and a mechanism by which the gate
+labels its own errors from the transcript with no human in the loop. Over 150
+real transcripts the gate went from 137 blocks to 127 once two false-positive
+classes were removed, with every freed case verified and no pending item lost.
+We report the negative results in full, including two failed attempts to obtain
+a usable confidence signal from the local model.
+\end{abstract}
+
