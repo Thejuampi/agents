@@ -131,6 +131,11 @@ def main():
     if brief_over(8, tools=9):
         failures.append("blocks that bought work must keep the brief quiet")
 
+    counted()
+    if report.classes({"waiting": True,
+                       "firm": ["Matched: ask: querés que"]}) != ["waiting"]:
+        failures.append("a block sent while work runs is graded as its own class")
+
     print(f"{len(RUNS)} cases, {len(failures)} failures")
     for line in failures:
         print("  FAIL", line)

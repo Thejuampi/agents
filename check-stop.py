@@ -357,7 +357,7 @@ def main():
     waiting = background.waiting_on(transcript)
     if sure:
         note(transcript, lane="pattern", firm=sure, weak=unsure,
-             head=message[:120])
+             head=message[:120], waiting=waiting)
         return block(state, transcript, chain, message,
                      WAITING if waiting else "\n\n".join(sure), repeated)
 

@@ -116,6 +116,9 @@ def locate(entry):
 
 
 def classes(entry):
+    if entry.get("waiting"):
+        return ["waiting"]
+
     names = []
     for text in (entry.get("firm") or []) + (entry.get("weak") or []):
         for part in text.split("Matched: ")[-1].split(chr(10))[0].split(","):
