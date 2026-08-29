@@ -499,6 +499,21 @@ at 0.050 on 40 closings on a wider interval. A rule that fires at a third of
 the rate of the thing it looks for is worse than not firing, and \texttt{wait}
 was the fourth most common intervention the gate made.
 
+The same corpus names what the gate misses. Twelve pushes get past both lanes,
+and reading them takes minutes: most are a turn that ends by naming the very
+next move in the present tense, in either language, and one ends on a colon
+with the thing it promised never written. Three rules were added from that
+reading - six Spanish verbs onto an existing line, a postponed recheck, and a
+shape rule for a closing whose last line ends in a colon - and measured on the
+same rows. The gate goes to 536 fires, precision 0.125, recall 0.859: fewer
+interventions, higher precision and higher recall than the shipped
+configuration at once. Both closings the new rules add are pushes.
+
+We are careful about what that shows. Rules read off a corpus and scored on
+the same corpus are fitted to it, and two closings is not evidence. What the
+loop demonstrates is the cost: an afternoon, no annotation, and a list of
+twelve messages the developer had already labelled by answering them.
+
 Demoting classes still barely moves the shipped number. A greedy search
 removes six of the nine and lifts precision from 0.119 to 0.127, because the
 judge fires on nearly everything the patterns do. The pattern list cannot be
