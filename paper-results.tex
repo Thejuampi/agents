@@ -497,6 +497,16 @@ judge fires on nearly everything the patterns do. The pattern list cannot be
 tuned out of this: the two lanes are not independent, and removing one lane's
 worst rules leaves the other lane firing on the same rows.
 
+The two classes below the base rate were demoted anyway, from firm to doubt:
+they no longer block on their own and now only raise a question the judge
+can settle. The effect is measured and modest. The pattern lane drops from
+389 fires to 326 and its precision rises from 0.123 to 0.132, at the cost of
+one push out of 78. The whole gate moves from 556 fires to 534 with recall
+from 0.846 to 0.833. We report the change because a rule that fires 128
+times at a third of the base rate is worse than no rule, and because the size
+of the gain is the point: 63 fewer interventions and a precision still inside
+the noise of a corpus this small.
+
 \subsection{Two changes that did not earn their place}
 
 Both were written, wired behind a switch, measured on 150 clean rows, and
