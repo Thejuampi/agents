@@ -29,14 +29,18 @@ present in the transcript and cost no annotation. Before the gate exists, the
 developer's own next message says whether they had to ask for work the agent
 could have done. After the gate intervenes, the agent's tool calls before the
 developer speaks again say whether the intervention bought anything. Measured
-over 854 closings from 66 real sessions, the first label puts the base rate of
-premature stopping at 13.9\% and the shipped gate's precision at 0.15 while it
-fires on 74\% of closings: barely above chance, and we report that without
-softening it. The label then pays for itself twice. It shows that an exemption
-the design was confident in -- releasing turns that wait on launched work --
-was releasing turns worse than average, and it selects a judge prompt that
-dominates the shipped one on precision, recall and intervention count at once.
-We report negative results in full, including three separate instructions a 9B
-judge would not hold, and two failed attempts to obtain a usable confidence
-signal from it.
+over 747 closings from 66 real sessions, the first label puts the base rate of
+premature stopping at 10.4\% and the shipped gate's precision at 0.119 while
+it fires on 74\% of closings: barely above chance, and we report that without
+softening it. The second label grades 33 interventions and finds 27 of them
+bought work, which locates the cost precisely -- the gate is imprecise about
+when to speak and largely useful when it does. The labels then pay for
+themselves again. They retire an exemption the design was confident in,
+releasing turns that wait on launched work, and they demote the two pattern
+classes that fire at a third of the base rate. We also report the corpus this
+was first measured on being contaminated by the system's own output, and what
+changed when it was rebuilt. Negative results are reported in full, including
+three separate instructions a 9B judge would not hold, two failed attempts to
+obtain a usable confidence signal from it, and a claim-verification lane that
+found almost nothing to catch.
 \end{abstract}
