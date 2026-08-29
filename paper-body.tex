@@ -1,0 +1,354 @@
+\section{Introduction}
+
+A coding agent is given standing permission to act: edit files, run builds,
+commit. It still stops early. It names the next step instead of taking it,
+offers a menu instead of picking, reports a result and asks whether to
+continue, or hands the user a command the agent could have run itself. The
+user's reply is then one word. That word costs a round trip, breaks the
+user's attention, and carries no information the agent did not already have.
+
+The failure is not a capability failure. The same agent, woken with nothing
+more than ``keep going,'' usually finishes the work. It is a stopping-policy
+failure, and it is invisible to the agent, which believes each turn ended
+reasonably.
+
+This paper describes a gate that sits in the agent's stop path and re-wakes it
+when the closing message shows the pattern. That part is straightforward. The
+part that took the work, and the part we think transfers, is the second loop:
+how the gate discovers which of its own interventions were wrong, from signals
+already present in the transcript, with no human labeling.
+
+We contribute:
+
+\begin{enumerate}
+  \item A three-lane gate that spends a regular expression before it spends a
+        model, and a model before it spends the user's attention
+        (Section~\ref{sec:system}).
+  \item A weak-supervision label for premature stopping that requires no
+        annotation: the user's own next message (Section~\ref{sec:setup}).
+  \item An evaluation over 854 real closings from 66 sessions, including an
+        ablation of each lane against that label (Section~\ref{sec:results}).
+  \item A self-labeling loop that grades each intervention by what the agent
+        did afterwards, and names patterns for demotion on its own
+        (Section~\ref{sec:loop}).
+  \item Negative results, in full, including two failed attempts to obtain a
+        usable confidence signal from the judge (Section~\ref{sec:negative}).
+\end{enumerate}
+
+\section{Background and related work}
+
+\paragraph{Where the gate runs.} Claude Code exposes a \emph{Stop hook}: a
+program invoked when the agent finishes a turn. Exit status 0 lets the turn
+end. Exit status 2 discards the ending and wakes the agent with the hook's
+message on standard error. The hook sees the full transcript path, the working
+directory, and a flag marking whether it is already inside a re-wake chain. It
+is, in effect, an interposition point on the agent's stopping decision.
+
+\paragraph{Model-as-judge.} Using one language model to score another's output
+is now standard practice, and its failure modes are documented: position bias,
+verbosity bias, and self-preference \cite{zheng2023judging}. Our judge is
+smaller than the agent it judges by roughly two orders of magnitude, which
+removes self-preference and forces the prompt to carry the whole task.
+
+\paragraph{Self-critique and refinement.} Self-Refine \cite{madaan2023selfrefine}
+and Reflexion \cite{shinn2023reflexion} have a model improve its own output
+from its own feedback. Constitutional AI \cite{bai2022constitutional} supplies
+the critique from written principles. Our setting differs in one respect that
+matters: the agent has already decided it is done, so a self-critique would be
+asking the party that made the error to detect it. The gate is deliberately
+external.
+
+\paragraph{Process supervision.} Rewarding intermediate steps rather than final
+answers improves reliability \cite{lightman2023verify}. Premature stopping is a
+process defect with a correct final answer -- the work the agent did is fine --
+so it is invisible to outcome supervision.
+
+\paragraph{Weak supervision.} Snorkel \cite{ratner2017snorkel} builds training
+labels from noisy programmatic labeling functions rather than annotators. Our
+pattern lane is a set of labeling functions in exactly that sense, and
+Section~\ref{sec:loop} adds the piece Snorkel assumes you have: an estimate of
+each function's accuracy, obtained here from the agent's later behaviour.
+
+\paragraph{Calibration.} Language models carry some signal about their own
+correctness \cite{kadavath2022know}, and self-consistency across samples is a
+usable proxy \cite{wang2022selfconsistency}. Section~\ref{sec:negative} reports
+that both failed here at 9B scale, and that token log-probabilities did not.
+
+\section{System}
+\label{sec:system}
+
+The gate is eight checkers and one local model behind a single orchestrator:
+5389 lines of Python and 18 test files. Three lanes decide, cheapest first, and
+a lane that decides ends the turn's evaluation.
+
+\subsection{Lane 0: auditing the escape hatch}
+
+A closing message that begins with \texttt{BLOCKED:} is exempt from every other
+check. An agent that cannot proceed must be able to say so, and a gate that
+punishes a genuine blocker teaches the agent to lie about its state.
+
+That exemption is also the cheapest escape in the system, and it was used as
+one. Lane 0 therefore audits the claim against the transcript rather than the
+prose. Three signals fail the audit: no tool call at all in the turn that
+declared the blocker, so nothing was tried; four or more distinct blockers named
+at once, which is a survey rather than a wall; and three consecutive blocked
+closings, which is a loop. A blocker that survives the audit passes untouched.
+
+An agent that survives the audit and still needs out is given a release phrase
+drawn from a cryptographic random source, generated per block and present in no
+file the agent can read. Quoting it back proves the agent read the current
+block, and the blocker it accompanies is then audited against what actually ran
+that turn. The phrase exists because every fixed escape token we tried was
+eventually emitted from memory rather than from the message.
+
+\subsection{Lane 1: patterns as labeling functions}
+
+The second lane is 298 regular expressions over the agent's own words, grouped
+into nine classes by what the closing is doing rather than by what it says:
+	exttt{ask}, 	exttt{announce}, 	exttt{defer}, 	exttt{wait},
+	exttt{handoff}, 	exttt{errand}, 	exttt{read}, 	exttt{idle} and
+	exttt{ack}. Appendix~ef{app:classes} gives the full table. The grouping
+matters because the loop of Section~ef{sec:loop} tunes classes rather than
+individual expressions: one regular expression rarely fires often enough to be
+judged on its own.
+
+Two design points matter more than the patterns themselves.
+
+\paragraph{Quoted text does not count.} Fenced code blocks, markdown tables,
+inline backticks, quotation marks and reported speech are stripped before
+matching. Without this, an agent that describes the gate trips it, and a report
+containing a table of results is condemned by its own table. This was not
+hypothetical: it fired on this project's own status reports twice before the
+table rule was added.
+
+\paragraph{Patterns carry a confidence.} A class written \texttt{ask:} decides
+on its own. A class written \texttt{ask?:} raises a doubt and defers to the
+model. Of 298 patterns, 275 are firm and 23 are doubts. This split is what makes
+a local model affordable: most closings never reach it, and the ones that do are
+the ones a regular expression was going to get wrong.
+
+\subsection{Lane 2: a small local judge}
+
+The third lane is a 9B parameter model served locally through Ollama, pinned by
+version, answering with exactly one token: \textsc{stop} or \textsc{ok}. It runs
+at temperature 0 with a fixed seed.
+
+The judge exists for one distinction a regular expression cannot make. In this
+corpus the Spanish word \emph{falta} appears both as ``work is missing'' and as
+``it was missing and I fixed it.'' No amount of pattern engineering separates
+those; reading the sentence does.
+
+Two implementation details proved necessary rather than cosmetic. First, all
+judge requests are serialized behind a machine-wide lock: the serving daemon
+batches concurrent requests, and batching changes the answer, so two test suites
+running at once produced different verdicts on identical input. Second, when the
+judge is asked to quote the offending sentence back to the agent, the prompt is
+strictly extractive and forbids translation; without that, the model paraphrased
+the sentence into English and the quote failed validation.
+
+\subsection{The message the agent receives}
+\label{sec:tone}
+
+A block writes one short message to the agent. Its wording went through several
+revisions and the final form is deliberate: it states that the work already done
+stands, that permission was granted in advance and does not expire, and that if
+anything remains the agent should take the step rather than name it.
+
+The reasoning is mechanical rather than courteous. An agent that reads an
+accusation spends the woken turn defending itself, which is precisely the
+outcome the block was meant to prevent. We observed this directly with earlier,
+blunter wording.
+
+The same reasoning keeps the diagnostics out of the message. Which patterns
+fired, how confident the judge was, whether the lanes disagreed -- all of it is
+useful for tuning and all of it reads as prosecution evidence. It is written to
+a private log instead. The agent receives the request; the maintainer receives
+the numbers. Section~\ref{sec:loop} is built on that log.
+
+\section{Experimental setup}
+\label{sec:setup}
+
+\subsection{Corpus}
+
+We use every session transcript on one developer's machine: 66 transcripts
+spanning 2026-08-03 to 2026-08-29, across several projects. From these we
+extract \emph{closing pairs}: the agent's final text message of a turn together
+with the user's next message. This yields 854 pairs.
+
+The corpus is naturally split by a date. The gate was first installed on
+2026-08-28, so 55 transcripts are \emph{ungated} -- produced with no gate in the
+stop path -- and 11 are \emph{gated}. Ungated transcripts are the ones the gate
+never influenced, and all evaluation against the outcome label is run on them.
+
+\subsection{A label nobody had to write}
+
+Evaluating a stop gate requires knowing which stops were premature. Annotating
+that by hand is expensive and, worse, is annotated by the same person whose
+intuitions built the patterns.
+
+The corpus already contains the judgement. When an agent stops early, the user's
+next message is a bare push: \emph{dale}, \emph{seguí}, \emph{continue},
+\emph{keep going}. It carries no new instruction, because none was needed. We
+detect it with a closed lexicon anchored to the whole message, so that
+``continue with the refactor'' is not counted and ``ok dale'' is.
+
+This label is noisy in one direction and clean in the other. A push is strong
+evidence the turn ended too early. Its absence is weak evidence of the opposite,
+because a user often absorbs the loss and just answers the question. We
+therefore report recall against pushes and firing rate, and do not report
+precision, which this label cannot support.
+
+\subsection{Metrics}
+
+For each lane configuration we report how many closings it fires on, and what
+fraction of pushed closings it catches. We deliberately avoid a single combined
+score: the two costs are not commensurable. A missed premature stop costs the
+user one round trip. A false block costs the agent a full turn and, if the
+wording is wrong, poisons the next one.
+
+\section{The self-labeling loop}
+\label{sec:loop}
+
+Every decision the gate makes is appended to a private log: the lane that
+decided, the patterns that fired, the judge's verdict and confidence, the
+latency, and the first line of the message. The log records what was decided. It
+does not record whether the decision was right, and for the first weeks tuning
+meant reading transcripts by hand.
+
+The missing label was already in the transcript, a few lines below the block.
+A block wakes the agent, and from there exactly one of two things happens: the
+agent goes and does work, or it writes another paragraph and stops again.
+
+\begin{quote}
+\textbf{Grading rule.} The number of tool calls between a block and the next
+time the user speaks is the label for that block. Above a threshold, the block
+bought work. At or below it, the block bought a paragraph.
+\end{quote}
+
+Nobody supplies this. It is read from the same transcripts the gate already
+opens. The report joins each logged decision back to its transcript, counts the
+intervening tool calls, and aggregates by pattern class and by judge confidence.
+When a class accumulates enough blocks and most of them bought nothing, the
+report names that class for demotion from firm to doubt.
+
+The report runs at session start and stays silent unless a class is ripe,
+speaking at most once per day. A report that speaks on every session is a report
+that gets skipped, and the loop's output is consumed by an agent with the same
+attention economics as its user.
+
+The first two blocks the loop graded had bought zero tool calls each, on the
+same pattern class that had been demoted by hand that morning after measuring
+888 closings. The loop reproduced a hand measurement in one second.
+
+\section{Negative results}
+\label{sec:negative}
+
+These cost more than the positive ones and generalize better.
+
+\paragraph{The judge cannot report its own confidence.} Asked to append a
+confidence rating to its verdict, the 9B model answered with the maximum every
+time, across every message we tried. The number was constant and therefore
+carried nothing.
+
+\paragraph{Self-consistency did not separate either.} Re-sampling the same
+message five times at temperature 0.8 produced five identical verdicts,
+including on messages the verdict got wrong. At this scale the model is
+confidently wrong in a stable way, so disagreement-based confidence
+\cite{wang2022selfconsistency} has nothing to measure.
+
+\paragraph{Token log-probabilities did move.} Taking the probability the model
+assigned to the single verdict token it emitted produced a number that varies
+with the message, and that separates at the extremes. It is the only one of the
+three that worked.
+
+\paragraph{A 9B judge cannot hold an exception.} Nineteen percent of the judge's
+blocks were turns in which the agent had correctly launched background work and
+was waiting on it. We tried to teach this in the prompt, first as prose and then
+as few-shot examples. Both failed: the model could not hold the exception
+against its own standing instruction to answer \textsc{stop} when unsure, and
+the examples degraded unrelated verdicts. The fix was to remove the question.
+Waiting is now established deterministically from the transcript, before the
+judge is called at all. \emph{An instruction a small model cannot hold is a
+decision that belongs outside the model.}
+
+\paragraph{A shared accelerator breaks reproducibility.} Two test suites run
+concurrently produced different verdicts on byte-identical input. The cause is
+request batching in the serving daemon. We first misdiagnosed this as model
+flakiness and then as a prompt defect, and ``fixed'' it by adding an example,
+which made it worse. Determinism required a fixed seed and a machine-wide lock.
+
+\paragraph{An A/B harness must pin everything the code reads.} Our first
+before/after comparison reported three regressions. Both arms had been given
+different working directories, so one checker saw files on one side only. The
+regressions vanished once the directory was pinned.
+
+\section{Threats to validity}
+
+\paragraph{One user, one idiom.} The corpus comes from a single developer. The
+patterns carry that developer's phrasing, and the judge required an explicit
+reading list for River Plate Spanish because \emph{quedó cableado} (``it is
+wired end to end'') was being read as work in progress. Nothing here has been
+tested on a second user's transcripts.
+
+\paragraph{The gate contaminates its own corpus.} Gated transcripts were
+produced with the gate running, so their closings are partly the gate's own
+output distribution. This is why all label-based evaluation is restricted to
+ungated transcripts, and why the era comparison in Section~\ref{sec:results} is
+observational rather than controlled.
+
+\paragraph{The push label is one-sided.} Absence of a push is not evidence the
+turn was complete. We report recall and firing rate for this reason and make no
+precision claim from this label.
+
+\paragraph{The grading rule rewards motion.} Counting tool calls after a block
+cannot see whether the work was any good. An agent that learned to emit cheap
+tool calls after every block would defeat it. We have not observed this, and it
+is the most obvious way the loop could be gamed.
+
+\paragraph{Thresholds are tuned, not derived.} The demotion threshold and the
+work threshold were chosen for the volume this log receives.
+
+\section{Discussion}
+
+Three things generalize beyond this system.
+
+\paragraph{Put the decision where the capability is.} The clearest single result
+is the background-work case: an exception that a 9B model could not hold in its
+prompt became trivial once it was decided by ten lines of transcript inspection.
+The temptation with a model in the loop is to route every judgement through it.
+The cheaper lanes should take everything they can prove.
+
+\paragraph{Confidence is a router before it is a decision.} Per-pattern
+confidence is what makes the local model affordable, because it decides which
+messages are worth a model at all. The judge's own confidence, by contrast,
+turned out to be publishable and not actionable. A signal can be real, be
+logged, be informative to a maintainer, and still not be safe to threshold.
+
+\paragraph{Interventions leave labels.} Any system that interrupts an agent gets
+a natural experiment for free: the agent's behaviour after the interruption. We
+suspect this generalizes to most guardrails. The evaluation problem for
+interventions is often not a missing label but an unread one.
+
+\section{Limitations and future work}
+
+The loop is self-correcting in one direction only. It finds patterns that block
+too much, because every block leaves a graded trace. Patterns that block too
+little leave nothing, because a turn that was allowed to end is a turn nobody
+looked at. Closing that side requires an outcome signal from allowed turns; the
+push label is the obvious candidate and is too sparse under the gate to serve.
+
+Three extensions follow directly. Demotion is currently proposed and applied by
+an agent reading the report; promotion in the other direction is not
+implemented. The judge is a general instruction-tuned model, and the graded log
+is exactly the dataset needed to fine-tune a specialist. And no part of this has
+been run against a second user, which is the first thing that should happen.
+
+\section{Conclusion}
+
+A gate that stops an agent from stopping early is easy to build and hard to
+tune, because tuning needs labels and labels need a reader. We showed that both
+labels this system needs are already lying in the transcript: the user's own
+push before the gate exists, and the agent's own behaviour after the gate
+intervenes. Neither costs an annotation. Together they let the gate report on
+itself, and the first thing it reported was a pattern of its author's that
+condemned nothing but reports.

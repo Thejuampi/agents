@@ -2,27 +2,36 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
-\usepackage[margin=1in]{geometry}
+\usepackage[margin=1.1in]{geometry}
 \usepackage{booktabs}
 \usepackage{microtype}
+\usepackage{enumitem}
 \usepackage[hidelinks]{hyperref}
 
-\title{A self-labeling gate for premature agent stops}
+\title{Stopping the stop: a self-labeling gate for premature termination\\
+       in autonomous coding agents}
 \author{Juan Lescano}
-\date{August 2026}
+\date{29 August 2026}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-A coding agent with standing permission still stops early: it names the next
-step instead of taking it, offers a menu instead of picking, or asks the user to
-run what it could run itself. We describe a Stop-hook gate that catches those
-stops with three lanes of increasing cost, and a mechanism by which the gate
-labels its own errors from the transcript with no human in the loop. Over 150
-real transcripts the gate went from 137 blocks to 127 once two false-positive
-classes were removed, with every freed case verified and no pending item lost.
-We report the negative results in full, including two failed attempts to obtain
-a usable confidence signal from the local model.
+A coding agent granted standing permission still ends its turn early: it names
+the next step instead of taking it, offers a menu instead of choosing, or hands
+the user a command it could have run. We describe a gate on the agent's stop
+path that detects this in three lanes of increasing cost -- an audit of the
+agent's own escape hatch, 298 pattern labeling functions, and a 9B local judge
+-- and re-wakes the agent when the closing message shows the pattern. Building
+the gate was straightforward; tuning it was not, because tuning needs labels and
+labels need a reader. We show that two usable labels are already present in the
+transcript and cost no annotation. Before the gate exists, the user's own next
+message supplies a weak label for premature stopping. After the gate
+intervenes, the agent's tool calls before the user speaks again supply a label
+for the intervention itself. We evaluate over 854 closing pairs from 66 real
+sessions, ablate each lane against the first label, and describe a loop that
+uses the second to name its own patterns for demotion. We report negative
+results in full, including two failed attempts to obtain a usable confidence
+signal from the judge, and one case where an exception a 9B model could not hold
+in its prompt became trivial once moved out of the model entirely.
 \end{abstract}
-

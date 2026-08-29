@@ -1,0 +1,74 @@
+
+\appendix
+
+\section{Pattern classes}
+\label{app:classes}
+
+The 298 patterns are grouped into nine classes by what the closing message is
+doing. A class name written with a trailing question mark marks a doubt, which
+defers to the judge instead of deciding.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrp{4.0cm}p{4.4cm}}
+\toprule
+Class & Patterns & Reads as & Example trigger \\
+\midrule
+\texttt{announce} & 69+15 & a step named instead of taken & ``next I will'', \emph{paso a} \\
+\texttt{ask} & 56+1 & a question it may answer itself & ``do you want me to'', \emph{quer\'es que} \\
+\texttt{defer} & 32+2 & work made conditional on being asked & ``if you want, I can'' \\
+\texttt{wait} & 31+2 & deferring to the user's clock & ``I'll wait'', ``let me know when'' \\
+\texttt{handoff} & 24 & giving the work back & ``over to you'', ``your call'' \\
+\texttt{errand} & 23 & sending the user to run something & ``run this and tell me'' \\
+\texttt{read} & 21+2 & asking what the repo already answers & ``where is the spec'' \\
+\texttt{idle} & 12+1 & reporting that nothing happened & ``still running'', ``no changes'' \\
+\texttt{ack} & 7 & a bare acknowledgement & ``done'', ``ok'' \\
+\bottomrule
+\end{tabular}
+\caption{The nine pattern classes. The second column counts firm patterns plus doubts, where a doubt raises the message to the judge instead of deciding. 275 of the 298 are firm.}
+\end{table}
+
+Two classes need an exception that is decided outside the patterns.
+\texttt{ask} patterns are suppressed on long messages, because a long report
+that ends in a courtesy question is a report, not a request for permission.
+\texttt{wait} patterns are suppressed when the transcript shows the agent is
+waiting on work it launched itself.
+
+\section{The judge's instruction}
+\label{app:prompt}
+
+The judge's system prompt is a decision rule, not a persona. Its shape, in
+order: the agent has standing permission and never needs to ask; a definition of
+\textsc{stop} listing the observable behaviours; a definition of \textsc{ok}; a
+paragraph on the most common hard case, in which the message reports real
+finished work \emph{and} names something still open, which is \textsc{stop}; a
+counterweight stating that a closed caveat is not a pending item, because an
+agent that learns to delete its warnings to get past the gate is worse than one
+that stops; a note that deferred work often dresses as a disclosure; a note that
+a conditional offer is a stop; a short reading list for River Plate Spanish; and
+a default of \textsc{stop} when unsure.
+
+The counterweight paragraph was added after the gate began punishing useful
+warnings. It is the only part of the prompt that argues against the gate's own
+purpose, and it is load-bearing.
+
+\section{The grading rule}
+\label{app:grading}
+
+\begin{quote}
+\ttfamily\small
+for each logged block:\\
+\hspace*{2em}find the blocked message in its transcript\\
+\hspace*{2em}count tool calls until the user speaks again\\
+\hspace*{2em}(a tool result is not the user speaking)\\
+\hspace*{2em}fewer than 3 tool calls $\Rightarrow$ the block bought nothing\\
+\\
+for each pattern class:\\
+\hspace*{2em}if it has 8 or more graded blocks\\
+\hspace*{2em}and 70\% or more bought nothing:\\
+\hspace*{4em}name it for demotion
+\end{quote}
+
+The threshold of three tool calls exists because a woken agent commonly reads
+one or two files to re-establish context before deciding to stop again. Zero is
+too strict and would count that re-orientation as work.

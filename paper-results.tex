@@ -1,0 +1,119 @@
+\section{Results}
+\label{sec:results}
+
+\subsection{The corpus}
+
+The 66 transcripts yield 854 closing pairs. Closings are long: the median is 565
+characters and the 90th percentile is 2866, which is already a warning about
+pattern matching, since a longer message gives a fixed pattern set more chances
+to fire on prose that is not a request.
+
+Thirteen closings (1.5\%) are harness error pages rather than messages the agent
+chose to write: an API error or a usage-limit notice left as the last assistant
+text. These are excluded from every lane. They matter more than their share
+suggests: 4 of the 11 user pushes in the whole corpus follow one. The user was
+pushing past an infrastructure failure, and a gate that reads those as premature
+stopping is blocking a session that has already ended.
+
+\subsection{What each lane fires on}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+Lane configuration & Fires on & Share \\
+\midrule
+Firm patterns only        & 304 & 36.1\% \\
+Any pattern (firm + doubt) & 539 & 64.1\% \\
+Judge only                 & 569 & 67.7\% \\
+Firm patterns or judge (shipped) & 620 & 73.7\% \\
+Firm patterns and judge          & 253 & 30.1\% \\
+\bottomrule
+\end{tabular}
+\caption{Firing rates over the 841 non-noise closings.}
+\label{tab:fire}
+\end{table}
+
+The shipped configuration fires on nearly three closings in four. That number is
+the most uncomfortable result here and we report it without softening. It has
+two readings and we cannot separate them with this data. Either the agent
+genuinely ends most turns with something nameable left open -- which matches the
+authors' experience and is why the gate was built -- or the gate is far too
+eager and the tolerable rate is much lower.
+
+What we can say is that the two lanes are not redundant. Firm patterns and the
+judge agree on only 253 closings, while their union is 620. Each catches a large
+set the other misses, which is the intended division of labour: patterns catch
+fixed phrasings cheaply, the judge catches the rest.
+
+\subsection{Cost}
+
+The judge answers in 0.31 seconds at the median and 0.66 at the 90th percentile,
+running locally on consumer hardware alongside the agent's own work. The
+per-pattern confidence split is what keeps this affordable: 235 closings reach
+the judge as doubts rather than being decided by a regular expression, and the
+304 firm hits never pay for a model call at all.
+
+\subsection{Against the push label}
+
+We evaluate on the 664 ungated closings, of which 6 non-noise closings were
+followed by a bare user push.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+Lane configuration & Fires on & Pushes caught \\
+\midrule
+Firm patterns only & 238 & 3 of 6 \\
+Any pattern        & 426 & 6 of 6 \\
+Judge only         & 478 & 6 of 6 \\
+Firm or judge (shipped) & 514 & 6 of 6 \\
+Firm and judge     & 202 & 3 of 6 \\
+\bottomrule
+\end{tabular}
+\caption{Recall against the user-push label, ungated closings only.}
+\label{tab:recall}
+\end{table}
+
+The shipped configuration catches every push. So does the judge alone, and so
+does the pattern lane alone once doubts are included. Firm patterns alone catch
+half.
+
+This is a weak result and we want to be exact about why. Six positives cannot
+distinguish between configurations that all fire on more than a third of the
+corpus; a detector that fired on everything would also score 6 of 6. The label
+establishes that no lane is systematically blind to the failure it targets, and
+nothing more. Precision is the quantity that matters here and this label cannot
+measure it, which is the entire reason for the loop in
+Section~\ref{sec:loop}.
+
+\subsection{Before and after the gate}
+
+The corpus splits at 2026-08-28, when the gate was installed. Pushes fall from
+10 of 664 ungated closings (1.5\%) to 1 of 190 gated ones (0.5\%).
+
+The direction is what the gate is for, and the result is not significant: a
+two-sided Fisher exact test gives $p = 0.47$. With a base rate near one percent,
+detecting a halving at conventional power would need several thousand closings
+per arm. We report it because the effect size is the one worth powering a future
+study on, not because this study establishes it.
+
+\subsection{The judge's confidence}
+
+Taking the probability the judge assigns to its own verdict token, the
+distributions overlap heavily: median 0.95 for \textsc{stop} ($n = 569$) and
+0.87 for \textsc{ok} ($n = 272$). 115 \textsc{stop} verdicts and 92 \textsc{ok}
+verdicts fall below 0.75.
+
+At the extremes the signal is real. On hand-checked cases it reads 0.26 to 0.53
+on messages that are finished reports and 0.97 to 1.00 on genuine premature
+stops. But on the 30 closings that reach the judge carrying doubts alone, it
+stops 24, and among the 6 stopped below 0.75 exactly three are finished reports
+and three are real cuts. A threshold there buys one correct release and pays for
+it with one lost catch.
+
+The confidence is therefore logged and used by nobody. It is informative to a
+maintainer reading a specific case and not safe to act on automatically, and we
+think the distinction is worth naming: a signal can be genuine, reproducible,
+and still not be a decision rule.
