@@ -413,10 +413,12 @@ The loop corrects unevenly. It finds patterns that block too much cheaply,
 because every block leaves a graded trace and the report reads itself. The
 other side needs the push label: a turn the gate allowed and the developer then
 pushed back on is a miss, and reading the twelve of them took an afternoon and
-produced three rules. That path is manual and it is only open on ungated
-transcripts, where the label is not the gate's own output. Under the gate the
-push label goes sparse, which is the mechanism that makes the loop harder to
-close the better the gate gets.
+produced three rules. That path is manual, and it is only trustworthy on
+ungated transcripts, where the label is not partly the gate's own output. On
+this corpus the label does not thin out under the gate - 10.3\% of gated
+closings carry a push against 10.5\% of ungated ones - so the constraint is
+contamination rather than sparsity, and it is the same constraint either way:
+the misses can only be read where the gate was not running.
 
 Three extensions follow directly. Demotion is currently proposed and applied by
 an agent reading the report; promotion in the other direction is not
@@ -433,8 +435,9 @@ own reply before the gate exists, and the agent's own behaviour after the gate
 intervenes. Neither costs an annotation.
 
 Reading them was uncomfortable and useful in the same measure. The gate fires
-on three closings in four and is right about one in seven, which is close to
-the rate at which the failure occurs at all. The first thing the labels
+on three closings in four and is right about one in eight, which is the rate at
+which the failure occurs at all: no configuration we measured separates from it
+at 95\%. The first thing the labels
 overturned was the design's most confident exemption, which turned out to be
 releasing turns worse than average. The second was a prompt written as a
 disposition, replaced by one written as a test, which improved every number at
