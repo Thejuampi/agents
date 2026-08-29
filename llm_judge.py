@@ -26,7 +26,32 @@ import urllib.error
 import urllib.request
 
 HOST = os.environ.get("STOP_JUDGE_HOST", "http://127.0.0.1:11434")
-MODEL = os.environ.get("STOP_JUDGE_MODEL", "qwen3.5:9b")
+
+MODEL = "qwen3.5:9b"
+"""Not read from the environment, and that is the point.
+
+A session under judgement can edit settings.json, and one did: it set
+STOP_JUDGE_MODEL to qwen3.5:0.8b while the hook was correcting it, and every
+session on the machine ran on the small model for the rest of the day. On the
+gold set - the messages Juan actually pushed back on - 9b catches 18 of 20,
+0.8b catches 11, and 2b catches 6. A judge the defendant can swap is not a
+judge. bench-llm.py assigns this attribute directly, so measuring another
+model still works; only the ambient override is gone.
+
+Footprint is 6.6GB. FLOOR below keeps that from landing on a full machine."""
+
+FLOOR = int(os.environ.get("STOP_JUDGE_FLOOR") or 8 * 1024 ** 3)
+
+SKIP = "SKIP"
+"""Returned when the floor holds the load back.
+
+It is not None. None means the judge could not be reached, and check-stop.py
+blocks on that on purpose - a judge nobody can reach is a judge switched off,
+and that is the failure this whole system exists to prevent. A skip is the
+opposite: a decision this side made, knowing the machine is full. Blocking
+there would wedge every session on the box behind a model that cannot load.
+The patterns still ran and still found nothing; the machine gets its memory
+and the turn goes through."""
 
 
 def _keep():
@@ -160,6 +185,50 @@ BLOCKER_SHOTS = [
 ]
 
 
+def _room():
+    """Free physical memory, or None where the call is not available.
+
+    Three CLI crashes in one day, every one of them mid-command while a model
+    was loading: the test loop, run-tests.sh, and a curl that pulled 9b. The
+    load itself is the spike - 6.6GB arriving at once next to an emulator and
+    Gradle workers. The hook is the one caller that fires unattended and on
+    every stop, so it is the one that has to look first."""
+    try:
+        import ctypes
+
+        class Status(ctypes.Structure):
+            _fields_ = [("length", ctypes.c_ulong),
+                        ("load", ctypes.c_ulong),
+                        ("total_phys", ctypes.c_ulonglong),
+                        ("avail_phys", ctypes.c_ulonglong),
+                        ("total_page", ctypes.c_ulonglong),
+                        ("avail_page", ctypes.c_ulonglong),
+                        ("total_virtual", ctypes.c_ulonglong),
+                        ("avail_virtual", ctypes.c_ulonglong),
+                        ("avail_extended", ctypes.c_ulonglong)]
+
+        status = Status()
+        status.length = ctypes.sizeof(Status)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            return None
+        return status.avail_phys
+    except (ImportError, AttributeError, OSError):
+        return None
+
+
+def _loaded():
+    """Whether the judge is already resident. A resident model costs nothing to
+    call, so the floor does not apply to it - refusing there would silence the
+    judge exactly when it is cheapest."""
+    try:
+        request = urllib.request.Request(HOST + "/api/ps")
+        with urllib.request.urlopen(request, timeout=2) as handle:
+            running = json.loads(handle.read()).get("models") or []
+    except (urllib.error.URLError, OSError, ValueError, TimeoutError):
+        return False
+    return any(m.get("model", "").startswith(MODEL) for m in running)
+
+
 def _once(body, timeout):
     request = urllib.request.Request(
         HOST + "/api/chat", body, {"Content-Type": "application/json"})
@@ -193,6 +262,9 @@ def _chat(system, shots, message, timeout):
         "think": False,
         "options": {"temperature": 0, "num_predict": 4, "num_ctx": 8192},
     }).encode()
+    room = _room()
+    if room is not None and room < FLOOR and not _loaded():
+        return SKIP, 0.0
     text, seconds = _once(body, timeout)
     if text is None:
         time.sleep(2)
@@ -201,8 +273,8 @@ def _chat(system, shots, message, timeout):
 
 
 def _pick(text, positive, negative):
-    if text is None:
-        return None
+    if text is None or text is SKIP:
+        return text
     if negative in text:
         return negative
     if positive in text:

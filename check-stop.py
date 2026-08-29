@@ -289,6 +289,8 @@ def main():
         audit = run_checker(BLOCKED_CHECKER, data)
         calls = tools_this_turn(transcript)
         verdict, _ = judge.blocker_verdict(message, calls)
+        if verdict is judge.SKIP:
+            verdict = "REAL" if not audit else "FAKE"
         if verdict is None:
             return block(state, transcript, chain, message,
                          SILENT.format(host=judge.HOST), repeated)
@@ -306,6 +308,8 @@ def main():
                      "\n\n".join(objections), repeated)
 
     verdict, _ = judge.stop_verdict(message)
+    if verdict is judge.SKIP:
+        return allow(state, transcript)
     if verdict is None:
         return block(state, transcript, chain, message,
                      SILENT.format(host=judge.HOST), repeated)
