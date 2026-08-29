@@ -124,6 +124,7 @@ def label(rows, step=50):
                        if not h.split(":")[0].rstrip().endswith("?")]
         verdict, _ = judge.stop_verdict(message, asked=row["asked"])
         row["verdict"] = verdict if isinstance(verdict, str) else None
+        row["sure"] = judge.sureness()
         row["fired"] = bool(row["firm"]) or row["verdict"] == "STOP"
     return rows
 

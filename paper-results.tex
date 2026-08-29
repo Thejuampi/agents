@@ -370,8 +370,10 @@ have.
 
 \subsection{The judge's confidence}
 
-These counts are from the first pass; the rebuilt corpus stores verdicts
-without their token probabilities, so the distribution was not recomputed.
+These counts are from the first pass. The rebuilt corpus stored verdicts
+without their token probabilities, so the distribution was not recomputed;
+the builder now keeps the probability with the verdict, so the next rebuild
+answers this without a second pass over the model.
 Taking the probability the judge assigns to its own verdict token, the
 distributions overlap heavily: median 0.95 for \textsc{stop} ($n = 569$) and
 0.87 for \textsc{ok} ($n = 272$). 115 \textsc{stop} verdicts and 92 \textsc{ok}
