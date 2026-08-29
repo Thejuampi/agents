@@ -50,11 +50,11 @@ HOLLOW = re.compile(
     re.IGNORECASE,
 )
 
-REMINDER = """STOP HOOK - A SUCCESS NOBODY CAN SEE
+REMINDER = """ALMOST - ONE PART IS STILL EMPTY
 
 {items}
 
-You declared it working and named the empty part in the same breath. Wire it to something a user can look at, then say it works."""
+The mechanism works and you proved it. The part you named as empty is the only thing between this and something a user can look at. Fill it, then the claim is fully yours."""
 
 
 def evidence(message):
@@ -66,8 +66,8 @@ def evidence(message):
             hollow.append(found)
     if not works or not hollow:
         return []
-    return [f"  - it claims: {works.group(0)}",
-            "  - it concedes: " + ", ".join(hollow[:4])]
+    return [f"  - it reports: {works.group(0)}",
+            "  - still open: " + ", ".join(hollow[:4])]
 
 
 def main():

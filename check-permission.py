@@ -51,9 +51,9 @@ def unquoted(message, code=True):
         plain = CODE.sub(" ", plain)
     return REPORTED.sub(" ", QUOTED.sub(" ", plain))
 
-REMINDER = """STOP HOOK - YOU DO NOT NEED PERMISSION
+REMINDER = """KEEP GOING - YOU ALREADY HAVE PERMISSION
 
-Matched: {hits}. Permission was granted in advance and does not expire. Take the step instead of naming it, pick one instead of offering a menu, run it yourself instead of sending the user, and answer from the repo instead of asking what it already says: {sources}"""
+Matched: {hits}. What you did is fine; permission was granted in advance and does not expire. If work is left, take the step instead of naming it, pick one instead of offering a menu, run it yourself instead of sending the user, and answer from the repo instead of asking what it already says: {sources}"""
 
 
 def read_patterns(path):

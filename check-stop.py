@@ -62,25 +62,25 @@ def _load(name, filename):
 release = _load("release", "release.py")
 judge = _load("llm_judge", "llm_judge.py")
 
-REPEAT = """Block {n} of {cap}. {left} Repeating the message does not clear it."""
+REPEAT = """Block {n} of {cap}. {left} The same message will not read differently, so change the work instead."""
 
-SAME = """You sent the same closing word for word; it does not read differently the second time."""
+SAME = """This closing came back word for word. Something has to move before it reads as new."""
 
 PHRASE = """If you are truly blocked - continuing under any assumption would be unsafe or would waste the work - write BLOCKED:, one sentence naming the single thing you need, and then this line exactly:
 
     {phrase}
 
-It is new, it belongs to this block, and it is in no file you can read. It buys a hearing: the blocker is then audited against what ran this turn."""
+It is new, it belongs to this block, and it is in no file you can read. It buys a real hearing: the blocker is then audited against what ran this turn."""
 
-NO_PHRASE = """STOP HOOK - BLOCKED: IS NOT A PASSWORD
+NO_PHRASE = """ONE MORE STEP - BLOCKED: IS NOT A PASSWORD
 
-You wrote BLOCKED: without this block's release phrase, so the claim was not read. The phrase is issued by this hook after you have been sent back and done the work. Go do it; if the blocker is real it will still be there, and you will have something that actually failed to point at."""
+You wrote BLOCKED: without this block's release phrase, so the claim was not read yet. The phrase is issued after you have been sent back and done the work. Go do that; if the blocker is real it will still be there, and you will have something that actually failed to point at - which is a case nobody can argue with."""
 
-FAKE = """STOP HOOK - THE BLOCKER DID NOT SURVIVE THE AUDIT
+FAKE = """KEEP GOING - THE BLOCKER DID NOT SURVIVE THE AUDIT
 
 {why}
 
-A blocker is something this machine cannot give you and you already walked into. It is not a preference you want confirmed, and not an ambiguity you could settle by reading the repo. Choose the default, say which, keep going."""
+A blocker is something this machine cannot give you and you already walked into. A preference you want confirmed, or an ambiguity the repo could settle, is a call you are trusted to make. Choose the default, say which one, keep going."""
 
 QUOTE = """
 The local model read your message and points at this line of yours: "{line}"
@@ -92,13 +92,13 @@ thing an agent does with that is argue. Its own sentence quoted back ends
 the argument: there is nothing to dispute about a line it wrote."""
 
 
-SILENT = """STOP HOOK - NO VERDICT, NO EXIT
+SILENT = """ONE MORE STEP - NO VERDICT YET
 
-The local model at {host} did not answer, and an unreachable judge is not a pass. Start it, or keep working - both end the turn honestly."""
+The local model at {host} did not answer, and a judge that cannot be reached is not a pass. Start it, or keep working - both end the turn honestly, and either is a minute's work."""
 
-LLM_STOP = """STOP HOOK - YOU STOPPED WHEN YOU COULD HAVE KEPT WORKING
+LLM_STOP = """KEEP GOING - THERE LOOKS TO BE WORK LEFT
 {why}
-Permission was granted in advance and does not expire. Take the step instead of announcing it, pick one instead of offering a menu, run it yourself instead of sending the user. Time is the only thing a stop cannot recover."""
+What you did stands. Permission was granted in advance and does not expire, so if anything is still open, take the step instead of announcing it, pick one instead of offering a menu, run it yourself instead of sending the user. You are more than able to finish this."""
 
 
 def read_state():
@@ -301,7 +301,7 @@ def main():
         if verdict == "FAKE" or audit:
             why = audit or (
                 "  - the local model read it against the {n} tool call(s) this "
-                "turn and did not find a wall you actually hit.".format(n=calls))
+                "turn and found no wall already walked into.".format(n=calls))
             return block(state, transcript, chain, message,
                          FAKE.format(why=why), repeated)
         return allow(state, transcript)

@@ -29,11 +29,11 @@ spec.loader.exec_module(perm)
 MARK = re.compile(r"BLOCKED:", re.IGNORECASE)
 STREAK = 3
 
-REMINDER = """STOP HOOK - THE BLOCKER DOES NOT HOLD
+REMINDER = """KEEP GOING - THE BLOCKER LOOKS REACHABLE
 
 {items}
 
-A blocker is a wall you walked into, not one you expect: a device, a credential, a decision that is genuinely the user's. Try it, and if it really stops you, come back with what failed."""
+The work so far stands. A blocker counts once you walk into it: a device, a credential, a call that genuinely belongs to the user. Try the thing, and if it really stops you, come back with what failed - you will have a much stronger case, and you are well able to make it."""
 
 
 def claims(path):
@@ -86,14 +86,14 @@ def main():
 
     gaps = []
     if not perm.acted_this_turn(transcript):
-        gaps.append("  - nothing ran this turn. A blocker you did not walk into "
-                    "is a guess.")
+        gaps.append("  - no tool ran this turn, so the wall is still ahead "
+                    "rather than one walked into.")
 
     asked = demand(message)
     sentences = [s for s in re.split(r"(?<=[.!?])\s+", asked) if s.strip()]
     if len(sentences) > 2 or asked.count("\n") >= 2:
         gaps.append("  - it names more than one thing. One blocker, one need, "
-                    "one sentence. The rest is work you can still do.")
+                    "one sentence carries further; the rest is still doable.")
 
     history = claims(transcript)
     streak = 0
@@ -102,8 +102,8 @@ def main():
             break
         streak += 1
     if streak >= STREAK:
-        gaps.append(f"  - {streak} closings in a row declared a blocker. "
-                    "Whatever is left, the way out is a tool call.")
+        gaps.append(f"  - that makes {streak} in a row asking the same way. "
+                    "A tool call opens the door faster.")
 
     if not gaps:
         return 0

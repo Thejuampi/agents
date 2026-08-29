@@ -102,11 +102,11 @@ def exercised(head, root):
         return target.lower().startswith(root)
     return "/tmp/" not in target.lower() and not target.lower().startswith("../")
 
-REMINDER = """STOP HOOK - YOU CALLED IT DONE AND THE TREE DISAGREES
+REMINDER = """ALMOST - A FEW GAPS ARE STILL OPEN
 
 {gaps}
 
-Green unit tests prove the code compiles, not that the app builds, that anybody ran it, or that a live endpoint answered. Close those gaps yourself now - build it, run it, commit it - and then report what happened."""
+The code is written and that is the hard part. Green unit tests prove it compiles; they do not prove the app builds, that anybody ran it, or that a live endpoint answered. Close those yourself now - build it, run it, commit it - and then tell me what happened. You are close."""
 
 
 def commands(path):
@@ -182,14 +182,14 @@ def main():
     gaps = []
     heads = [h for c in ran for h in steps(c)]
     if not any(BUILD.search(h) for h in heads):
-        gaps.append("  - the build never ran. A test task is not a build.")
+        gaps.append("  - the build never ran yet; a test task is not a build.")
     if not any(exercised(h, root) for h in heads) and not any(live(c) for c in ran):
-        gaps.append("  - nothing ran the app or touched a live endpoint. "
-                    "Fixtures answer the questions you already knew.")
+        gaps.append("  - the app and the live endpoint are still untouched; "
+                    "fixtures answer only what was already known.")
     pending = uncommitted(cwd, touched)
     if pending:
         shown = ", ".join(sorted(pending)[:6])
-        gaps.append(f"  - {len(pending)} source file(s) you wrote are uncommitted: {shown}")
+        gaps.append(f"  - {len(pending)} source file(s) still uncommitted: {shown}")
 
     if not gaps:
         return 0

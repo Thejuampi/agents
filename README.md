@@ -112,6 +112,19 @@ que es la parte medida en 17 de 17.
 Todo lo que sale del guardia entra en un título y dos párrafos. Un recordatorio
 largo se saltea igual que uno corto, y cuesta más.
 
+## El tono
+
+Del otro lado hay alguien capaz que ya venía trabajando. Un mensaje que retea se
+lee como un adversario, y con un adversario se discute en vez de seguir. Así que
+cada recordatorio reconoce primero lo que sí está hecho, nombra lo que queda, y
+confía en que lo va a cerrar.
+
+Los hechos también se eligen. "Nada corrió y no entraste en ninguna pared" y "no
+corrió ninguna herramienta, así que la pared sigue adelante" dicen lo mismo; el
+segundo describe el trabajo, el primero a la persona. La verdad no ofende, pero
+cambia cómo te tratan después, y el guardia necesita que lo escuchen seis veces
+seguidas.
+
 Ocupa 6.6 GB. Si a la máquina le quedan menos de 8 GB libres, el guardia no lo
 carga y deja pasar el turno: trabar todas las sesiones detrás de memoria que no
 va a aparecer es peor que perder un control.

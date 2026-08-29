@@ -61,7 +61,7 @@ def main():
     code, err = run([REAL], acted=False)
     if code != 2:
         failures.append("a blocker declared with nothing run must fire")
-    elif "did not walk into" not in err:
+    elif "walked into" not in err:
         failures.append("the reminder must name the missing attempt")
 
     code, err = run(["BLOCKED: falta el SDK. Tambien falta la clave de FRED. "

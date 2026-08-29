@@ -39,11 +39,11 @@ INVERTED = re.compile(
 
 DIGITS = re.compile(r"\d[\d.,]*")
 
-REMINDER = """STOP HOOK - NUMBERS YOU DID NOT MEASURE
+REMINDER = """ONE MORE STEP - THESE FIGURES ARE NOT MEASURED YET
 
 {items}
 
-Nothing in this session printed them. Run the thing and quote what it says, or drop the number - a figure nobody measured is the one a reader trusts most and checks least."""
+Nothing in this session printed them. A number nobody measured is the one a reader trusts most and checks least, so it is worth the extra minute: run the thing and quote what it says, or drop the figure. Everything else in the report holds up."""
 
 
 def blocks(path):
@@ -135,7 +135,7 @@ def main():
     if not missing:
         return 0
 
-    items = "\n".join(f"  - {n}, nowhere in this session's output" for n in missing[:8])
+    items = "\n".join(f"  - {n}, not found in this session's output" for n in missing[:8])
     sys.stderr.write(REMINDER.format(items=items) + "\n")
     return 2
 

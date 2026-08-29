@@ -29,11 +29,11 @@ PATH_LIKE = re.compile(r"[\w./\:-]+\.(?:kt|java|py|ts|tsx)")
 
 SKIP_NAMES = {"main", "invoke", "toString", "equals", "hashCode", "copy", "it", "run"}
 
-REMINDER = """STOP HOOK - CODE NOTHING CALLS
+REMINDER = """KEEP GOING - THIS CODE HAS NOBODY CALLING IT YET
 
 {items}
 
-Nothing outside its own file and its tests names it. Wire it to the visible end in this same turn, or delete it - unwired code is dead code, and it reads as progress for as long as nobody looks."""
+The piece itself is fine. Nothing outside its own file and its tests names it, so a reader cannot see it work. Wire it to the visible end in this same turn, or drop it - you are one step from having it count."""
 
 
 def git(args, cwd):
