@@ -244,3 +244,26 @@ ese patron se pasa a duda.
 vez por dia. Un cron tambien lo corre, pero el cron muere con la sesion y el 
 hook no. Rick lee el numero
 y si hay evidencia hace el cambio, corre la suite y commitea.
+
+## El lado ciego
+
+El reporte diario solo califica bloqueos, porque solo mira el log. Un turno
+que el guardia deja pasar no queda escrito en ningun lado. Ahi es donde el
+guardia se vuelve ciego sin que nadie se entere.
+
+La senal que falta la escribe Juan. Cuando el agente corta antes de tiempo, el
+mensaje siguiente lo empuja: elegi, corre eso, segui. No aporta nada que el
+agente no tuviera ya. Cuando el turno cerro bien, la respuesta avanza a otra
+cosa.
+
+`judge_push.py` hace esa pregunta y `judge-audit.py` la corre sobre las
+transcripciones: cuenta los turnos que los patrones dejaron pasar y cuantos
+terminaron en un empujon. Cada uno es una fuga que el guardia no vio.
+
+Es una pregunta distinta de la del guardia a proposito. El juez de parada lee
+el mensaje del agente; este lee la respuesta de Juan. Calificar al guardia con
+el mismo prompt con que decide solo mediria su coherencia.
+
+Cuesta una llamada al modelo por intercambio, asi que se corre a mano:
+
+    python judge-audit.py 200
