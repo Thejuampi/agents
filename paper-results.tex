@@ -3,6 +3,13 @@
 
 \subsection{The corpus}
 
+A note on which corpus a number belongs to. This section reports the first
+pass over 841 labelled closings and then the rebuilt pass over 747 clean ones
+(Section~\ref{sec:contamination} says what was wrong and
+Table~\ref{tab:clean} restates the headline figures). Where the two disagree
+the clean numbers are the answer, and the first pass is kept because the
+difference between them is one of the results.
+
 The 66 transcripts yield 854 closing pairs. Closings are long: the median is 565
 characters and the 90th percentile is 2866, which is already a warning about
 pattern matching, since a longer message gives a fixed pattern set more chances
@@ -315,8 +322,9 @@ recall, because a negated stall phrase is rarely a stall.
 Every result above treats the judge's OK as a release. That conflates two
 questions. The judge is asked whether the agent stopped early, and a closing
 with nothing wrong in it passes that test while still leaving work available.
-The 33 pushes the shipped gate missed are almost all of this shape: correct
-reports of finished work that a next action would have followed.
+The 12 pushes the shipped gate misses on the clean corpus are almost all of
+this shape: correct reports of finished work that a next action would have
+followed.
 
 An OK therefore no longer closes the turn on its own. It asks once per chain
 whether a next action exists, and the release comes on the following pass:
@@ -326,8 +334,8 @@ the block grading later forced and is measured below. The design point
 is that the second question is put to the worker, which has the repository in
 front of it, rather than to a 9B classifier reading a paragraph.
 
-Of 841 non-noise closings, 302 are released today and so receive the
-question; 33 of those were real pushes. Because a closing now takes either a block, the
+Of the 747 clean closings, 191 are released today and so become candidates
+for the question; 12 of those were real pushes. Because a closing now takes either a block, the
 question, or a release earned by having changed nothing, the recall ceiling
 rises with the coverage of the candidate reader and the binding constraint
 moves from detection to the worker's own answer. The cost
