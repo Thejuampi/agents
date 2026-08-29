@@ -11,6 +11,8 @@ import json
 import os
 import sys
 
+NL = chr(10)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 CORPUS = os.path.join(HERE, "corpus.json")
 INSTALL = "2026-08-28"
