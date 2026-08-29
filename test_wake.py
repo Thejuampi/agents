@@ -55,7 +55,20 @@ off = load("judge_off")
 check("zero turns the start off", off._wake(), False)
 os.environ.pop("STOP_JUDGE_WAKE")
 
+def servers():
+    out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq llama-server.exe"],
+                         capture_output=True, text=True)
+    return out.stdout.count("llama-server.exe")
+
+
+judge = load("judge_live")
+judge.stop_verdict("Listo, suite verde, commit abc1234.")
+check("the model is up before the daemon is killed", servers() > 0, True)
+
 subprocess.run(["taskkill", "/F", "/IM", "ollama.exe"], capture_output=True)
+check("killing the parent hard leaves the model server orphaned, holding the "
+      "card - this is what made the judge answer SKIP for an hour",
+      servers() > 0, True)
 for _ in range(15):
     if not alive():
         break
@@ -81,6 +94,7 @@ if os.path.exists(state):
 
 check("a stop with the daemon down still gets a verdict", done.returncode, 0)
 check("and the daemon is left running for the next session", alive(), True)
+check("and no orphan is left holding VRAM for the next load", servers() <= 1, True)
 
 print(f"{cases} cases, {len(failures)} failures")
 for line in failures:

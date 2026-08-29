@@ -246,6 +246,51 @@ def _alive():
         return False
 
 
+def _orphans():
+    """Kill the model servers left behind when the daemon died.
+
+    Ollama runs each model in its own llama-server child. Kill the parent hard
+    and the children stay up holding the card: four of them, 5GB of VRAM
+    between them, and the next load fails with ErrorOutOfDeviceMemory while
+    every free-memory reading on the box looks fine. That is not a guess -
+    test_wake killed the daemon with taskkill /F and left exactly that, and
+    the judge answered SKIP for an hour afterwards.
+
+    Only when no ollama.exe is left, because then every one of them is an
+    orphan by definition. The path filter keeps a llama-server somebody else
+    started out of it."""
+    try:
+        alive = subprocess.run(["tasklist", "/FI", "IMAGENAME eq ollama.exe"],
+                               capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return
+    if "ollama.exe" in alive.stdout:
+        return
+    binary = shutil.which("ollama")
+    if not binary:
+        return
+    home = os.path.dirname(os.path.abspath(binary)).replace(chr(92), "/").lower()
+    try:
+        listing = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "Get-CimInstance Win32_Process -Filter \"Name='llama-server.exe'\" "
+             "| ForEach-Object { $_.ProcessId.ToString() + '|' + $_.ExecutablePath }"],
+            capture_output=True, text=True, timeout=25)
+    except (OSError, subprocess.SubprocessError):
+        return
+    for row in listing.stdout.splitlines():
+        pid, _, path = row.strip().partition("|")
+        if not pid.isdigit() or not path:
+            continue
+        if not path.replace(chr(92), "/").lower().startswith(home):
+            continue
+        try:
+            subprocess.run(["taskkill", "/F", "/PID", pid],
+                           capture_output=True, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+
 def _wake():
     """Start Ollama when it is simply not running, and say whether it answered.
 
@@ -265,6 +310,7 @@ def _wake():
     binary = shutil.which("ollama")
     if not binary:
         return False
+    _orphans()
     try:
         subprocess.Popen([binary, "serve"],
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,

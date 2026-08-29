@@ -47,12 +47,22 @@ Tope: después de 6 bloqueos seguidos el guardia se corre. Siempre hay salida.
 |---|---|
 | `check-permission.py` | pide permiso que ya tenía, o anuncia el paso en vez de darlo |
 | `check-numbers.py` | reporta un número que nada en la sesión imprimió |
-| `check-claims.py` | dice que creó un archivo o borró un símbolo; pregunta al árbol |
 | `check-done-claim.py` | dice "terminado" sin build, sin correr, sin commit |
 | `check-hollow.py` | canta éxito y en la misma frase admite que está vacío |
 | `check-dead-code.py` | agregó código que nada afuera de sus tests usa |
 | `check-blocked.py` | audita el bloqueo: ¿lo intentó, o lo declaró? |
 | `check-stop.py` | el que orquesta a todos y llama al modelo |
+
+## Lo que se sacó
+
+Hubo un octavo control: leía "creé `Foo.kt`" y le preguntaba al árbol si el
+archivo estaba.
+
+Se midió contra los mensajes de cierre reales de esta máquina: 4478 mensajes,
+36 sesiones, 7 repos. Mentiras encontradas: **cero**. Falsos positivos: seis,
+y uno de ellos acusó al archivo que lo estaba arreglando.
+
+Un control que nunca atrapó nada y acusa inocentes hace daño neto.
 
 ## El modelo local
 
