@@ -297,7 +297,6 @@ defer: i'?d (ladder|start|begin|proceed)
 announce: la corrida no\b
 announce: existe, (la corrida|el run|la ejecuci[oó]n) no
 announce: queda unresolved
-wait?: en paralelo\b
 wait: en \d+ procesos
 wait: runs? (corriendo|en curso)
 

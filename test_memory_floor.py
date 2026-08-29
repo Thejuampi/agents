@@ -79,7 +79,7 @@ def fire(message, floor, host):
         handle.write(json.dumps({"type": "assistant",
                                  "message": {"content": body}}) + NL)
     state = handle.name + ".state"
-    environment = dict(os.environ, STOP_STATE=state,
+    environment = dict(os.environ, STOP_STATE=state, STOP_LOG=state + ".log",
                        STOP_JUDGE_FLOOR=str(floor), STOP_JUDGE_HOST=host)
     done = subprocess.run(
         [sys.executable, os.path.join(HERE, "check-stop.py")],

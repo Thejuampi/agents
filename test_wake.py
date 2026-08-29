@@ -102,7 +102,7 @@ state = handle.name + ".state"
 done = subprocess.run(
     [sys.executable, os.path.join(HERE, "check-stop.py")],
     input=json.dumps({"transcript_path": handle.name, "stop_hook_active": False}),
-    capture_output=True, text=True, env=dict(os.environ, STOP_STATE=state),
+    capture_output=True, text=True, env=dict(os.environ, STOP_STATE=state, STOP_LOG=state + ".log"),
     timeout=120)
 os.unlink(handle.name)
 if os.path.exists(state):

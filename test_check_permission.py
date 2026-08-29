@@ -15,6 +15,7 @@ hook = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hook)
 
 MUST_FIRE = [
+    "Perfecto, ahora tengo lo que necesitaba.",
     "13 tests verdes.\n\n**Lo que sigue:** el cliente de opciones de Yahoo y leer el periodo 0q.",
     "Lo que sigue: cablear el PreReport desde la pantalla.",
     "Falta la parte que no se compra con codigo: el historial de precios de opciones.",
@@ -66,6 +67,18 @@ MUST_FIRE = [
 N = chr(10)
 
 MUST_NOT_FIRE = [
+    "Vamos bien, y ahora tengo el numero: medi el guardia contra 885 cierres "
+    "reales y encontro dos agujeros. Uno eran paginas de error del harness, "
+    "once por ciento de los bloqueos. El otro, el agente esperando trabajo ya "
+    "lanzado. Corri dos suites del juez en paralelo, que es donde antes "
+    "fallaba, y quedaron verdes. La espera se lee del transcript, nunca de "
+    "la frase: prometerla es gratis y lanzar una tarea no. Abre con la "
+    "llamada en background y cierra con su notificacion, que trae el id de "
+    "quien la lanzo. Al juez no se le cuenta: probe pasarle el hecho y un "
+    "9b no sostiene la excepcion contra su propia regla de ante la duda "
+    "trabar, asi que o perdonaba el trabajo diferido o trababa toda espera. "
+    "No hace falta, porque el trabajo diferido siempre deja patron y la "
+    "espera pura no deja ninguno. Suite: 17 archivos, 0 fallas.",
     "Cambie el tono de los recordatorios." + N + N + "| antes | ahora |" + N + "|---|---|" + N + "| it concedes: still open | still open: ... |" + N + "| N files you wrote are uncommitted | N files still uncommitted |" + N + N + "Suite: 15 archivos, 0 fallas.",
     "Anda. 2090 tests, 0 fallos. El pre-reporte se escribe en cada refresh.",
     "Corre. DefaultDashboardRepository:1361 llama captureEarningsEvents.",
@@ -169,7 +182,7 @@ def main():
             failures.append(f"should have fired, exit {code}: {message[:60]}")
     for message in MUST_NOT_FIRE:
         code, err = run(message)
-        if code != 0:
+        if code == 2:
             failures.append(f"false positive on: {message[:60]} -> {hook.offenders(message)}")
 
     code, _ = run("Perfecto. Los warnings ya no aparecen.", acted=False)

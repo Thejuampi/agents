@@ -158,6 +158,35 @@ trabajo diferido siempre deja un patron - "te la debo", "manana sigo", "queda
 pendiente" - y la espera pura no deja ninguno. Tarea en curso y cero patrones
 es un turno que sigue.
 
+## El log privado
+
+`judge-log.jsonl`. Una linea por decision, que el agente no ve nunca.
+
+El recordatorio que lee el agente tiene que ser corto y tiene que ser amable,
+asi que todo lo que sirve para afinar el guardia no entra: cuanto de seguro
+estaba el modelo, que patrones saltaron, si el carril determinista y el modelo
+opinaron distinto. Ese detalle ademas se lee como acusacion, y un agente que se
+siente acusado discute en vez de trabajar.
+
+La certeza sale de los logprobs que devuelve Ollama: la probabilidad que el
+modelo le puso a la palabra que eligio. Dos intentos anteriores no midieron
+nada. Preguntarle cuan seguro estaba dio 3 sobre 3 siempre; volver a tirar la
+misma pregunta a temperatura 0.8 dio 5 de acuerdo sobre 5. Un 9b no tiene
+opinion de si mismo y su distribucion es muy filosa para que el muestreo
+encuentre el borde. El numero estaba en la respuesta desde el principio.
+
+Y discrimina. Un bloqueo con 0.27 fue justo el falso positivo que habiamos
+encontrado leyendo a mano; los stops de verdad dan 0.97 para arriba.
+
+```sh
+python judge-log.py             # que hizo el guardia ultimamente
+python judge-log.py --weak      # bloqueos con el modelo poco seguro
+python judge-log.py --patterns  # que patrones saltan, y cuantas veces
+```
+
+Un bloqueo de baja certeza es un patron para medir. Un patron firme con el que
+el modelo no coincide es un patron para degradar a duda.
+
 ## El tono
 
 Del otro lado hay alguien capaz que ya venía trabajando. Un mensaje que retea se

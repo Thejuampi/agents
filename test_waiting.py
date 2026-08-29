@@ -49,7 +49,7 @@ def fire(reply, launched=None, landed=False, asked="segui"):
                                             "cwd": HERE,
                                             "stop_hook_active": False}),
                           capture_output=True, text=True,
-                          env=dict(os.environ, STOP_STATE=state), timeout=200)
+                          env=dict(os.environ, STOP_STATE=state, STOP_LOG=state + ".log"), timeout=200)
     os.unlink(handle.name)
     if os.path.exists(state):
         os.unlink(state)

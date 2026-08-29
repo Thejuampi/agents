@@ -50,7 +50,7 @@ def fire(asked, reply):
         input=json.dumps({"transcript_path": handle.name,
                           "stop_hook_active": False}),
         capture_output=True, text=True,
-        env=dict(os.environ, STOP_STATE=state), timeout=150)
+        env=dict(os.environ, STOP_STATE=state, STOP_LOG=state + ".log"), timeout=150)
     os.unlink(handle.name)
     if os.path.exists(state):
         os.unlink(state)

@@ -51,7 +51,7 @@ class Gate(unittest.TestCase):
         transcript(path, turns)
         payload = json.dumps({"transcript_path": path, "cwd": self.repo,
                               "stop_hook_active": chained})
-        env = dict(os.environ, STOP_STATE=self.state)
+        env = dict(os.environ, STOP_STATE=self.state, STOP_LOG=self.state + ".log")
         done = subprocess.run([sys.executable, HOOK], input=payload,
                               capture_output=True, text=True, timeout=180, env=env)
         return done.returncode, done.stderr

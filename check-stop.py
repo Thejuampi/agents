@@ -43,6 +43,7 @@ import re
 import os
 import subprocess
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SELF = os.path.basename(os.path.abspath(__file__))
@@ -100,6 +101,30 @@ The local model at {host} did not answer, and a judge that cannot be reached is 
 LLM_STOP = """KEEP GOING - THERE LOOKS TO BE WORK LEFT
 {why}
 What you did stands. Permission was granted in advance and does not expire, so if anything is still open, take the step instead of announcing it, pick one instead of offering a menu, run it yourself instead of sending the user. You are more than able to finish this."""
+
+
+LOG = os.environ.get("STOP_LOG") or os.path.join(HERE, "judge-log.jsonl")
+
+
+def note(transcript, **fields):
+    """One line per decision, for Rick, never for the agent.
+
+    The reminder the agent reads has to stay short and has to stay kind, so
+    everything useful for tuning the gate has no room in it: how sure the
+    model was, which patterns fired, whether the deterministic lane and the
+    model agreed. That detail also reads as an accusation, and an agent that
+    feels accused argues instead of working.
+
+    So it goes here instead. A block the model scored 0.3 on is a pattern
+    worth measuring; a firm pattern the model disagrees with is one worth
+    demoting. Read it with judge-log.py."""
+    fields["at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    fields["session"] = os.path.basename(transcript or "")[:12]
+    try:
+        with open(LOG, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(fields, ensure_ascii=False) + chr(10))
+    except OSError:
+        pass
 
 
 def read_state():
@@ -372,6 +397,8 @@ def main():
 
     sure, unsure = deterministic(data)
     if sure:
+        note(transcript, lane="pattern", firm=sure, weak=unsure,
+             head=message[:120])
         return block(state, transcript, chain, message,
                      "\n\n".join(sure), repeated)
 
@@ -383,11 +410,33 @@ def main():
         # deferred work or blocked every wait. The split is already clean
         # without it. Deferred work always leaves a pattern ("te la debo",
         # "manana sigo", "queda pendiente"); a pure wait leaves none.
+        note(transcript, lane="waiting", passed=True, head=message[:120])
         return allow(state, transcript)
 
-    verdict, _ = judge.stop_verdict(message, asked=last_user(transcript))
+    asked = last_user(transcript)
+    verdict, seconds = judge.stop_verdict(message, asked=asked)
     if verdict is judge.SKIP:
+        note(transcript, lane="judge", verdict="skip", weak=unsure,
+             head=message[:120])
         return allow(state, transcript)
+    if verdict is None:
+        note(transcript, lane="judge", verdict="silent", weak=unsure,
+             head=message[:120])
+        return block(state, transcript, chain, message,
+                     SILENT.format(host=judge.HOST), repeated)
+
+    line = ""
+    if verdict == "STOP" and not unsure:
+        line = judge.why(message, asked=asked)
+    note(transcript, lane="judge", verdict=verdict, sure=judge.sureness(),
+         weak=unsure, seconds=round(seconds, 2), quote=line,
+         head=message[:120])
+
+    if verdict == "STOP":
+        body = ("\n\n".join(unsure) if unsure
+                else LLM_STOP.format(why=QUOTE.format(line=line) if line else ""))
+        return block(state, transcript, chain, message, body, repeated)
+    return allow(state, transcript)
     if verdict is None:
         return block(state, transcript, chain, message,
                      SILENT.format(host=judge.HOST), repeated)

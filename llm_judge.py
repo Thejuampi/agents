@@ -20,6 +20,7 @@ Both are given the transcript facts, not only the prose, because the message is
 written by the party with an interest in the answer.
 """
 import json
+import math
 import os
 import re
 import shutil
@@ -356,6 +357,14 @@ def _loaded():
     return any(m.get("model", "").startswith(MODEL) for m in running)
 
 
+def _weight(logprobs):
+    """The probability the model put on the token it chose."""
+    try:
+        return round(math.exp(logprobs[0]["logprob"]), 3)
+    except (TypeError, IndexError, KeyError, ValueError, OverflowError):
+        return 0.0
+
+
 def _once(body, timeout):
     """Returns (text, seconds, refused).
 
@@ -386,6 +395,7 @@ def _once(body, timeout):
     text = (data.get("message", {}).get("content") or "").strip().upper()
     if not text:
         return None, 0.0, False
+    LAST_SURE[0] = _weight(data.get("logprobs"))
     return text, data.get("total_duration", 0) / 1e9, False
 
 
@@ -414,6 +424,7 @@ def _chat(system, shots, message, timeout):
         "stream": False,
         "keep_alive": KEEP,
         "think": False,
+        "logprobs": True,
         "options": {"temperature": 0, "seed": 7, "num_predict": 4, "num_ctx": 8192},
     }).encode()
     room = _room()
@@ -506,6 +517,24 @@ def _flat(text):
     folded = unicodedata.normalize("NFD", text or "")
     bare = "".join(c for c in folded if not unicodedata.combining(c))
     return " ".join(re.findall(r"\w+", bare.lower()))
+
+
+LAST_SURE = [0.0]
+
+
+def sureness():
+    """How sure the last verdict was, 0.0 to 1.0.
+
+    The probability the model put on the label it picked, read from the
+    logprobs Ollama returns. Two earlier attempts measured nothing: asked how
+    sure it was, a 9B answered 3 out of 3 every time, and re-rolled at
+    temperature 0.8 it agreed with itself 5 times out of 5. It has no view of
+    itself, and its distribution is too sharp for sampling to find the edge.
+    The number was there in the response all along.
+
+    Never reaches the agent. It goes to the log, where a block that scored
+    low is the pattern worth measuring next."""
+    return LAST_SURE[0]
 
 
 def why(message, asked="", timeout=25):

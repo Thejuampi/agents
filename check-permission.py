@@ -278,12 +278,25 @@ def quoted_hit(found):
     return text.rstrip(" .,;:")
 
 
+ACK_WORDS = 60
+"""How short a turn has to be for an acknowledgement to be the whole of it.
+
+An ack is a turn that ends on one - "perfecto", "ahora tengo", "that worked" -
+with nothing built behind it. The same words inside a long report are the
+agent saying what it found. Measured over 885 real closings: three messages
+carried an ack pattern, and the two above this line were reports of finished
+work. The one below it was the real thing."""
+
+
 def offenders(message, cwd=None, acted=True):
     # Naming a trigger phrase is not using it. Talking about the hook, or
     # quoting someone, must not fire it.
     stripped = unquoted(message)
+    brief = len(message.split()) <= ACK_WORDS
     hits = []
     for label, rx in patterns_for(cwd or os.getcwd()):
+        if label.startswith("ack") and not brief:
+            continue
         found = rx.search(stripped)
         if found:
             hits.append(f"{label}: {quoted_hit(found)}")
