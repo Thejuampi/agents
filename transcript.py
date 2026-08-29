@@ -59,3 +59,41 @@ def reply_of(text):
         return None
     return body
 
+
+
+def said_by(entry):
+    """The text of one entry, developer or agent, with nothing else in it."""
+    content = entry.get("message", {}).get("content")
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    return " ".join(b.get("text", "") for b in content
+                    if isinstance(b, dict) and b.get("type") == "text")
+
+
+def exchanges(entries, turns=4):
+    """The last few things the developer asked, each with the agent's answer.
+
+    One message is not always enough to judge a reply against. A developer who
+    asks for a measurement, reads it, and then says "y ahora el resto" has left
+    the subject in the turn before; a closing that names the next step reads
+    like an offer against the last message alone and like a plan already agreed
+    against the two before it.
+
+    The answer to a request is the last thing the agent said before the
+    developer spoke again. Everything between is working: tool calls, and the
+    paragraphs the gate itself woke the agent to write. Neither is a reply."""
+    pairs = []
+    for entry in entries:
+        if spoke(entry):
+            words = reply_of(said_by(entry))
+            if words:
+                pairs.append([words, ""])
+            continue
+        if entry.get("type") != "assistant" or not pairs:
+            continue
+        words = " ".join(said_by(entry).split())
+        if words:
+            pairs[-1][1] = words
+    return [(ask, answer) for ask, answer in pairs[-turns:]]

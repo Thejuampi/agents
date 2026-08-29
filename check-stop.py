@@ -249,6 +249,24 @@ def harness_noise(message):
                             "request interrupted"))
 
 
+def turns():
+    """How many developer turns the judge sees, this one included.
+
+    One is what it had, and one is enough for a reply that answers a question.
+    It is not enough for a reply that continues something agreed two messages
+    ago. The number is a knob because the right value is an experiment, not an
+    opinion: bench-context.py scores it against the push label."""
+    return int(os.environ.get("STOP_JUDGE_TURNS") or 1)
+
+
+def earlier(transcript):
+    """The exchanges before this one, oldest first, empty when turns is 1."""
+    keep = turns()
+    if keep <= 1:
+        return ()
+    return tuple(reader.exchanges(entries(transcript), keep)[:-1])
+
+
 def last_user(transcript):
     """What the developer said last, which is the only thing a reply
     can be wrong about.
@@ -452,7 +470,8 @@ def main():
                      WAITING if waiting else "\n\n".join(sure), repeated)
 
     asked = last_user(transcript)
-    verdict, seconds = judge.stop_verdict(message, asked=asked)
+    before = earlier(transcript)
+    verdict, seconds = judge.stop_verdict(message, asked=asked, before=before)
     if verdict is judge.SKIP:
         note(transcript, lane="judge", verdict="skip", weak=unsure,
              head=message[:120])

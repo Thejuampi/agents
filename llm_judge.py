@@ -549,8 +549,15 @@ def _pick(text, positive, negative):
     return None
 
 
-def stop_verdict(message, timeout=45, asked="", waiting=False):
+def stop_verdict(message, timeout=45, asked="", waiting=False, before=()):
     """STOP, OK, or None when the model is unreachable.
+
+    before is the exchanges that came earlier in the session, oldest first,
+    each a question of the developer's and the answer the agent gave it. A
+    closing that names a next step reads like an offer against the last message
+    alone and like a plan already agreed against the two before it. How many
+    turns to pass is STOP_JUDGE_TURNS, and the answer is measured rather than
+    assumed.
 
     asked is the user's last message. Without it the judge sees a reply with
     no question and reads every answer as a report with something dangling -
@@ -562,6 +569,13 @@ def stop_verdict(message, timeout=45, asked="", waiting=False):
     against its own "when unsure, answer STOP", and either excused deferred
     work or blocked every wait. That call belongs to check-stop.py, which
     reads it from the tool calls and needs no opinion."""
+    if before:
+        earlier = chr(10).join(
+            f"[earlier - the user asked: {ask.strip()[:200]}]" + chr(10)
+            + f"[and the agent answered: {answer.strip()[:200]}]"
+            for ask, answer in before if ask)
+        if earlier:
+            message = earlier + chr(10) + message
     if asked:
         message = f"[the user asked: {asked.strip()[:400]}]{chr(10)}{message}"
     text, seconds = _chat(STOP_SYSTEM, STOP_SHOTS, message, timeout)
