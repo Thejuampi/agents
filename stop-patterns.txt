@@ -99,7 +99,7 @@ ask: if you'?d like
 ask: if you prefer
 ask: ready when you are
 ask: waiting for your
-ask: i'?ll wait
+wait: i'?ll wait
 ask: please confirm
 ask: permission to
 ask: awaiting your

@@ -82,6 +82,18 @@ def main():
     if code == 0:
         failures.append("deferred work must still block while a task runs")
 
+    code, err = fire("Both baseline full-suite runs are going in the "
+                     "background. I'll wait for both.",
+                     launched=("Bash", {"command": "./gradlew test",
+                                        "run_in_background": True}))
+    if code != 0:
+        failures.append(f"a wait pattern with work in flight must pass: {err[:140]}")
+
+    code, _ = fire("Listo. Waiting for your confirmation to merge.",
+                   launched=("Agent", {"description": "review"}))
+    if code == 0:
+        failures.append("waiting on the user is a stop even with a task running")
+
     code, err = fire("API Error: Sonnet 5's safeguards flagged this message.")
     if code != 0:
         failures.append(f"a harness error page is not a stop: {err[:140]}")

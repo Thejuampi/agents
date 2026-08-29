@@ -19,12 +19,14 @@ Two judgements, two very different failure modes:
 Both are given the transcript facts, not only the prose, because the message is
 written by the party with an interest in the answer.
 """
+import contextlib
 import json
 import math
 import os
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 import unicodedata
 import urllib.error
@@ -365,6 +367,48 @@ def _weight(logprobs):
         return 0.0
 
 
+LOCK = os.path.join(tempfile.gettempdir(), "stop-judge.lock")
+
+
+@contextlib.contextmanager
+def _alone(timeout=30):
+    """One request at a time, across every session on this machine.
+
+    Two hooks asking at once share one GPU, and the batch changes the answer:
+    a message that scored OK at 0.94 on its own came back STOP while a second
+    run was in flight. Temperature 0 and a pinned seed do not cover that -
+    the batch is upstream of both.
+
+    Waiting costs nothing next to being wrong: a verdict takes about a tenth
+    of a second. If the lock cannot be taken the request goes through anyway,
+    because a stale lock file must never be able to switch the gate off."""
+    handle = None
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        try:
+            handle = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+            break
+        except FileExistsError:
+            try:
+                if time.time() - os.path.getmtime(LOCK) > 120:
+                    os.unlink(LOCK)
+                    continue
+            except OSError:
+                pass
+            time.sleep(0.05)
+        except OSError:
+            break
+    try:
+        yield
+    finally:
+        if handle is not None:
+            os.close(handle)
+            try:
+                os.unlink(LOCK)
+            except OSError:
+                pass
+
+
 def _once(body, timeout):
     """Returns (text, seconds, refused).
 
@@ -382,8 +426,9 @@ def _once(body, timeout):
     request = urllib.request.Request(
         HOST + "/api/chat", body, {"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as handle:
-            data = json.loads(handle.read())
+        with _alone():
+            with urllib.request.urlopen(request, timeout=timeout) as handle:
+                data = json.loads(handle.read())
     except urllib.error.HTTPError as failure:
         try:
             detail = json.loads(failure.read()).get("error", "")
