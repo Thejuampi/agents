@@ -46,6 +46,23 @@ def main():
     if corpus.spoke({"type": "assistant", "message": {"content": "hi"}}):
         failures.append("the agent is not the developer")
 
+    cases += 1
+    if corpus.reply_of(
+            "[Image: original 1080x2400, displayed at 900x2000.]") is not None:
+        failures.append("a screenshot with no words is not a reply")
+
+    cases += 1
+    if corpus.reply_of("[Image #2] esta vacia, arreglalo") != "esta vacia, arreglalo":
+        failures.append("words next to a screenshot are still the reply")
+
+    cases += 1
+    if corpus.reply_of("[Request interrupted by user]") is not None:
+        failures.append("an escape is not the developer writing")
+
+    cases += 1
+    if corpus.reply_of("seguí con el resto") != "seguí con el resto":
+        failures.append("a plain reply survives untouched")
+
     print(f"{cases} cases, {len(failures)} failures")
     for line in failures:
         print("  FAIL", line)
