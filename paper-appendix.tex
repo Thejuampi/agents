@@ -90,11 +90,11 @@ labels and are arithmetic, so they run in seconds and give the same answer
 every time.
 
 \begin{center}
-\begin{tabular}{lll}
+\begin{tabular}{lp{6.2cm}p{3.2cm}}
 \toprule
 Script & What it does & Feeds \\
 \midrule
-\texttt{corpus.py} & builds the labelled corpus; \texttt{--patterns} re-scores the pattern lane alone, keeping the stored verdicts & Table~\ref{tab:clean} inputs \\
+\texttt{corpus.py} & builds the labelled corpus; \texttt{--patterns} re-scores the pattern lane alone and keeps the stored verdicts & Table~\ref{tab:clean} inputs \\
 \texttt{bench-lanes.py} & lane and class ablation with Wilson intervals & Table~\ref{tab:clean} \\
 \texttt{bench-split.py} & the same search scored on held-out sessions & transfer result \\
 \texttt{bench-prompt.py} & three closing instructions over the same rows & Table~\ref{tab:ab} \\
