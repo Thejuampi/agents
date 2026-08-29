@@ -404,8 +404,13 @@ Three things generalize beyond this system.
 \paragraph{Put the decision where the capability is.} The clearest single result
 is the background-work case: an exception that a 9B model could not hold in its
 prompt became trivial once it was decided by ten lines of transcript inspection.
-The temptation with a model in the loop is to route every judgement through it.
-The cheaper lanes should take everything they can prove.
+The temptation with a model in the loop is to route every judgement through
+it. The cheaper lanes should take everything they can prove, and the marginal
+cut says how much that is worth here: on the closings only the patterns catch,
+precision is 0.145; on the closings only the judge catches, it is 0.106 on a
+base rate of 0.104. The model earns its place by covering three times the
+volume, and it earns none of it by being more discriminating than a regular
+expression.
 
 \paragraph{Confidence is a router before it is a decision.} Per-pattern
 confidence is what makes the local model affordable, because it decides which
