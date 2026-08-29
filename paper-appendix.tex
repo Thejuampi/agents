@@ -4,7 +4,7 @@
 \section{Pattern classes}
 \label{app:classes}
 
-The 298 patterns are grouped into nine classes by what the closing message is
+The 299 patterns are grouped into nine classes by what the closing message is
 doing. A class name written with a trailing question mark marks a doubt, which
 defers to the judge instead of deciding.
 
@@ -14,25 +14,30 @@ defers to the judge instead of deciding.
 \toprule
 Class & Patterns & Reads as & Example trigger \\
 \midrule
-\texttt{announce} & 69+15 & a step named instead of taken & ``next I will'', \emph{paso a} \\
+\texttt{announce} & 70+15 & a step named instead of taken & ``next I will'', \emph{paso a} \\
 \texttt{ask} & 56+1 & a question it may answer itself & ``do you want me to'', \emph{quer\'es que} \\
 \texttt{defer} & 32+2 & work made conditional on being asked & ``if you want, I can'' \\
-\texttt{wait} & 31+2 & deferring to the user's clock & ``I'll wait'', ``let me know when'' \\
+\texttt{wait?} & 0+33 & deferring to the user's clock & ``I'll wait'', ``let me know when'' \\
 \texttt{handoff} & 24 & giving the work back & ``over to you'', ``your call'' \\
-\texttt{errand} & 23 & sending the user to run something & ``run this and tell me'' \\
+\texttt{errand?} & 0+23 & sending the user to run something & ``run this and tell me'' \\
 \texttt{read} & 21+2 & asking what the repo already answers & ``where is the spec'' \\
 \texttt{idle} & 12+1 & reporting that nothing happened & ``still running'', ``no changes'' \\
 \texttt{ack} & 7 & a bare acknowledgement & ``done'', ``ok'' \\
 \bottomrule
 \end{tabular}
-\caption{The nine pattern classes. The second column counts firm patterns plus doubts, where a doubt raises the message to the judge instead of deciding. 275 of the 298 are firm.}
+\caption{The nine pattern classes. The second column counts firm patterns plus doubts, where a doubt raises the message to the judge instead of deciding. 222 of the 299 are firm.}
 \end{table}
 
 Two classes need an exception that is decided outside the patterns.
 \texttt{ask} patterns are suppressed on long messages, because a long report
 that ends in a courtesy question is a report, not a request for permission.
-\texttt{wait} patterns are suppressed when the transcript shows the agent is
+\texttt{wait?} patterns are suppressed when the transcript shows the agent is
 waiting on work it launched itself.
+
+\texttt{wait?} and \texttt{errand?} are written as doubts because they fire
+below the base rate of the failure they look for: 0.034 and 0.050 against
+0.104 (Table~\ref{tab:clean}). They raise the closing to the judge and decide
+nothing on their own.
 
 \section{The judge's instruction}
 \label{app:prompt}

@@ -103,7 +103,7 @@ eventually emitted from memory rather than from the message.
 
 \subsection{Lane 1: patterns as labeling functions}
 
-The second lane is 298 regular expressions over the agent's own words, grouped
+The second lane is 299 regular expressions over the agent's own words, grouped
 into nine classes by what the closing is doing rather than by what it says:
 \texttt{ask}, \texttt{announce}, \texttt{defer}, \texttt{wait},
 \texttt{handoff}, \texttt{errand}, \texttt{read}, \texttt{idle} and
@@ -123,7 +123,7 @@ table rule was added.
 
 \paragraph{Patterns carry a confidence.} A class written \texttt{ask:} decides
 on its own. A class written \texttt{ask?:} raises a doubt and defers to the
-model. Of 298 patterns, 275 are firm and 23 are doubts. This split is what makes
+model. Of 299 patterns, 222 are firm and 77 are doubts. This split is what makes
 a local model affordable: most closings never reach it, and the ones that do are
 the ones a regular expression was going to get wrong.
 
