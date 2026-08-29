@@ -33,6 +33,7 @@ def load(name, filename):
     return module
 
 
+reader = load("transcript", "transcript.py")
 perm = load("perm", "check-permission.py")
 gate = load("gate", "check-stop.py")
 judge = load("judge", "llm_judge.py")
@@ -67,16 +68,7 @@ def text_of(entry):
         if isinstance(block, dict) and block.get("type") == "text").strip()
 
 
-def spoke(entry):
-    """The developer, never a tool result and never this gate's own wake."""
-    if entry.get("type") != "user":
-        return False
-    content = entry.get("message", {}).get("content")
-    if isinstance(content, str):
-        return WAKE not in content[:200]
-    return isinstance(content, list) and any(
-        isinstance(block, dict) and block.get("type") != "tool_result"
-        for block in content)
+spoke = reader.spoke
 
 
 def tools(entry):
