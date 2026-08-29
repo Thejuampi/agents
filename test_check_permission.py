@@ -63,7 +63,10 @@ MUST_FIRE = [
     "La agrego a la memoria asi?\n\n```\nNo pedir permiso cuando ya hay tarea.\n```",
 ]
 
+N = chr(10)
+
 MUST_NOT_FIRE = [
+    "Cambie el tono de los recordatorios." + N + N + "| antes | ahora |" + N + "|---|---|" + N + "| it concedes: still open | still open: ... |" + N + "| N files you wrote are uncommitted | N files still uncommitted |" + N + N + "Suite: 15 archivos, 0 fallas.",
     "Anda. 2090 tests, 0 fallos. El pre-reporte se escribe en cada refresh.",
     "Corre. DefaultDashboardRepository:1361 llama captureEarningsEvents.",
     "Listo: el hook queda registrado y probado.",

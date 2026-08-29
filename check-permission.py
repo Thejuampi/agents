@@ -27,6 +27,8 @@ BASE_PATTERNS = os.path.join(HERE, "stop-patterns.txt")
 
 FENCED = re.compile(r"```.*?```", re.DOTALL)
 CODE = re.compile(r"`[^`\n]*`")
+TABLE = re.compile(r"^[ 	]*\|.*\|[ 	]*$", re.M)
+
 QUOTED = re.compile("\"[^\"\n]*\"|«[^»\n]*»|“[^”\n]*”")
 
 
@@ -39,14 +41,16 @@ REPORTED = re.compile(
 
 def unquoted(message, code=True):
     """The agent's own words. Reporting a phrase is not saying it, so anything
-    fenced, backticked, quoted or attributed to something else comes out.
+    fenced, tabled, backticked, quoted or attributed to something else comes
+    out. A markdown table row is a listing of phrases, and a gate that reads
+    the before column of "before / after" blocks the report of its own fix.
     One pass cannot do this: a backtick inside a quoted span eats the closing
     quote and leaks the rest of the line back in.
 
     Pass code=False when backticks do not mean attribution. An agent writes
     its own measurements as `2118 tests` all day; dropping those would hand it
     a way to launder every number it never ran."""
-    plain = FENCED.sub(" ", message)
+    plain = TABLE.sub(" ", FENCED.sub(" ", message))
     if code:
         plain = CODE.sub(" ", plain)
     return REPORTED.sub(" ", QUOTED.sub(" ", plain))
