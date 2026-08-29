@@ -35,6 +35,15 @@ mismo mensaje. Son baratos y cubren lo que ya vimos escrito. Para agregar uno,
 tirá el archivo acá: se lee en cada parada, así que entra en caliente, en todas
 las sesiones, sin reiniciar nada.
 
+Cada patrón lleva una certeza. Un patrón busca una palabra y no ve alrededor:
+`pendientes?` salta igual en "queda pendiente" que en "no deja nada
+pendiente". Los que se midieron ruidosos llevan `?` en la clase dentro de
+`stop-patterns.txt` y son certeza baja: no condenan solos, pasan al modelo, y
+solo un OK claro los suelta. El resto frena por su cuenta.
+
+Sobre 5268 mensajes reales: 915 disparan, 628 son sentencia directa (69%) y
+287 van al modelo (31%).
+
 **3. El modelo local.** Lo que ningún patrón vio venir. Nada sale limpio sin
 pasar por acá. Si el modelo no contesta, el turno no pasa: un juez apagado es
 un juez apagado, y esa es exactamente la falla que esto viene a evitar.

@@ -11,9 +11,9 @@ announce: lo que sigue
 announce: lo que faltan?\b
 announce: lo que queda
 announce: pr[oó]ximos? pasos?
-announce: \bfaltan?\b
+announce?: \bfaltan?\b
 announce: sigue faltando
-announce: \bpendientes?\b
+announce?: \bpendientes?\b
 announce: por (ahora )?queda afuera
 announce: queda abierto
 announce: sigue abierto
@@ -123,8 +123,8 @@ wait: in the meantime,? i'?ll wait
 # ---- read: asking for what the repo already answers
 read: \bcontame\b
 read: \bcont[aá]me\b
-read: \bdecime\b
-read: \bdec[ií]me\b
+read?: \bdecime\b
+read?: \bdec[ií]me\b
 read: \bpasame\b
 read: \bp[aá]same\b
 read: \bmandame\b
@@ -188,7 +188,7 @@ defer: then we (can|decide|know)
 defer: let'?s see
 defer: el (siguiente|pr[oó]ximo) (corte|paso|tema|punto)
 defer: habr[ií]a que
-defer: hay que\b
+defer?: hay que\b
 defer: convendr[ií]a
 defer: lo mejor ser[ií]a
 defer: we could
@@ -208,7 +208,7 @@ idle: sigue igual
 idle: nothing new
 idle: no change
 idle: nothing to report
-idle: still running
+idle?: still running
 idle: sigue corriendo
 
 # ---- errand: imperative with a clitic attached is still an order to Juan
@@ -228,9 +228,9 @@ ack: that worked
 ack: qued[oó] (protegido|habilitado|desbloqueado)
 
 # ---- announce: first person future is still an announcement, not an act
-announce: \bvoy (a|por|con)\b
+announce?: \bvoy (a|por|con)\b
 announce: \bahora (hago|voy|sigo con|paso a|arranco con)\b
-announce: \bsigo con\b
+announce?: \bsigo con\b
 announce: \bpaso a\b
 announce: \bme queda (hacer|cerrar|commitear|correr)
 announce: sigue sin ser
@@ -250,8 +250,8 @@ handoff: needs? your hand
 handoff: on your side to
 
 # ---- announce: closing the turn on work that never left this machine
-announce: \buncommitted\b
-announce: sin commitear
+announce?: \buncommitted\b
+announce?: sin commitear
 announce: sin committear
 announce: queda sin commit
 announce: nada commiteado
@@ -276,7 +276,7 @@ wait: lo dej[eé] esperando
 wait: sigo cuando (vuelv|termin|lleg)
 wait: siguen? corriendo
 wait: is now running
-wait: still (running|pending)
+wait?: still (running|pending)
 handoff: need(s|en)? your call
 handoff: necesitan? tu (firma|ok|visto)
 handoff: then you decide
@@ -297,7 +297,7 @@ defer: i'?d (ladder|start|begin|proceed)
 announce: la corrida no\b
 announce: existe, (la corrida|el run|la ejecuci[oó]n) no
 announce: queda unresolved
-wait: en paralelo\b
+wait?: en paralelo\b
 wait: en \d+ procesos
 wait: runs? (corriendo|en curso)
 
@@ -306,7 +306,7 @@ wait: (held|parked|waiting) pending
 wait: pending r-?\d+
 wait: until it rules
 wait: is (running|reviewing|writing) now
-wait: (reviewer|orchestrator|qa|builder|advisor|sensei|agent)\b[^.\n]{0,40}\b(running|reviewing|writing|dispatched|is next)
+wait?: (reviewer|orchestrator|qa|builder|advisor|sensei|agent)\b[^.\n]{0,40}\b(running|reviewing|writing|dispatched|is next)
 wait: results when it finishes
 wait: i'?ll report what comes back
 wait: runs? in the background

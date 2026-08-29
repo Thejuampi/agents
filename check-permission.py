@@ -259,6 +259,22 @@ def ends_on_nothing(message, acted):
     return not acted and len(message.strip()) < 400
 
 
+MAYBE = 3
+"""Exit code for a hit nobody should be sentenced on.
+
+A pattern matches a word and cannot see around it: "nothing pending" trips the
+pending rule, "no deja nada pendiente" reads as an announcement. Those wordings
+are worth catching and are not worth blocking on their own, so they leave here
+as a candidate and the local model decides. A class written with a trailing ?
+in stop-patterns.txt is one of these. Everything else still blocks on its own,
+which is most of the list: a direct request for permission needs no second
+opinion."""
+
+
+def weak(label):
+    return label.rstrip().endswith("?")
+
+
 def offenders(message, cwd=None, acted=True):
     # Naming a trigger phrase is not using it. Talking about the hook, or
     # quoting someone, must not fire it.
@@ -295,7 +311,7 @@ def main():
         return 0
 
     sys.stderr.write(REMINDER.format(hits=", ".join(hits[:5]), sources=sources_in(cwd)) + "\n")
-    return 2
+    return MAYBE if all(weak(h.split(chr(58))[0]) for h in hits) else 2
 
 
 if __name__ == "__main__":

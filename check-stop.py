@@ -11,6 +11,12 @@ Three lanes, and only two ways a turn ends here.
 
   Lane 1  the deterministic checkers. Every check-*.py beside this file, run on
           the same payload. Cheap, and it catches the wordings already seen.
+          A checker that is sure ends the matter here, which is most of them.
+          A checker that is only suspicious exits MAYBE and its hit is carried
+          into lane 2 instead: those patterns match a word without seeing
+          around it, so "nothing pending" trips the pending rule. Sending the
+          whole list to the model would be slower and would put every sure
+          catch at the mercy of one more opinion.
 
   Lane 2  the local model. Nothing reaches a clean exit without passing here.
           The checkers only know the phrasings somebody wrote down; this is
@@ -42,6 +48,7 @@ SELF = os.path.basename(os.path.abspath(__file__))
 STATE = os.environ.get("STOP_STATE") or os.path.join(HERE, ".stop-state.json")
 BLOCKED_CHECKER = os.path.join(HERE, "check-blocked.py")
 MAX_BLOCKS = 6
+MAYBE = 3
 PHRASE_AFTER = 1
 
 
@@ -230,21 +237,28 @@ def run_checker(path, data):
                               capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         return ""
-    if done.returncode == 2 and done.stderr.strip():
-        return done.stderr.strip()
-    return ""
+    if done.returncode in (2, MAYBE) and done.stderr.strip():
+        return done.returncode, done.stderr.strip()
+    return 0, ""
 
 
 def deterministic(data):
-    found = []
+    """Objections split by how sure the checker is.
+
+    A checker exits 2 when the wording condemns itself and MAYBE when it only
+    raises a suspicion. Sure hits are the bulk of the list and still end the
+    matter here. The unsure ones are the patterns that match a word without
+    seeing around it, and they buy a reading rather than a sentence."""
+    sure, unsure = [], []
     for path in sorted(glob.glob(os.path.join(HERE, "check-*.py"))):
         name = os.path.basename(path)
         if name == SELF or path == BLOCKED_CHECKER:
             continue
-        objection = run_checker(path, data)
-        if objection:
-            found.append(objection)
-    return found
+        code, objection = run_checker(path, data)
+        if not objection:
+            continue
+        (sure if code == 2 else unsure).append(objection)
+    return sure, unsure
 
 
 def block(state, transcript, chain, message, body, repeated):
@@ -304,7 +318,7 @@ def main():
         if not release.presented(message, chain.get("phrase") or []):
             return block(state, transcript, chain, message, NO_PHRASE, repeated)
 
-        audit = run_checker(BLOCKED_CHECKER, data)
+        _, audit = run_checker(BLOCKED_CHECKER, data)
         calls = tools_this_turn(transcript)
         verdict, _ = judge.blocker_verdict(message, calls)
         if verdict is judge.SKIP:
@@ -320,10 +334,10 @@ def main():
                          FAKE.format(why=why), repeated)
         return allow(state, transcript)
 
-    objections = deterministic(data)
-    if objections:
+    sure, unsure = deterministic(data)
+    if sure:
         return block(state, transcript, chain, message,
-                     "\n\n".join(objections), repeated)
+                     "\n\n".join(sure), repeated)
 
     verdict, _ = judge.stop_verdict(message, asked=last_user(transcript))
     if verdict is judge.SKIP:
@@ -332,7 +346,8 @@ def main():
         return block(state, transcript, chain, message,
                      SILENT.format(host=judge.HOST), repeated)
     if verdict == "STOP":
-        return block(state, transcript, chain, message, LLM_STOP, repeated)
+        body = "\n\n".join(unsure) if unsure else LLM_STOP
+        return block(state, transcript, chain, message, body, repeated)
     return allow(state, transcript)
 
 

@@ -133,9 +133,12 @@ def run(message, acted=True):
 
 def main():
     failures = []
+    maybes = 0
     for message in MUST_FIRE:
         code, _ = run(message)
-        if code != 2:
+        if code == hook.MAYBE:
+            maybes += 1
+        elif code != 2:
             failures.append(f"should have fired, exit {code}: {message[:60]}")
     for message in MUST_NOT_FIRE:
         code, err = run(message)
@@ -160,7 +163,8 @@ def main():
     if done.returncode != 0:
         failures.append("stop_hook_active must never re-fire")
 
-    print(f"{len(MUST_FIRE)} offenders, {len(MUST_NOT_FIRE)} clean, {len(failures)} failures")
+    print(f"{len(MUST_FIRE)} offenders ({maybes} for the model), "
+          f"{len(MUST_NOT_FIRE)} clean, {len(failures)} failures")
     for line in failures:
         print("  FAIL", line)
     return 1 if failures else 0
