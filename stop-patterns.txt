@@ -8,7 +8,7 @@
 
 # ---- announce: naming the next step instead of taking it
 announce: lo que sigue
-announce: lo que faltan?\b
+announce?: lo que faltan?\b
 announce: lo que queda
 announce: pr[oó]ximos? pasos?
 announce?: \bfaltan?\b
