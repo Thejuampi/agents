@@ -149,6 +149,19 @@ def main():
             "Matched: ask: queres que, README.md, AGENTS.md"]}) != ["ask"]:
         failures.append("a file the reminder quotes is not a class")
 
+    counted()
+    woken = [
+        {"type": "assistant", "message": {"content": [
+            {"type": "text", "text": "Listo, no queda nada."}]}},
+        {"type": "user", "message": {"content":
+            "Stop hook feedback: KEEP GOING - YOU ALREADY HAVE PERMISSION"}},
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "a", "name": "Edit", "input": {}},
+            {"type": "tool_use", "id": "b", "name": "Bash", "input": {}}]}},
+    ]
+    if report.after(woken, "Listo, no queda nada.") != 2:
+        failures.append("the gate's own wake must not close the window it is graded in")
+
     print(f"{len(RUNS)} cases, {len(failures)} failures")
     for line in failures:
         print("  FAIL", line)

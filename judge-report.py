@@ -56,13 +56,22 @@ def turns(path):
     return rows
 
 
+WAKE = "Stop hook feedback:"
+"""How this gate's own reminder comes back in.
+
+It arrives as a plain user string, so read loosely it looks like the
+developer speaking and closes the window the label is counted in. Every
+block then grades as zero, which is what the report showed: 14 of 14 bought
+nothing, including the ones that bought a full session of work."""
+
+
 def spoke(entry):
     """A real user turn. Tool results wear the user role and are not the user."""
     if entry.get("type") != "user":
         return False
     content = entry.get("message", {}).get("content")
     if isinstance(content, str):
-        return True
+        return WAKE not in content[:200]
     return isinstance(content, list) and any(
         isinstance(b, dict) and b.get("type") != "tool_result" for b in content)
 

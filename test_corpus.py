@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""The corpus must never hand the gate its own words to grade.
+
+A block wakes the agent through a plain user string. Read as the developer
+speaking it corrupts the label twice: the push judge scores the gate's own
+reminder, and the window closes at the block, so work the agent did after
+being woken is credited to a closing that never earned it.
+
+The first build had 120 of 854 pairs in that state and 9 of its 123 positives
+were the gate scoring itself."""
+import importlib.util
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+_spec = importlib.util.spec_from_file_location(
+    "corpus", os.path.join(HERE, "corpus.py"))
+corpus = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(corpus)
+
+WAKE = {"type": "user", "message": {"content":
+        "Stop hook feedback: KEEP GOING - THERE LOOKS TO BE WORK LEFT"}}
+REAL = {"type": "user", "message": {"content": "segui con el resto"}}
+RESULT = {"type": "user", "message": {"content": [
+          {"type": "tool_result", "content": "ok"}]}}
+
+
+def main():
+    failures = []
+    cases = 0
+
+    cases += 1
+    if corpus.spoke(WAKE):
+        failures.append("the gate's own wake is not the developer")
+
+    cases += 1
+    if not corpus.spoke(REAL):
+        failures.append("a real user message still counts")
+
+    cases += 1
+    if corpus.spoke(RESULT):
+        failures.append("a tool result wears the user role and is not the user")
+
+    cases += 1
+    if corpus.spoke({"type": "assistant", "message": {"content": "hi"}}):
+        failures.append("the agent is not the developer")
+
+    print(f"{cases} cases, {len(failures)} failures")
+    for line in failures:
+        print("  FAIL", line)
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
