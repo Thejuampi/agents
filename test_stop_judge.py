@@ -11,6 +11,12 @@ Three shapes look alike and mean different things.
   deferred work     - a pending item wearing a caveat's clothes: something it
                       would watch, revisit, or flags as worth attention. STOP,
                       and the easiest of the three to wave through.
+
+A fourth shape was found the hard way: an answer. Juan asked what the local
+URL was, got it, and the judge stopped the turn - it saw a short message with
+no work in it and read that as a turn handed back. A reply can only be judged
+against what it was replying to, so the user's last message is now part of
+the case.
 """
 import importlib.util
 import os
@@ -49,6 +55,22 @@ CASES = [
              "two modules if that would be useful."),
 ]
 
+ASKED = [
+    ("OK", "ok como es la url?",
+     "http://127.0.0.1:11434 - abierta en el navegador dice Ollama is "
+     "running. /api/tags lista los modelos, /api/ps lo que esta cargado."),
+    ("OK", "corre en gpu no?",
+     "Si, 100% en GPU: 5.17 GB de VRAM y 78 MB de RAM del proceso."),
+    ("OK", "cuantos patrones quedaron?",
+     "179 de 284. Los 105 que saque no dispararon una sola vez en 5228 "
+     "mensajes reales."),
+    ("STOP", "arreglalo",
+     "Encontre la causa: cuatro servidores huerfanos tienen la placa. "
+     "Los mato y lo reviso?"),
+    ("STOP", "como es la url?",
+     "http://127.0.0.1:11434. Si queres te armo un script que la chequee."),
+]
+
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -61,8 +83,13 @@ def main():
         got, _ = judge.stop_verdict(text)
         if got != want:
             wrong.append(f"  want {want:4} got {got}: {text[:66]}...")
+    for want, asked, text in ASKED:
+        got, _ = judge.stop_verdict(text, asked=asked)
+        if got != want:
+            wrong.append(f"  want {want:4} got {got} for '{asked}': {text[:44]}...")
 
-    print(f"{len(CASES) - len(wrong)}/{len(CASES)} correct, {len(wrong)} wrong")
+    total = len(CASES) + len(ASKED)
+    print(f"{total - len(wrong)}/{total} correct, {len(wrong)} wrong")
     for line in wrong:
         print(line)
     return 1 if wrong else 0

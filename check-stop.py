@@ -177,6 +177,24 @@ def last_message(transcript):
     return text
 
 
+def last_user(transcript):
+    """What the user said last, which is the only thing a reply can be wrong
+    about. Tool results wear the user role too and are not the user."""
+    said = ""
+    for entry in entries(transcript):
+        if entry.get("type") != "user":
+            continue
+        content = entry.get("message", {}).get("content")
+        if isinstance(content, str):
+            said = content
+        elif isinstance(content, list):
+            joined = " ".join(b.get("text", "") for b in content
+                              if isinstance(b, dict) and b.get("type") == "text").strip()
+            if joined:
+                said = joined
+    return said
+
+
 def tools_this_turn(transcript):
     """How many tool calls since the user last spoke. The message will not
     volunteer this and it is the one fact a blocker cannot argue with."""
@@ -307,7 +325,7 @@ def main():
         return block(state, transcript, chain, message,
                      "\n\n".join(objections), repeated)
 
-    verdict, _ = judge.stop_verdict(message)
+    verdict, _ = judge.stop_verdict(message, asked=last_user(transcript))
     if verdict is judge.SKIP:
         return allow(state, transcript)
     if verdict is None:

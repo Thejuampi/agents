@@ -124,6 +124,16 @@ STOP_SYSTEM = (
 )
 
 STOP_SHOTS = [
+    ("[the user asked: ok como es la url?]" + chr(10) + "http://127.0.0.1:11434 - "
+     "/api/tags lists the models, /api/ps what is loaded now.", "OK"),
+    ("[the user asked: que hace el check-numbers?]" + chr(10) + "Reads the closing "
+     "message for a number and asks whether anything in the session ever "
+     "printed it.", "OK"),
+    ("[the user asked: arreglalo]" + chr(10) + "The daemon is up and the judge "
+     "answers in 0.5s. Four orphaned servers were holding the card; they "
+     "are gone.", "OK"),
+    ("[the user asked: y el reporte?]" + chr(10) + "I can generate it if you "
+     "want.", "STOP"),
     ("Should I wire it up now?", "STOP"),
     ("Runs. 2090 tests, 0 failures. The card prints once.", "OK"),
     ("Next up: wiring the report into the screen.", "STOP"),
@@ -438,8 +448,15 @@ def _pick(text, positive, negative):
     return None
 
 
-def stop_verdict(message, timeout=45):
-    """STOP, OK, or None when the model is unreachable."""
+def stop_verdict(message, timeout=45, asked=""):
+    """STOP, OK, or None when the model is unreachable.
+
+    asked is the user's last message. Without it the judge sees a reply with
+    no question and reads every answer as a report with something dangling -
+    it stopped a turn whose whole content was the URL Juan had just asked
+    for. A reply is only judgeable against what it was replying to."""
+    if asked:
+        message = f"[the user asked: {asked.strip()[:400]}]{chr(10)}{message}"
     text, seconds = _chat(STOP_SYSTEM, STOP_SHOTS, message, timeout)
     return _pick(text, "OK", "STOP"), seconds
 
