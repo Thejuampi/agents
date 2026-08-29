@@ -5,6 +5,7 @@ Everything here reads the stored labels, so it runs offline and costs no
 model calls. The tables in the paper were first computed on the contaminated
 corpus; this reproduces them on the clean one."""
 import json
+import math
 import os
 import sys
 
@@ -16,6 +17,18 @@ def rows(path):
     return [r for r in data if not r.get("noise")]
 
 
+def wilson(hit, total, z=1.96):
+    """95% interval on a proportion. A precision of 0.13 over 293 rows and a
+    base rate of 0.104 over 747 are not two numbers to compare by eye."""
+    if not total:
+        return 0.0, 0.0
+    share = hit / total
+    span = z * math.sqrt(share * (1 - share) / total + z * z / (4 * total * total))
+    centre = share + z * z / (2 * total)
+    return ((centre - span) / (1 + z * z / total),
+            (centre + span) / (1 + z * z / total))
+
+
 def score(real, fires):
     fired = [r for r in real if fires(r)]
     caught = [r for r in fired if r.get("push")]
@@ -23,7 +36,7 @@ def score(real, fires):
     prec = len(caught) / max(len(fired), 1)
     rec = len(caught) / max(hits, 1)
     f1 = 2 * prec * rec / max(prec + rec, 1e-9)
-    return len(fired), prec, rec, f1
+    return len(fired), prec, rec, f1, wilson(len(caught), len(fired))
 
 
 def classes(real):
@@ -40,15 +53,18 @@ def firm_of(row, off=()):
 
 
 def line(name, got):
-    fires, prec, rec, f1 = got
-    print(f"{name:22} {fires:4}  {prec:.3f}  {rec:.3f}  {f1:.3f}")
+    fires, prec, rec, f1, band = got
+    print(f"{name:22} {fires:4}  {prec:.3f}  {rec:.3f}  {f1:.3f}"
+          f"  [{band[0]:.3f}, {band[1]:.3f}]")
 
 
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "corpus.json")
     real = rows(path)
     hits = sum(1 for r in real if r.get("push"))
-    print(f"{len(real)} closings, {hits} pushes, base {100.0 * hits / len(real):.1f}%")
+    band = wilson(hits, len(real))
+    print(f"{len(real)} closings, {hits} pushes, base "
+          f"{100.0 * hits / len(real):.1f}% [{100.0 * band[0]:.1f}, {100.0 * band[1]:.1f}]")
     print(f"{'config':22} {'fires':>4}  {'prec':>5}  {'rec':>5}  {'f1':>5}")
     line("patterns", score(real, lambda r: bool(r.get("firm"))))
     line("patterns+doubt", score(real, lambda r: bool(r.get("hits"))))
@@ -60,7 +76,9 @@ def main():
     for name, group in sorted(classes(real).items(),
                               key=lambda kv: -len(kv[1])):
         caught = sum(1 for r in group if r.get("push"))
-        print(f"{name:22} {len(group):4}  {caught / len(group):.3f}")
+        edge = wilson(caught, len(group))
+        print(f"{name:22} {len(group):4}  {caught / len(group):.3f}"
+              f"  [{edge[0]:.3f}, {edge[1]:.3f}]")
     print()
     off, best = set(), score(real, lambda r: bool(r.get("firm")) or r.get("verdict") == "STOP")
     while True:
