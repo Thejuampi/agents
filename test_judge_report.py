@@ -154,6 +154,11 @@ def main():
         failures.append("the question an OK earns is graded on its own")
 
     counted()
+    named = report.table("x", {"nombro algo": [3, 4], "sin nombrar": [0, 0]})
+    if "50% bought nothing" in " ".join(named):
+        failures.append("the ask cut must separate the two groups, not blend them")
+
+    counted()
     if not report.classes({"verdict": "OK", "ask": False}):
         failures.append("a released OK still falls back to a class")
 
