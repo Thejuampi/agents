@@ -610,8 +610,8 @@ agent goes and does something. The system labels this for itself. A block
 wakes the agent, and the tool calls it makes before the developer next speaks
 are the answer.
 
-Over 33 graded blocks, 27 bought work and 6 bought none: an 82\%
-conversion, with a 95\% interval of [0.656, 0.914]. The interval is wide and clear of a half: the interventions are mostly bought, whatever the exact share. The rate is not uniform across lanes.
+Over 41 graded blocks, 35 bought work and 6 bought none: an 85\%
+conversion, with a 95\% interval of [0.716, 0.931]. The interval is wide and clear of a half: the interventions are mostly bought, whatever the exact share. The rate is not uniform across lanes.
 
 \begin{center}
 \begin{tabular}{lrr}
@@ -619,6 +619,7 @@ conversion, with a 95\% interval of [0.656, 0.914]. The interval is wide and cle
 Lane & Blocks & Bought nothing \\
 \midrule
 judge & 11 & 9\% \\
+waiting & 10 & 0\% \\
 announce & 7 & 14\% \\
 announce? & 7 & 14\% \\
 proactive & 6 & 50\% \\
@@ -628,8 +629,9 @@ wait & 3 & 33\% \\
 \end{tabular}
 \end{center}
 
-The lanes are not equal. The judge wastes one block in eleven and the pattern
-lanes about one in seven. The proactive question, the newest lane and the one
+The lanes are not equal. The judge wastes one block in eleven, the pattern
+lanes about one in seven, and the release for work in flight - which tells the
+agent to keep going while a background job runs - wastes none of its ten. The proactive question, the newest lane and the one
 that fires on closings nothing is wrong with, wastes one block in two - by a
 distance the worst in the system, and the cost of putting a question to every
 clean closing.
