@@ -89,6 +89,7 @@ measure it, which is the entire reason for the loop in
 Section~\ref{sec:loop}.
 
 \subsection{When the label reads the system's own output}
+\label{sec:contamination}
 
 The first build of this corpus was contaminated, and the way it was
 contaminated is the more general finding. A weak label built by reading
@@ -398,3 +399,55 @@ restarted. The gate now starts nothing, and the tests that need the model are
 opt-in, like the git ones. This is not a footnote about our hardware. A guard
 that degrades the machine it guards will be switched off, and a gate that is
 switched off has whatever accuracy you like.
+
+\subsection{The corpus rebuilt on clean replies}
+
+Every number above this point was computed on a corpus that included the
+system's own output. Three contaminations were found and are described in
+Section~\ref{sec:contamination}: the gate's wake read as a developer
+reply, bare image placeholders, and harness notices. The corpus was rebuilt
+from the same 66 transcripts with those readers corrected. The ablations that
+produced the tables above have not been re-run on it; the headline figures
+move as follows.
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+ & contaminated & clean \\
+\midrule
+labelled closings & 841 & 747 \\
+pushes & 117 & 78 \\
+base rate & 13.9\% & 10.4\% \\
+gate fires & 624 & 556 \\
+precision & 0.15 & 0.119 \\
+recall & 0.81 & 0.846 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The direction is the one contamination predicts. The rows removed were mostly
+positives the system had manufactured for itself, so the base rate falls by a
+quarter and precision falls with it, while recall rises slightly. The
+qualitative finding is unchanged and sharper: the gate fires on 74\% of
+all closings to catch 85\% of the 10\% that matter.
+
+\subsection{Two changes that did not earn their place}
+
+Both were written, wired behind a switch, measured on 150 clean rows, and
+left switched off.
+
+The judge reads the closing and the single developer message it answers. A
+reply that continues something agreed two turns earlier is hard to read that
+way, so we gave the judge the last three and four exchanges, each a developer
+request with the answer the agent gave it, excluding the working in between.
+Precision moved from 0.245 to 0.248 at three turns and to 0.243 at four;
+recall held at three and fell at four. The window buys nothing.
+
+The judge also cannot see what the turn did: a message claiming a green suite
+is the same string whether the agent ran it or imagined it. We passed the
+count of tool calls the turn made as a fact rather than asking the model to
+infer one. Catches were identical and false positives rose from 70 to 74. The
+count alone is not the fact that matters; which tools ran probably is, and
+that is a larger change than this experiment tested.
+
+We report both because the alternative is a paper in which every idea worked.

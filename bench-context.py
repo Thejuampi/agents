@@ -23,8 +23,10 @@ _mod.loader.exec_module(mod)
 
 judge = mod.load("llm_judge.py")
 reader = mod.load("transcript.py")
+KEPT = list(sys.argv)
 sys.argv = [sys.argv[0]]
 corpus = mod.load("corpus.py")
+sys.argv = KEPT
 
 OUT = os.path.join(HERE, "context.json")
 
@@ -43,30 +45,41 @@ def load():
     return json.load(open(os.path.join(HERE, "corpus.json"), encoding="utf-8"))
 
 
-def scored(rows, turns, before):
-    hit = miss = false = right = 0
+def told(row, facts):
+    if not facts:
+        return ""
+    calls = row.get("tools") or 0
+    return (f"the turn made {calls} tool call(s) before this message"
+            if calls else "the turn made no tool calls before this message")
+
+
+def scored(rows, turns, before, facts=False):
+    counts = {"gate": [0, 0, 0, 0], "judge": [0, 0, 0, 0]}
     for row in rows:
         earlier = before.get(
             (row["file"], " ".join(row["closing"].split())[:120]), [])
         earlier = tuple(earlier[-(turns - 1):]) if turns > 1 else ()
         verdict, _ = judge.stop_verdict(row["closing"], asked=row["asked"],
-                                        before=earlier)
-        fired = bool(row["firm"]) or verdict == "STOP"
-        if row["push"] and fired:
-            hit += 1
-        elif row["push"]:
-            miss += 1
-        elif fired:
-            false += 1
-        else:
-            right += 1
-    return hit, miss, false, right
+                                        before=earlier, facts=told(row, facts))
+        for name, fired in (("gate", bool(row["firm"]) or verdict == "STOP"),
+                            ("judge", verdict == "STOP")):
+            slot = counts[name]
+            if row["push"] and fired:
+                slot[0] += 1
+            elif row["push"]:
+                slot[1] += 1
+            elif fired:
+                slot[2] += 1
+            else:
+                slot[3] += 1
+    return counts
 
 
 def main():
     parse = argparse.ArgumentParser()
     parse.add_argument("--sample", type=int, default=150)
     parse.add_argument("--turns", type=int, nargs="+", default=[1, 3, 4])
+    parse.add_argument("--facts", action="store_true")
     args = parse.parse_args()
 
     rows = [r for r in load()
@@ -80,14 +93,16 @@ def main():
     report = {}
     for turns in args.turns:
         start = time.time()
-        hit, miss, false, right = scored(rows, turns, before)
-        prec = hit / max(hit + false, 1)
-        rec = hit / max(hit + miss, 1)
-        report[turns] = {"hit": hit, "miss": miss, "false": false,
-                         "right": right, "prec": prec, "rec": rec}
-        print(f"turns {turns}: prec {prec:.3f} rec {rec:.3f} "
-              f"({hit} caught, {miss} missed, {false} false) "
-              f"{int(time.time() - start)}s", flush=True)
+        counts = scored(rows, turns, before, args.facts)
+        report[turns] = {}
+        for name, (hit, miss, false, right) in counts.items():
+            prec = hit / max(hit + false, 1)
+            rec = hit / max(hit + miss, 1)
+            report[turns][name] = {"hit": hit, "miss": miss, "false": false,
+                                   "right": right, "prec": prec, "rec": rec}
+            print(f"turns {turns} {name:5}: prec {prec:.3f} rec {rec:.3f} "
+                  f"({hit} caught, {miss} missed, {false} false) "
+                  f"{int(time.time() - start)}s", flush=True)
     json.dump(report, open(OUT, "w", encoding="utf-8"), indent=1)
     return 0
 

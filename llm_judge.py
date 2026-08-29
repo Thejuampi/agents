@@ -549,8 +549,15 @@ def _pick(text, positive, negative):
     return None
 
 
-def stop_verdict(message, timeout=45, asked="", waiting=False, before=()):
+def stop_verdict(message, timeout=45, asked="", waiting=False, before=(),
+                 facts=""):
     """STOP, OK, or None when the model is unreachable.
+
+    facts is what the turn did, counted rather than described. A 9B model is
+    a poor reader of long prose and a fine reader of a short fact, and it
+    cannot see the tool calls at all: a message saying the suite is green is
+    the same string whether the agent ran it or imagined it. Handing it the
+    count instead of asking it to infer one is the cheapest help it gets.
 
     before is the exchanges that came earlier in the session, oldest first,
     each a question of the developer's and the answer the agent gave it. A
@@ -576,6 +583,8 @@ def stop_verdict(message, timeout=45, asked="", waiting=False, before=()):
             for ask, answer in before if ask)
         if earlier:
             message = earlier + chr(10) + message
+    if facts:
+        message = f"[{facts.strip()[:200]}]{chr(10)}{message}"
     if asked:
         message = f"[the user asked: {asked.strip()[:400]}]{chr(10)}{message}"
     text, seconds = _chat(STOP_SYSTEM, STOP_SHOTS, message, timeout)
