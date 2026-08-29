@@ -9,6 +9,8 @@ being woken is credited to a closing that never earned it.
 The first build had 120 of 854 pairs in that state and 9 of its 123 positives
 were the gate scoring itself."""
 import importlib.util
+import json
+import tempfile
 import os
 import sys
 
@@ -29,9 +31,26 @@ RESULT = {"type": "user", "message": {"content": [
           {"type": "tool_result", "content": "ok"}]}}
 
 
+def written(row):
+    handle = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False,
+                                         encoding="utf-8")
+    with handle:
+        json.dump([row], handle)
+    return handle.name
+
+
 def main():
     failures = []
     cases = 0
+
+    cases += 1
+    kept = {"closing": "Listo. Sigue el grafico:", "tools": 1,
+            "verdict": "OK", "push": True, "noise": False}
+    corpus.OUT = written(kept)
+    again = corpus.repatterned()
+    os.unlink(corpus.OUT)
+    if [r["verdict"] for r in again] != ["OK"]:
+        failures.append("re-reading the patterns must not touch the verdicts")
 
     cases += 1
     if corpus.spoke(WAKE):

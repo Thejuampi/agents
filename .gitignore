@@ -11,3 +11,4 @@ corpus.json
 *.stackdump
 corpus.out
 context.json
+corpus.json.bak

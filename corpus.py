@@ -128,19 +128,48 @@ def label(rows, step=50):
     return rows
 
 
+def repatterned():
+    """The pattern lane re-scored on the stored rows, model untouched.
+
+    Patterns change every week and the judge costs 13 minutes. The verdicts
+    already on disk are a fixed seed at temperature 0, so re-reading them is
+    the same answer, and the pattern side is a regex pass over strings."""
+    rows = json.load(open(OUT, encoding="utf-8"))
+    for row in rows:
+        if row.get("noise"):
+            continue
+        hits = perm.offenders(row["closing"], HERE, row["tools"] > 0)
+        row["hits"] = hits
+        row["firm"] = [h for h in hits
+                       if not h.split(":")[0].rstrip().endswith("?")]
+        row["fired"] = bool(row["firm"]) or row.get("verdict") == "STOP"
+    return rows
+
+
+def report(rows):
+    real = [r for r in rows if not r.get("noise")]
+    hit = [r for r in real if r.get("push")]
+    fired = [r for r in real if r.get("fired")]
+    caught = [r for r in fired if r.get("push")]
+    print(f"{len(real)} non-noise, {len(hit)} pushes "
+          f"({100.0 * len(hit) / max(len(real), 1):.1f}%)")
+    print(f"gate fires {len(fired)} prec {len(caught) / max(len(fired), 1):.3f}"
+          f" rec {len(caught) / max(len(hit), 1):.3f}")
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if "--patterns" in sys.argv:
+        rows = repatterned()
+        json.dump(rows, open(OUT, "w", encoding="utf-8"), ensure_ascii=False)
+        report(rows)
+        return
     rows = pairs()
     print(len(rows), "closings", flush=True)
     label(rows)
     json.dump(rows, open(OUT, "w", encoding="utf-8"),
               ensure_ascii=False)
-    real = [r for r in rows if not r.get("noise")]
-    hit = [r for r in real if r.get("push")]
-    fired = [r for r in real if r.get("fired")]
-    caught = [r for r in fired if r.get("push")]
-    print(f"{len(real)} non-noise, {len(hit)} pushes ({100.0 * len(hit) / max(len(real), 1):.1f}%)")
-    print(f"gate fires {len(fired)} prec {len(caught) / max(len(fired), 1):.3f} rec {len(caught) / max(len(hit), 1):.3f}")
+    report(rows)
 
 
 if __name__ == "__main__":
