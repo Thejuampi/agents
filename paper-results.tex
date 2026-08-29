@@ -514,6 +514,30 @@ the same corpus are fitted to it, and two closings is not evidence. What the
 loop demonstrates is the cost: an afternoon, no annotation, and a list of
 twelve messages the developer had already labelled by answering them.
 
+\subsection{Does the tuning transfer?}
+
+Every choice above was searched on the rows it is reported on, which is the
+objection a reader should raise. The corpus answers it: closings carry the
+session they came from, so it splits by session rather than by row. We run the
+greedy class demotion on half the sessions and score the classes it chose on
+the other half, twenty times.
+
+The search transfers in direction and barely in size. Held-out precision rises
+in 16 of 20 splits, and the mean gain is +0.003 - about two closings. The
+demoted set is not stable either: the search removes between four and seven
+classes depending on the half it sees. Three classes are removed in all twenty
+splits (\texttt{ask}, \texttt{idle}, \texttt{errand}), \texttt{wait} in 17 and
+\texttt{shape} in 11 - and \texttt{shape} and \texttt{idle} are the two classes
+whose precision is significantly above the base rate. A search that maximises
+precision over the union with the judge will happily remove a good pattern
+whose rows the judge already covers.
+
+That is the honest ceiling of pattern tuning on a corpus this size. The classes the search agrees on are the ones the judge
+covers, so removing them costs nothing and buys almost nothing, and everything
+past that is fitting. It also says what a larger corpus would be for: not a better score,
+which we would not trust, but a demotion set that stops changing when you
+change the half.
+
 Demoting classes still barely moves the shipped number. A greedy search
 removes six of the nine and lifts precision from 0.119 to 0.127, because the
 judge fires on nearly everything the patterns do. The pattern list cannot be
