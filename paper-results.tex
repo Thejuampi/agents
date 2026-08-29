@@ -270,6 +270,27 @@ lose every firm label and fall through to the judge, which still sees them.
 The guard removes matches that were wrong by construction and costs almost no
 recall, because a negated stall phrase is rarely a stall.
 
+\subsection{Separating two questions the judge had been answering as one}
+
+Every result above treats the judge's OK as a release. That conflates two
+questions. The judge is asked whether the agent stopped early, and a closing
+with nothing wrong in it passes that test while still leaving work available.
+The 33 pushes the shipped gate missed are almost all of this shape: correct
+reports of finished work that a next action would have followed.
+
+An OK therefore no longer closes the turn on its own. It asks once per chain
+whether a next action exists, and the release comes on the following pass:
+the turn ends when the agent looked and could not name one. The design point
+is that the second question is put to the worker, which has the repository in
+front of it, rather than to a 9B classifier reading a paragraph.
+
+Of 841 non-noise closings, 302 are released today and so receive the
+question; 33 of those were real pushes. Because every closing now takes
+either a block or the question, the recall ceiling rises to 1.0 and the
+binding constraint moves from detection to the worker's own answer. The cost
+is one turn per clean closing, which the request bounds by accepting
+``I checked these and nothing remains'' as a closing answer.
+
 \subsection{Before and after the gate}
 
 The corpus splits at 2026-08-28, when the gate was installed. Pushes fall from

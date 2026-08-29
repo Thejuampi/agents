@@ -23,6 +23,13 @@ Three lanes, and only two ways a turn ends here.
           what reads the ones nobody did. Unreachable counts as an objection,
           so taking the model away is not a way out.
 
+          An OK from the model does not close the turn by itself. It only
+          answers whether the agent stopped early, which a turn with
+          nothing wrong in it passes while still leaving work on the
+          table. So an OK asks once for the next action, and the release
+          comes on the pass after that: the turn ends when the agent
+          looked and could not name one.
+
 Why one entry: a session loads settings.json when it starts and keeps that
 snapshot. A checker added to settings later never reaches a session already
 running - which is how a real stop went unchecked. Files in this directory are
