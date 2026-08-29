@@ -80,6 +80,15 @@ def main():
         print(f"{name:22} {len(group):4}  {caught / len(group):.3f}"
               f"  [{edge[0]:.3f}, {edge[1]:.3f}]")
     print()
+    print(f"{'only this lane fires':22} {'fires':>4}  {'prec':>5}")
+    line("firm patterns alone", score(
+        real, lambda r: bool(r.get("firm")) and r.get("verdict") != "STOP"))
+    line("judge alone", score(
+        real, lambda r: not r.get("firm") and r.get("verdict") == "STOP"))
+    line("doubt, judge passes", score(
+        real, lambda r: bool(r.get("hits")) and not r.get("firm")
+        and r.get("verdict") != "STOP"))
+    print()
     off, best = set(), score(real, lambda r: bool(r.get("firm")) or r.get("verdict") == "STOP")
     while True:
         moved = None
