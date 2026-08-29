@@ -130,6 +130,19 @@ Se arma solo desde el repo. Si el `AGENTS.md`, el `CLAUDE.md` o el archivo de
 proceso del árbol nombra ese ciclo, el checker aplica. En cualquier otro árbol
 se queda quieto y no cuesta nada.
 
+## Negar no es prometer
+
+El guardia se disparo con su propio informe: "Nothing is running now" cayo
+en el patron `is (running|reviewing|writing) now`. La frase decia lo
+contrario de lo que el patron busca.
+
+Ahora ningun patron dispara dentro de una clausula negada. La ventana es de
+4 palabras y corta en el signo de puntuacion mas cercano, asi que `no|nada|
+ningun|nunca|n't` cerca de la frase la desactiva, y una negacion lejana en
+el mismo mensaje no. Medido sobre 854 cierres: 37 cambian de etiqueta y 3
+eran empujones reales; 19 pierden toda etiqueta firme y siguen yendo al
+juez, que igual los ve.
+
 ## Esperar no es una excusa
 
 Antes era una exencion: trabajo lanzado, ningun patron levantado, turno

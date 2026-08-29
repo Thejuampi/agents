@@ -280,6 +280,26 @@ def quoted_hit(found):
     return text.rstrip(" .,;:")
 
 
+NO = re.compile(
+    r"(\b(no|not|nothing|none|never|without|nor|nada|ning[u\u00fa]n\w*|nunca|sin|tampoco)\b"
+    r"|n't)", re.IGNORECASE)
+"""Words that turn a stall phrase into a report that nothing is stalled."""
+
+LOOKBACK = 4
+"""How many words back a negation still governs the phrase.
+
+'Nothing is running now' is one word away and must not fire. 'I did not
+finish the audit; I will report back when it lands' carries a negation in the
+same message and is a real stall, so the window stays short and stops at the
+nearest clause break."""
+
+
+def negated(text, found):
+    head = text[:found.start()]
+    clause = re.split(r"[.;:,!?\n]", head)[-1]
+    return bool(NO.search(" ".join(clause.split()[-LOOKBACK:])))
+
+
 ACK_WORDS = 60
 """How short a turn has to be for an acknowledgement to be the whole of it.
 
@@ -300,7 +320,7 @@ def offenders(message, cwd=None, acted=True):
         if label.startswith("ack") and not brief:
             continue
         found = rx.search(stripped)
-        if found:
+        if found and not negated(stripped, found):
             hits.append(f"{label}: {quoted_hit(found)}")
     if ends_on_a_question(message):
         hits.append("shape: closing question")

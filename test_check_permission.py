@@ -67,6 +67,11 @@ MUST_FIRE = [
 N = chr(10)
 
 MUST_NOT_FIRE = [
+    "Nothing is running now, and the gate handles the question itself from "
+    "here. The waiting turn blocks whatever the judge answers: recall 0.700 "
+    "to 0.764 at the same precision. Suite green, paper builds clean.",
+    "Nada quedo corriendo en background. El commit esta hecho y la suite "
+    "quedo verde, asi que el ciclo cerro entero.",
     "Vamos bien, y ahora tengo el numero: medi el guardia contra 885 cierres "
     "reales y encontro dos agujeros. Uno eran paginas de error del harness, "
     "once por ciento de los bloqueos. El otro, el agente esperando trabajo ya "
