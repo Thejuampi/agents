@@ -261,6 +261,35 @@ Los tests que hablan con el modelo, y el que mata el daemon para verlo volver,
 corren solo con `STOP_TEST_LIVE=1`. La suite de todos los días no toca la
 placa: cuesta 42 procesos, todos `git` de andamiaje, y ni un byte de VRAM.
 
+## Lo que cuesta
+
+Un guardia que corre en cada turno es un costo que vive ahí. No lo medimos
+hasta que frenó la máquina.
+
+Antes, una parada arrancaba nueve intérpretes de Python, uno por checker, y el
+checker de código muerto le preguntaba a git una vez por cada símbolo que el
+turno había agregado: hasta 120 procesos en un solo cierre. En Windows un
+programa de consola lanzado desde un padre sin consola se abre la suya, así que
+el costo se veía: ventanas que aparecían y desaparecían sobre el editor.
+
+Hoy los checkers comparten un intérprete, sin perder el contrato de que un
+checker es un archivo que se deja en el directorio. Las preguntas a git se
+hacen una sola vez cada una, de a sesenta símbolos por llamada, y solo cuando
+el cierre dice que entregó.
+
+| el turno | procesos |
+|---|---|
+| miro código | 0 |
+| escribí y sigo | 0 |
+| digo que está listo | 3 |
+| suite entera | 42 |
+
+Para medirlo vos mismo, `STOP_SPAWN_LOG=ruta` anota cada hijo que arranca
+cualquier hook. Y si algo abre una ventana y no sabés qué es, `watch.py 60
+salida.log` mira el escritorio y anota cada consola nueva con la cadena de
+quién la abrió, hasta la raíz. No arranca un solo proceso para hacerlo, que es
+justo lo que hace falta cuando lo que investigás es la cantidad de procesos.
+
 ## Las pruebas se juntan solas
 
 El log dice que decidio el guardia. No dice si acerto. Esa respuesta ya esta
