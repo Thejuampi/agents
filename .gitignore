@@ -2,3 +2,4 @@
 .stop-state.json
 __pycache__/
 judge-log.jsonl
+judge-log.jsonl.stamp

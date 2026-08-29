@@ -17,7 +17,7 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LOG = os.path.join(HERE, "judge-log.jsonl")
+LOG = os.environ.get("STOP_LOG") or os.path.join(HERE, "judge-log.jsonl")
 PROJECTS = os.path.expanduser("~/.claude/projects")
 WORKED = 3
 ENOUGH = 8
@@ -170,7 +170,7 @@ def brief():
     ripe = ripe_ones(by_class)
     if not ripe:
         return 0
-    stamp = os.path.join(HERE, ".report-stamp")
+    stamp = LOG + ".stamp"
     today = time.strftime("%Y-%m-%d")
     try:
         if open(stamp, encoding="utf-8").read().strip() == today:

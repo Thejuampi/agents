@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import tempfile
 
@@ -53,6 +54,26 @@ def graded(rows, head):
     return did
 
 
+def brief_over(blocks, tools, twice=False):
+    """Runs the session-start brief over a log built for this case."""
+    rows = [said("falta el commit")] + ([used(tools)] if tools else [])
+    path = transcript(rows)
+    log = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")
+    for _ in range(blocks):
+        log.write(json.dumps({"lane": "pattern", "file": path, "head": "falta el commit",
+                              "firm": ["Matched: ask: querés que"]}) + chr(10))
+    log.close()
+    env = dict(os.environ, STOP_LOG=log.name, PYTHONIOENCODING="utf-8")
+    hook = os.path.join(HERE, "judge-report.py")
+    if twice:
+        subprocess.run([sys.executable, hook, "--brief"], env=env, capture_output=True)
+    done = subprocess.run([sys.executable, hook, "--brief"], env=env,
+                          capture_output=True, text=True)
+    os.unlink(path)
+    os.unlink(log.name)
+    return done.stdout.strip()
+
+
 def main():
     failures = []
 
@@ -96,6 +117,19 @@ def main():
     counted()
     if report.ripe_ones({"ask": [9] * 8}):
         failures.append("a pattern whose blocks bought work must never be demoted")
+
+    counted()
+    body = brief_over(8, tools=0)
+    if "ask" not in body:
+        failures.append(f"a ripe pattern must be named at session start: {body!r}")
+
+    counted()
+    if brief_over(8, tools=0, twice=True):
+        failures.append("the same news must not be repeated the same day")
+
+    counted()
+    if brief_over(8, tools=9):
+        failures.append("blocks that bought work must keep the brief quiet")
 
     print(f"{len(RUNS)} cases, {len(failures)} failures")
     for line in failures:
