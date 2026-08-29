@@ -88,6 +88,43 @@ nothing more. Precision is the quantity that matters here and this label cannot
 measure it, which is the entire reason for the loop in
 Section~\ref{sec:loop}.
 
+\subsection{When the label reads the system's own output}
+
+The first build of this corpus was contaminated, and the way it was
+contaminated is the more general finding. A weak label built by reading
+transcripts asks who spoke last. In an agent harness the answer is not
+obvious, because several things wear the user's role.
+
+The gate wakes the agent by writing to standard error, and the harness feeds
+that text back as a plain user string. Read as a turn, it is the gate's own
+reminder handed to the push judge as though a person had written it: 120 of
+the 854 pairs were in that state and 9 of the 123 positives were the system
+scoring itself. The same string also ended the window in which the
+self-labelling loop counts tool calls, so every block graded as zero work
+bought. The report read 14 of 14 blocks bought nothing, a figure that is
+impossible rather than merely bad, and which no amount of prompt tuning
+would have explained.
+
+Two further sources wore the same role. A screenshot arrives as a placeholder
+carrying its pixel dimensions, and an interrupted turn, a context compaction
+and a usage-limit notice each arrive as a paragraph the harness writes about
+itself. Together with the wakes, 152 of 753 replies contained no developer
+words at all, so a fifth of the label was the judge reading boilerplate.
+
+The correction is one definition of a developer turn, shared by every
+reader. Three components had each written their own and
+each failed differently, which is the usual shape of this bug: it is not a
+modelling error and no evaluation of the classifier can surface it, because
+the classifier is working correctly on inputs that should never have reached
+it.
+
+One of the three was not a measurement bug at all. The component that detects
+work still in flight cleared its state on any user turn, so the first block
+retired the agent's launched task and every stop after it saw nothing
+running. The reminder that asks a waiting agent to keep working went silent
+exactly when it was needed, and it did so in production for as long as the
+feature had existed. Building the measurement is what found it.
+
 \subsection{A stronger label, and what it costs to trust it}
 \label{sec:pushlabel}
 

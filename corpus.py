@@ -70,32 +70,7 @@ def text_of(entry):
 
 
 spoke = reader.spoke
-
-
-IMAGE = re.compile(r"\A\s*\[Image[^\]]*\]\s*")
-HARNESS = re.compile(
-    r"Request interrupted|This session is being continued|"
-    r"Usage limit approaching|no visible output|API Error|"
-    r"^Caveat:|^Stop hook feedback", re.IGNORECASE)
-"""What the harness says in the developer's place.
-
-A screenshot arrives as a placeholder carrying its pixel size, an escape
-arrives as an interrupt notice, a compaction arrives as a paragraph about
-itself. Read as a reply, the push judge scores boilerplate: 152 of 753 rows
-in the first build had no developer words in them at all."""
-
-
-def reply_of(text):
-    """The developer's own words, or None when there are none."""
-    body = " ".join(str(text or "").split())
-    while True:
-        stripped = IMAGE.sub("", body, count=1)
-        if stripped == body:
-            break
-        body = stripped
-    if not body or HARNESS.search(body[:120]):
-        return None
-    return body
+reply_of = reader.reply_of
 
 
 def tools(entry):

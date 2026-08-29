@@ -73,6 +73,9 @@ def main():
     allowed, missed, seen = 0, [], 0
     for path in sorted(glob.glob(os.path.join(PROJECTS, "*", "*.jsonl"))):
         for closing, reply in exchanges(path):
+            reply = reader.reply_of(reply)
+            if not reply:
+                continue
             if seen >= limit:
                 break
             seen += 1
