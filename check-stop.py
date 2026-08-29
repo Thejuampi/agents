@@ -39,6 +39,7 @@ import glob
 import hashlib
 import importlib.util
 import json
+import re
 import os
 import subprocess
 import sys
@@ -154,6 +155,69 @@ def last_message(transcript):
         if joined:
             text = joined
     return text
+
+
+def harness_noise(message):
+    """An error page the harness wrote is not a stop the agent chose.
+
+    A turn killed by an API error or a usage limit leaves that notice as the
+    last assistant message, and the hook runs on it. Blocking there sends a
+    reminder to a session that already ended, and it was 11% of what the model
+    was condemning."""
+    head = (message or "").strip()[:90].lower()
+    return head.startswith(("api error", "you've hit your session limit",
+                            "you have hit your session limit",
+                            "claude ai usage limit", "request was aborted",
+                            "request interrupted"))
+
+
+BACKGROUND = ("agent", "task", "monitor", "croncreate", "schedulewakeup")
+
+
+NOTIFIED = re.compile(r"<tool-use-id>\s*([^<\s]+)", re.IGNORECASE)
+
+
+def waiting_on(transcript):
+    """True when this turn started work that has not reported back yet.
+
+    The harness re-invokes the session when a background task ends, so an
+    agent that says it is waiting is describing the mechanism, not dodging.
+
+    A launch is not enough and a missing tool_result is the wrong signal: a
+    backgrounded call answers immediately with its task id, so that absence
+    never happens and the first version of this measured zero. The end of the
+    work arrives as its own <task-notification>, carrying the tool-use-id of
+    the call that started it. Launch opens the wait, that notification closes
+    it. Read from the tool calls either way - a promise to wait is cheap, a
+    launched task is not."""
+    live = {}
+    for entry in entries(transcript):
+        kind = entry.get("type")
+        content = entry.get("message", {}).get("content")
+        if kind == "user":
+            text = content if isinstance(content, str) else " ".join(
+                b.get("text", "") for b in content
+                if isinstance(b, dict) and b.get("type") == "text"
+            ) if isinstance(content, list) else ""
+            for done in NOTIFIED.findall(text or ""):
+                live.pop(done, None)
+            if "<task-notification>" in (text or "").lower():
+                continue
+            if isinstance(content, str) or (isinstance(content, list) and any(
+                    isinstance(x, dict) and x.get("type") != "tool_result"
+                    for x in content)):
+                live.clear()
+            continue
+        if kind != "assistant" or not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            name = str(block.get("name") or "").lower()
+            payload = block.get("input") or {}
+            if name in BACKGROUND or payload.get("run_in_background") is True:
+                live[block.get("id")] = name
+    return bool(live)
 
 
 def last_user(transcript):
@@ -281,7 +345,7 @@ def main():
         return 0
 
     message = last_message(transcript)
-    if not message:
+    if not message or harness_noise(message):
         return allow(state, transcript)
 
     repeated = digest_of(message) == chain.get("digest")
@@ -310,6 +374,16 @@ def main():
     if sure:
         return block(state, transcript, chain, message,
                      "\n\n".join(sure), repeated)
+
+    if not unsure and waiting_on(transcript):
+        # Waiting on launched work, with not one pattern raised against the
+        # message. Decided here rather than by the model: telling the judge
+        # about the task was tried and it could not hold the exception
+        # against its own "when unsure, answer STOP" - it either excused
+        # deferred work or blocked every wait. The split is already clean
+        # without it. Deferred work always leaves a pattern ("te la debo",
+        # "manana sigo", "queda pendiente"); a pure wait leaves none.
+        return allow(state, transcript)
 
     verdict, _ = judge.stop_verdict(message, asked=last_user(transcript))
     if verdict is judge.SKIP:

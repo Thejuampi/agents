@@ -414,7 +414,7 @@ def _chat(system, shots, message, timeout):
         "stream": False,
         "keep_alive": KEEP,
         "think": False,
-        "options": {"temperature": 0, "num_predict": 4, "num_ctx": 8192},
+        "options": {"temperature": 0, "seed": 7, "num_predict": 4, "num_ctx": 8192},
     }).encode()
     room = _room()
     if room is not None and room < FLOOR and not _loaded():
@@ -454,13 +454,19 @@ def _pick(text, positive, negative):
     return None
 
 
-def stop_verdict(message, timeout=45, asked=""):
+def stop_verdict(message, timeout=45, asked="", waiting=False):
     """STOP, OK, or None when the model is unreachable.
 
     asked is the user's last message. Without it the judge sees a reply with
     no question and reads every answer as a report with something dangling -
     it stopped a turn whose whole content was the URL Juan had just asked
-    for. A reply is only judgeable against what it was replying to."""
+    for. A reply is only judgeable against what it was replying to.
+
+    waiting is accepted and ignored. Telling the model about a running
+    background task was tried and measured: it could not hold the exception
+    against its own "when unsure, answer STOP", and either excused deferred
+    work or blocked every wait. That call belongs to check-stop.py, which
+    reads it from the tool calls and needs no opinion."""
     if asked:
         message = f"[the user asked: {asked.strip()[:400]}]{chr(10)}{message}"
     text, seconds = _chat(STOP_SYSTEM, STOP_SHOTS, message, timeout)
@@ -530,7 +536,7 @@ def why(message, asked="", timeout=25):
         "stream": False,
         "keep_alive": KEEP,
         "think": False,
-        "options": {"temperature": 0, "num_predict": 40, "num_ctx": 8192},
+        "options": {"temperature": 0, "seed": 7, "num_predict": 40, "num_ctx": 8192},
     }).encode()
     try:
         request = urllib.request.Request(

@@ -130,6 +130,34 @@ Se arma solo desde el repo. Si el `AGENTS.md`, el `CLAUDE.md` o el archivo de
 proceso del árbol nombra ese ciclo, el checker aplica. En cualquier otro árbol
 se queda quieto y no cuesta nada.
 
+## Esperar no es parar
+
+Medimos el guardia contra tus 883 cierres reales. De los que ningun patron ve,
+el juez trababa la mitad. Leerlos dio dos causas, y ninguna era pereza del
+agente.
+
+Una: paginas de error del harness. `API Error`, `You've hit your session
+limit`. El turno ya murio y el guardia le mandaba un recordatorio a nadie. Once
+por ciento de los bloqueos.
+
+Dos, la grande: el agente esperando trabajo que ya lanzo. "Waiting for the
+profiler", "I'll pick this back up once the Reviewer's response lands". El
+harness despierta la sesion sola cuando eso aterriza, asi que trabar ahi lo
+obliga a inventar trabajo mientras espera. Diecinueve por ciento.
+
+La espera se lee del transcript, nunca de la frase: prometer que se espera es
+gratis, lanzar una tarea no. Se abre con la llamada en background y se cierra
+con su `<task-notification>`, que trae el `tool-use-id` de quien la lanzo. La
+primera version buscaba un `tool_result` que faltara y midio cero: una llamada
+en background contesta al toque con su id.
+
+Al juez no se le cuenta. Se probo, y un 9b no sostiene la excepcion contra su
+propia regla de "ante la duda, STOP": o perdonaba el trabajo diferido o trababa
+toda espera. No hace falta. La separacion ya es limpia sin el, porque el
+trabajo diferido siempre deja un patron - "te la debo", "manana sigo", "queda
+pendiente" - y la espera pura no deja ninguno. Tarea en curso y cero patrones
+es un turno que sigue.
+
 ## El tono
 
 Del otro lado hay alguien capaz que ya venía trabajando. Un mensaje que retea se
