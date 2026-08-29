@@ -59,9 +59,10 @@ fixed phrasings cheaply, the judge catches the rest.
 
 The judge answers in 0.31 seconds at the median and 0.66 at the 90th percentile,
 running locally on consumer hardware alongside the agent's own work. The
-per-pattern confidence split is what keeps this affordable: 235 closings reach
-the judge as doubts rather than being decided by a regular expression, and the
-304 firm hits never pay for a model call at all.
+per-pattern confidence split is what keeps this affordable. On the clean
+corpus 329 closings carry a firm hit and never pay for a model call, and 187
+more carry only a doubt, which is a message raised to the judge instead of
+being decided by a regular expression.
 
 \subsection{Against the push label}
 
