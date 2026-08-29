@@ -23,15 +23,20 @@ the user a command it could have run. We describe a gate on the agent's stop
 path that detects this in three lanes of increasing cost -- an audit of the
 agent's own escape hatch, 298 pattern labeling functions, and a 9B local judge
 -- and re-wakes the agent when the closing message shows the pattern. Building
-the gate was straightforward; tuning it was not, because tuning needs labels and
-labels need a reader. We show that two usable labels are already present in the
-transcript and cost no annotation. Before the gate exists, the user's own next
-message supplies a weak label for premature stopping. After the gate
-intervenes, the agent's tool calls before the user speaks again supply a label
-for the intervention itself. We evaluate over 854 closing pairs from 66 real
-sessions, ablate each lane against the first label, and describe a loop that
-uses the second to name its own patterns for demotion. We report negative
-results in full, including two failed attempts to obtain a usable confidence
-signal from the judge, and one case where an exception a 9B model could not hold
-in its prompt became trivial once moved out of the model entirely.
+the gate was straightforward; evaluating it was not, because evaluation needs
+labels and labels need a reader. We show that two usable labels are already
+present in the transcript and cost no annotation. Before the gate exists, the
+developer's own next message says whether they had to ask for work the agent
+could have done. After the gate intervenes, the agent's tool calls before the
+developer speaks again say whether the intervention bought anything. Measured
+over 854 closings from 66 real sessions, the first label puts the base rate of
+premature stopping at 13.9\% and the shipped gate's precision at 0.15 while it
+fires on 74\% of closings: barely above chance, and we report that without
+softening it. The label then pays for itself twice. It shows that an exemption
+the design was confident in -- releasing turns that wait on launched work --
+was releasing turns worse than average, and it selects a judge prompt that
+dominates the shipped one on precision, recall and intervention count at once.
+We report negative results in full, including three separate instructions a 9B
+judge would not hold, and two failed attempts to obtain a usable confidence
+signal from it.
 \end{abstract}

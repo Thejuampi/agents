@@ -107,8 +107,10 @@ The second lane is 298 regular expressions over the agent's own words, grouped
 into nine classes by what the closing is doing rather than by what it says:
 	exttt{ask}, 	exttt{announce}, 	exttt{defer}, 	exttt{wait},
 	exttt{handoff}, 	exttt{errand}, 	exttt{read}, 	exttt{idle} and
-	exttt{ack}. Appendix~ef{app:classes} gives the full table. The grouping
-matters because the loop of Section~ef{sec:loop} tunes classes rather than
+	exttt{ack}. Appendix~
+ef{app:classes} gives the full table. The grouping
+matters because the loop of Section~
+ef{sec:loop} tunes classes rather than
 individual expressions: one regular expression rarely fires often enough to be
 judged on its own.
 
@@ -271,6 +273,16 @@ Waiting is now established deterministically from the transcript, before the
 judge is called at all. \emph{An instruction a small model cannot hold is a
 decision that belongs outside the model.}
 
+\paragraph{Nor a disposition.} The judge's instruction ended with
+\emph{when unsure, answer STOP}. Replacing it with its exact opposite,
+\emph{when unsure, answer OK}, changed 31 verdicts out of 841 and moved
+precision by 0.001. Replacing it instead with a test the model can apply --
+is there an action available right now that needs nothing only the developer
+knows -- moved precision, recall and intervention count together. Three
+instructions in this work went unheld by the same model, and the pattern
+across them is consistent: it follows a criterion it can evaluate against the
+text in front of it, and ignores a disposition about how to feel when unsure.
+
 \paragraph{A shared accelerator breaks reproducibility.} Two test suites run
 concurrently produced different verdicts on byte-identical input. The cause is
 request batching in the serving daemon. We first misdiagnosed this as model
@@ -346,9 +358,18 @@ been run against a second user, which is the first thing that should happen.
 \section{Conclusion}
 
 A gate that stops an agent from stopping early is easy to build and hard to
-tune, because tuning needs labels and labels need a reader. We showed that both
-labels this system needs are already lying in the transcript: the user's own
-push before the gate exists, and the agent's own behaviour after the gate
-intervenes. Neither costs an annotation. Together they let the gate report on
-itself, and the first thing it reported was a pattern of its author's that
-condemned nothing but reports.
+evaluate, because evaluation needs labels and labels need a reader. Both
+labels this system needs were already lying in the transcript: the developer's
+own reply before the gate exists, and the agent's own behaviour after the gate
+intervenes. Neither costs an annotation.
+
+Reading them was uncomfortable and useful in the same measure. The gate fires
+on three closings in four and is right about one in seven, which is close to
+the rate at which the failure occurs at all. The first thing the labels
+overturned was the design's most confident exemption, which turned out to be
+releasing turns worse than average. The second was a prompt written as a
+disposition, replaced by one written as a test, which improved every number at
+once.
+
+Neither correction came from a new idea. Both came from finally measuring
+something that had been sitting in the transcript the whole time.
