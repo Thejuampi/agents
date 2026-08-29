@@ -231,6 +231,24 @@ It is gone. Waiting no longer excuses a turn; it selects a different request,
 which points out that the launched work reports back on its own and asks for
 the next piece in the meantime.
 
+Removing it from the text was not enough. The waiting request lived inside
+the branch the judge reached only when it answered STOP, so a report written
+while a launched task ran was still released on the OK path. The system's own
+log caught this: a summary closing went out at judge confidence 0.976 with
+work in flight, and the developer had to push.
+
+The label sized the leak. Of 119 closings with work in flight, 22 ended in a
+push (18.5\%) against 14.8\% for closings with nothing running. Of the 37 that
+the judge released with OK, 6 still needed a push: 16.2\%, above the base rate
+for the population. The OK path on a waiting turn was worse than average, the
+same finding as the original exemption one level down.
+
+Waiting now decides the block on its own, whatever the judge answers. On the
+labelled corpus this raises recall from 0.700 to 0.764 at unchanged precision
+0.150: 44 more fires, 9 of them real. The cost is bounded by the request
+itself, which accepts ``nothing else can move without this result'' as an
+answer and spends one turn collecting it.
+
 \subsection{Before and after the gate}
 
 The corpus splits at 2026-08-28, when the gate was installed. Pushes fall from
