@@ -88,6 +88,20 @@ def main():
     line("doubt, judge passes", score(
         real, lambda r: bool(r.get("hits")) and not r.get("firm")
         and r.get("verdict") != "STOP"))
+    bands = [(0, .5), (.5, .75), (.75, .9), (.9, 1.01)]
+    scored = [r for r in real if r.get("sure") is not None
+              and r.get("verdict") == "STOP"]
+    if scored:
+        print()
+        print(f"{'judge STOP by certainty':22} {'fires':>4}  {'prec':>5}")
+        for low, high in bands:
+            part = [r for r in scored if low <= r["sure"] < high]
+            if not part:
+                continue
+            caught = sum(1 for r in part if r.get("push"))
+            edge = wilson(caught, len(part))
+            print(f"{f'{low:.2f}-{high:.2f}':22} {len(part):4}"
+                  f"  {caught / len(part):.3f}  [{edge[0]:.3f}, {edge[1]:.3f}]")
     print()
     off, best = set(), score(real, lambda r: bool(r.get("firm")) or r.get("verdict") == "STOP")
     while True:
