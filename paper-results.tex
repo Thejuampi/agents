@@ -182,9 +182,10 @@ turns ended early.}
 
 The shipped configuration fires on 74\% of closings and is right 15\% of the
 time, against a base rate of 13.9\%. It is barely above chance. Requiring both
-lanes to agree raises precision to 0.21 and halves recall, which is the only
-configuration that clearly beats the base rate, and it still fires on 30\% of
-all closings.
+lanes to agree raises precision to 0.21 and halves recall, the only
+configuration here that clearly beats the base rate, and it still fires on
+30\% of all closings. That last claim does not survive the clean corpus and is
+withdrawn in Table~ef{tab:clean}.
 
 Per class, precision ranges from 0.30 (\texttt{idle}) down to 0.07
 (\texttt{wait}) and 0.09 (\texttt{errand}) -- two classes that fire
@@ -406,9 +407,8 @@ Every number above this point was computed on a corpus that included the
 system's own output. Three contaminations were found and are described in
 Section~\ref{sec:contamination}: the gate's wake read as a developer
 reply, bare image placeholders, and harness notices. The corpus was rebuilt
-from the same 66 transcripts with those readers corrected. The ablations that
-produced the tables above have not been re-run on it; the headline figures
-move as follows.
+from the same 66 transcripts with those readers corrected. The lane and class
+ablations are re-run on it below; the headline figures move as follows.
 
 \begin{center}
 \begin{tabular}{lrr}
@@ -430,6 +430,71 @@ positives the system had manufactured for itself, so the base rate falls by a
 quarter and precision falls with it, while recall rises slightly. The
 qualitative finding is unchanged and sharper: the gate fires on 74\% of
 all closings to catch 85\% of the 10\% that matter.
+
+Every configuration was then re-run on the clean rows. Nothing in this table
+needs the model: the corpus stores each lane's opinion per row, so the whole
+ablation is arithmetic over stored labels.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+Lane configuration & Fires on & Precision & Recall & F1 \\
+\midrule
+Base rate (the failure itself) & 78 & 0.104 & 1.000 & --- \\
+\midrule
+Firm patterns only & 389 & 0.123 & 0.615 & 0.206 \\
+Any pattern & 515 & 0.117 & 0.769 & 0.202 \\
+Judge only & 460 & 0.122 & 0.718 & 0.208 \\
+Firm or judge (shipped) & 556 & 0.119 & 0.846 & 0.208 \\
+Firm and judge & 293 & 0.130 & 0.487 & 0.205 \\
+\bottomrule
+\end{tabular}
+\caption{The same ablation on the clean corpus of 747 closings.}
+\label{tab:clean}
+\end{table}
+
+The clean numbers withdraw a claim made above. On the contaminated corpus,
+requiring both lanes to agree reached 0.21 against a base rate of 0.139 and
+was described as the one configuration that clearly beats chance. On clean
+rows the same configuration reaches 0.130 against 0.104. The gap is 26
+closings out of 747 - it survives as a direction and not as a result, and no
+configuration we measured separates itself from the base rate. The ordering
+holds: agreement between lanes is the most precise setting and the shipped
+either-lane rule the least, trading precision for the recall it was tuned
+for.
+
+The per-class picture holds too, with sharper extremes.
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Class & Fires on & Precision \\
+\midrule
+\texttt{ask} & 177 & 0.113 \\
+\texttt{shape} & 137 & 0.197 \\
+\texttt{announce} & 128 & 0.109 \\
+\texttt{wait} & 88 & 0.034 \\
+\texttt{handoff} & 43 & 0.116 \\
+\texttt{errand} & 40 & 0.050 \\
+\texttt{idle} & 35 & 0.257 \\
+\texttt{defer} & 35 & 0.086 \\
+\texttt{read} & 15 & 0.267 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two classes fire well above the base rate: \texttt{read} at 0.267 on 15
+closings and \texttt{idle} at 0.257 on 35. Two fire far below it:
+\texttt{wait} at 0.034 on 88 closings and \texttt{errand} at 0.050 on
+40. A class firing at a third of the base rate is worse than a coin, and
+\texttt{wait} is the eleventh most common intervention the gate makes.
+
+Demoting classes still barely moves the shipped number. A greedy search
+removes six of the nine and lifts precision from 0.119 to 0.127, because the
+judge fires on nearly everything the patterns do. The pattern list cannot be
+tuned out of this: the two lanes are not independent, and removing one lane's
+worst rules leaves the other lane firing on the same rows.
 
 \subsection{Two changes that did not earn their place}
 
