@@ -205,6 +205,10 @@ def main():
         if code == 2:
             failures.append(f"false positive on: {message[:60]} -> {hook.offenders(message)}")
 
+    code, _ = run("Ahora el camino del ROIC y la version de la huella:")
+    if code != 2:
+        failures.append("a closing that ends on a colon must fire")
+
     code, _ = run("Perfecto. Los warnings ya no aparecen.", acted=False)
     if code != 2:
         failures.append("a short turn that ran nothing must fire")

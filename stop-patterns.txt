@@ -383,8 +383,12 @@ announce?: \b(stays|remains|sigue|queda|siguen|quedan)\s+(unpriced|unfixed|unwir
 # More closings that name the move: 'Moving straight to Stage 7 now.',
 # 'Writing plan.v2.md now.', 'Abro el aviso completo:', 'Leo resultados:'
 announce?: (?:^|[.!?]\s)(Going|Dropping|Moving|Switching|Turning|Heading|Pulling|Pushing|Writing|Reading|Testing)\b[^.!?\n]{0,150}[.!?]?\s*$
-announce?: (?:^|[.!?]\s)(Miro|Leo|Abro|Cambio|Quito|Sumo|Uso|Copio|Mando|Traigo|Vuelvo)\b[^.!?\n]{0,150}[.!?]?\s*$
+announce?: (?:^|[.!?]\s)(Miro|Leo|Abro|Cambio|Quito|Sumo|Uso|Copio|Mando|Traigo|Vuelvo|Aplico|Corrijo|Agrego|Arreglo|Escribo|Ajusto)\b[^.!?\n]{0,150}[.!?]?\s*$
 
 # 'still depends on', 'sigue dependiendo de' - the thing it did not fix,
 # named at the end of a report.
 announce?: \b(still depends on|sigue dependiendo de|todavía depende de)\b
+
+# 'will recheck PR39 in ~8 minutes' - a check postponed to a clock instead
+# of made, with the wait handed to the reader.
+announce: \bwill (?:recheck|re-check|check back|revisit|follow up)\b

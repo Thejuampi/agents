@@ -214,6 +214,17 @@ def ends_on_a_question(message):
                for sentence in re.split(r"(?<=[.!?])\s+", line))
 
 
+def ends_on_a_colon(message):
+    """A closing whose last line ends in a colon promised the thing that comes
+    after it and never wrote it. The shape says the turn stopped mid-sentence."""
+    body = prose(message).strip()
+    for line in reversed(body.splitlines()):
+        stripped = line.strip().strip("*_`> ")
+        if stripped:
+            return stripped.endswith(":")
+    return False
+
+
 def acted_this_turn(path):
     """Did any tool run since the user last spoke? A turn of pure prose that
     closes short is an acknowledgement, and an acknowledgement is not work."""
@@ -324,6 +335,8 @@ def offenders(message, cwd=None, acted=True):
             hits.append(f"{label}: {quoted_hit(found)}")
     if ends_on_a_question(message):
         hits.append("shape: closing question")
+    if ends_on_a_colon(message):
+        hits.append("shape: a closing that ends on a colon")
     if ends_on_nothing(message, acted):
         hits.append("shape: a short turn that ran nothing")
     return hits
