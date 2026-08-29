@@ -380,16 +380,14 @@ def main():
          weak=unsure, seconds=round(seconds, 2), quote=line,
          head=message[:120], waiting=waiting)
 
-    if verdict == "STOP":
-        if waiting:
-            body = WAITING
-        elif unsure:
-            body = "\n\n".join(unsure)
-        else:
-            body = LLM_STOP.format(
-                why=QUOTE.format(line=line) if line else "")
-        return block(state, transcript, chain, message, body, repeated)
-    return allow(state, transcript)
+    if waiting:
+        body = WAITING
+    elif verdict == "STOP":
+        body = "\n\n".join(unsure) if unsure else LLM_STOP.format(
+            why=QUOTE.format(line=line) if line else "")
+    else:
+        return allow(state, transcript)
+    return block(state, transcript, chain, message, body, repeated)
 
 
 if __name__ == "__main__":

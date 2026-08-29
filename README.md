@@ -137,15 +137,19 @@ liberado. Medido sobre las transcripciones, 56 turnos usaron ese pase y 12
 terminaron con Juan teniendo que empujar. 21% contra una base de 14%: la
 exencion soltaba turnos peores que el promedio.
 
-Ahora esperar no excusa nada. Elige otro pedido. El trabajo lanzado avisa
-solo cuando termina, asi que el tiempo hasta entonces es del agente: que lo
-gaste en la pieza siguiente en vez de dejar el turno abierto. Si de verdad
-nada mas puede avanzar sin ese resultado, que diga que espera y por que nada
-mas arranca.
+Quitarla del texto no alcanzo. El pedido de esperar solo aparecia cuando el
+juez ya decia STOP, asi que un informe con trabajo corriendo seguia saliendo
+libre por el camino OK. Medido: de 119 cierres con trabajo en vuelo, 22
+terminaron en empujon (18.5%) contra 14.8% cuando no corria nada. Y de los 37
+que el juez solto con OK, 6 igual necesitaron empujon: 16.2%, peor que la base.
 
-`background.waiting_on` sigue leyendo el lanzamiento de las llamadas a
-herramientas, no de la prosa. Prometer que se espera es barato; lanzar una
-tarea no.
+Ahora esperar bloquea siempre, diga lo que diga el juez. Sobre el corpus:
+recall 0.700 -> 0.764 con la misma precision 0.150. Elige otro pedido. El
+trabajo lanzado avisa solo cuando termina, asi que el tiempo hasta entonces es
+del agente: que lo gaste en la pieza siguiente en vez de dejar el turno
+abierto. Si de verdad nada mas puede avanzar sin ese resultado, que diga que
+espera y por que nada mas arranca.
+
 ## El log privado
 
 `judge-log.jsonl`. Una linea por decision, que el agente no ve nunca.

@@ -30,6 +30,10 @@ WAIT = ("The fixed build is installed and running with a 7-minute RSS profile. "
         "I will report the outcome when the profiler ends.")
 
 
+OK_REPORT = ("Both are in good shape now, and the product improved twice from the same"
+             " measurement. The gate now fires on 536 closings at precision 0.164,"
+             " recall 0.821. The paper builds clean at 13 pages.")
+
 def counted():
     RUNS.append(None)
 
@@ -82,6 +86,10 @@ def main():
                                               "run_in_background": True}))
     if "REPORTS BACK ON ITS OWN" not in err:
         failures.append(f"a backgrounded command counts as launched: {err[:140]}")
+
+    code, err = fire(OK_REPORT, launched=("Agent", {"description": "audit"}))
+    if "REPORTS BACK ON ITS OWN" not in err:
+        failures.append(f"a judge OK does not release a waiting turn: {err[:140]}")
 
     code, err = fire(WAIT)
     if "REPORTS BACK ON ITS OWN" in err:
