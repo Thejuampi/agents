@@ -353,13 +353,29 @@ ungated transcripts, and why the era comparison in Section~\ref{sec:results} is
 observational rather than controlled.
 
 \paragraph{The push label is one-sided.} Absence of a push is not evidence the
-turn was complete. We report recall and firing rate for this reason and make no
-precision claim from this label.
+turn was complete: a developer often absorbs a premature stop and simply
+answers. Every precision in this paper is therefore a floor on the true value
+and not an estimate of it. What the label supports is the comparison of rates,
+and the comparison holds under any one-sided correction: the gate fires several
+times more often than a push occurs.
 
 \paragraph{The grading rule rewards motion.} Counting tool calls after a block
 cannot see whether the work was any good. An agent that learned to emit cheap
 tool calls after every block would defeat it. We have not observed this, and it
 is the most obvious way the loop could be gamed.
+
+\paragraph{Rules are searched on the rows they are scored on.} Every class
+demotion, and the three rules added from the missed pushes, were chosen by
+reading this corpus and reported on it. Section~ef{sec:results} splits the
+corpus by session and scores the search on held-out sessions to bound the
+damage: the direction transfers, the size is about two closings, and the set of
+classes chosen is not stable across halves.
+
+\paragraph{The corpus is small where it counts.} 747 closings carry 78 pushes,
+so every precision here has a Wilson interval two to four points wide and every
+per-class number rests on tens of rows. No configuration we measured separates
+from the base rate at 95\%. Conclusions in this paper are stated at the level
+the intervals support, which is rates and directions rather than values.
 
 \paragraph{Thresholds are tuned, not derived.} The demotion threshold and the
 work threshold were chosen for the volume this log receives.
@@ -387,11 +403,14 @@ interventions is often not a missing label but an unread one.
 
 \section{Limitations and future work}
 
-The loop is self-correcting in one direction only. It finds patterns that block
-too much, because every block leaves a graded trace. Patterns that block too
-little leave nothing, because a turn that was allowed to end is a turn nobody
-looked at. Closing that side requires an outcome signal from allowed turns; the
-push label is the obvious candidate and is too sparse under the gate to serve.
+The loop corrects unevenly. It finds patterns that block too much cheaply,
+because every block leaves a graded trace and the report reads itself. The
+other side needs the push label: a turn the gate allowed and the developer then
+pushed back on is a miss, and reading the twelve of them took an afternoon and
+produced three rules. That path is manual and it is only open on ungated
+transcripts, where the label is not the gate's own output. Under the gate the
+push label goes sparse, which is the mechanism that makes the loop harder to
+close the better the gate gets.
 
 Three extensions follow directly. Demotion is currently proposed and applied by
 an agent reading the report; promotion in the other direction is not
