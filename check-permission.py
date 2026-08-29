@@ -303,13 +303,15 @@ def offenders(message, cwd=None, acted=True, waiting=False):
     for label, rx in patterns_for(cwd or os.getcwd()):
         if label.startswith("ack") and not brief:
             continue
-        if label.startswith("wait") and waiting:
+        if label.startswith(("wait", "idle")) and waiting:
             # The wait class exists for an agent parked on the user's
             # confirmation. With work actually in flight, waiting is the
             # mechanism: four of the five firm hits on turns that had a task
             # running were "running in the background" and "I'll wait for
             # both". The launch is read from the tool calls, so this cannot
-            # be claimed by saying it.
+            # be claimed by saying it. idle belongs with it: "still running"
+            # is what a correctly waiting agent says, and the gate fired on
+            # exactly that while its own measurement was in flight.
             continue
         found = rx.search(stripped)
         if found:

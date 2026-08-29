@@ -6,7 +6,13 @@ import subprocess
 import sys
 import tempfile
 
+import importlib.util
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+_spec = importlib.util.spec_from_file_location(
+    "perm", os.path.join(HERE, "check-permission.py"))
+perm = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(perm)
 HOOK = os.path.join(HERE, "check-stop.py")
 
 RUNS = []
@@ -102,6 +108,14 @@ def main():
                      "(America/New_York)")
     if code != 0:
         failures.append(f"a usage limit notice is not a stop: {err[:140]}")
+
+    counted()
+    if perm.offenders("Still running, nothing to report yet.", waiting=True):
+        failures.append("an idle report must pass while launched work is in flight")
+
+    counted()
+    if not perm.offenders("Still running, nothing to report yet.", waiting=False):
+        failures.append("the same words with nothing running must still fire")
 
     print(f"{len(RUNS)} cases, {len(failures)} failures")
     for line in failures:
