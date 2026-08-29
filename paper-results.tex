@@ -320,14 +320,17 @@ reports of finished work that a next action would have followed.
 
 An OK therefore no longer closes the turn on its own. It asks once per chain
 whether a next action exists, and the release comes on the following pass:
-the turn ends when the agent looked and could not name one. The design point
+the turn ends when the agent looked and could not name one. The question is
+put only when the turn's own tool calls name a candidate, which is the shape
+the block grading later forced and is measured below. The design point
 is that the second question is put to the worker, which has the repository in
 front of it, rather than to a 9B classifier reading a paragraph.
 
 Of 841 non-noise closings, 302 are released today and so receive the
-question; 33 of those were real pushes. Because every closing now takes
-either a block or the question, the recall ceiling rises to 1.0 and the
-binding constraint moves from detection to the worker's own answer. The cost
+question; 33 of those were real pushes. Because a closing now takes either a block, the
+question, or a release earned by having changed nothing, the recall ceiling
+rises with the coverage of the candidate reader and the binding constraint
+moves from detection to the worker's own answer. The cost
 is one turn per clean closing, which the request bounds by accepting
 ``I checked these and nothing remains'' as a closing answer.
 

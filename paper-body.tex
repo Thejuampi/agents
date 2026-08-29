@@ -169,19 +169,24 @@ the sentence into English and the quote failed validation.
 \subsection{The last question before the turn closes}
 \label{sec:proactive}
 
-An \textsc{ok} from the judge used to end the turn. It no longer does. Every
-closing the three lanes find clean receives one further prompt, which states
-plainly that nothing looks unfinished and then asks whether there is a next
-action available right now: the test that covers the case just fixed, the
-document that still describes the old behaviour, the neighbouring caller with
-the same defect, the measurement that would say whether the change worked. The
-turn ends when the agent answers that it looked and found nothing, or when it
-goes and does the thing it found.
+An \textsc{ok} from the judge used to end the turn. It no longer does, when the transcript
+can name what is missing. The gate reads the turn's own tool calls, collects
+the files it wrote, and asks whether there is a next action available right
+now, naming the candidates it found: the source file changed with no test
+written beside it, the code changed with nothing in the documentation moving
+with it. The turn ends when the agent answers that it looked and found
+nothing, or when it goes and does the thing it found.
+
+The candidates are read off the record rather than inferred, and a turn that
+leaves none is released without a question. That gate on the question is
+measured rather than assumed: a candidate exists on 30\% of real turns, and
+the first blocks of the unconditional version bought no work half the time,
+the worst conversion of any lane (Section~\ref{sec:results}).
 
 The asymmetry is deliberate. A block says the agent left work behind, and it is
 wrong whenever the closing was clean. This question makes no such claim, so it
-costs one paragraph when there is nothing to do and buys a whole unit of work
-when there is. It is asked once per closing: the state file records that the
+costs one paragraph when the answer is no and buys a whole unit of work when
+the answer is yes. It is asked once per closing: the state file records that the
 question was put, and the answer to it is released without a second look.
 
 That property is what makes it the right home for two other cases. A block the
@@ -366,7 +371,8 @@ is the most obvious way the loop could be gamed.
 
 \paragraph{Rules are searched on the rows they are scored on.} Every class
 demotion, and the three rules added from the missed pushes, were chosen by
-reading this corpus and reported on it. Section~ef{sec:results} splits the
+reading this corpus and reported on it. Section~
+ef{sec:results} splits the
 corpus by session and scores the search on held-out sessions to bound the
 damage: the direction transfers, the size is about two closings, and the set of
 classes chosen is not stable across halves.
