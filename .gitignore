@@ -9,3 +9,5 @@ paper.out
 paper.tex
 corpus.json
 *.stackdump
+corpus.out
+context.json
