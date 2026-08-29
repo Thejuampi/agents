@@ -36,6 +36,13 @@ def entries(transcript):
 BACKGROUND = ("agent", "task", "monitor", "croncreate", "schedulewakeup")
 
 
+STALE = 6
+"""Closings a launch survives without its notification.
+
+A task killed from outside the session never reports, and a register that
+never forgets would answer "still waiting" for the rest of the day."""
+
+
 NOTIFIED = re.compile(r"<tool-use-id>\s*([^<\s]+)", re.IGNORECASE)
 
 
@@ -44,6 +51,14 @@ def waiting_on(transcript):
 
     The harness re-invokes the session when a background task ends, so an
     agent that says it is waiting is describing the mechanism, not dodging.
+
+    The developer speaking does not end it. It used to: any real user turn
+    cleared the register, on the reasoning that a new request retires the old
+    wait. It does not - the task keeps running and the harness still wakes the
+    session for it - and on 2026-08-29 that told an agent it was making excuses
+    while a 12 minute job it had started was 400 rows in. A launch ends when its
+    notification arrives, or after STALE closings if that notification never
+    does, which covers a task killed from outside the session.
 
     A launch is not enough and a missing tool_result is the wrong signal: a
     backgrounded call answers immediately with its task id, so that absence
@@ -54,6 +69,8 @@ def waiting_on(transcript):
     launched task is not."""
     live = {}
     for entry in entries(transcript):
+        for key in [k for k, (_, age) in live.items() if age > STALE]:
+            live.pop(key, None)
         kind = entry.get("type")
         content = entry.get("message", {}).get("content")
         if kind == "user":
@@ -63,20 +80,19 @@ def waiting_on(transcript):
             ) if isinstance(content, list) else ""
             for done in NOTIFIED.findall(text or ""):
                 live.pop(done, None)
-            if "<task-notification>" in (text or "").lower():
-                continue
-            if reader.spoke(entry):
-                live.clear()
             continue
         if kind != "assistant" or not isinstance(content, list):
             continue
+        if any(isinstance(b, dict) and b.get("type") == "text" and
+               (b.get("text") or "").strip() for b in content):
+            live = {k: (n, age + 1) for k, (n, age) in live.items()}
         for block in content:
             if not isinstance(block, dict) or block.get("type") != "tool_use":
                 continue
             name = str(block.get("name") or "").lower()
             payload = block.get("input") or {}
             if name in BACKGROUND or payload.get("run_in_background") is True:
-                live[block.get("id")] = name
+                live[block.get("id")] = (name, 0)
     return bool(live)
 
 
