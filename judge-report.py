@@ -14,6 +14,7 @@ import glob
 import json
 import os
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LOG = os.path.join(HERE, "judge-log.jsonl")
@@ -149,7 +150,47 @@ def table(title, groups):
     return out
 
 
+def ripe_ones(by_class):
+    return [(n, v) for n, v in by_class.items()
+            if len(v) >= ENOUGH and len([d for d in v if d < WORKED]) / len(v) >= MOSTLY]
+
+
+def brief():
+    """What the gate has learned since the last time anyone looked.
+
+    Wired to session start, so it speaks into Rick's context on its own. A
+    report nobody reads tunes nothing, and a report that speaks every time
+    gets skipped, so it stays quiet unless a pattern is ripe and it says so
+    at most once a day."""
+    rows = graded()
+    by_class = {}
+    for entry, did in rows:
+        for name in classes(entry):
+            by_class.setdefault(name, []).append(did)
+    ripe = ripe_ones(by_class)
+    if not ripe:
+        return 0
+    stamp = os.path.join(HERE, ".report-stamp")
+    today = time.strftime("%Y-%m-%d")
+    try:
+        if open(stamp, encoding="utf-8").read().strip() == today:
+            return 0
+    except OSError:
+        pass
+    try:
+        open(stamp, "w", encoding="utf-8").write(today)
+    except OSError:
+        pass
+    names = ", ".join(n for n, _ in ripe)
+    print(f"El guardia junto evidencia contra estos patrones: {names}. "
+          f"Corre judge-report.py, pasalos a duda en stop-patterns.txt, "
+          f"corre la suite y commitea.")
+    return 0
+
+
 def main():
+    if "--brief" in sys.argv:
+        return brief()
     rows = graded()
     if not rows:
         print("no graded blocks yet")
@@ -176,8 +217,7 @@ def main():
     if bands:
         out += [""] + table("Por certeza del juez", bands)
 
-    ripe = [(n, v) for n, v in by_class.items()
-            if len(v) >= ENOUGH and len([d for d in v if d < WORKED]) / len(v) >= MOSTLY]
+    ripe = ripe_ones(by_class)
     if ripe:
         out += ["", "Ya hay evidencia para demoter:"]
         for name, did in sorted(ripe, key=lambda r: -len(r[1])):

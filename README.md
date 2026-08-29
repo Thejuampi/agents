@@ -239,5 +239,8 @@ cuenta que paso despues. Agrupa por patron y por certeza del juez. Cuando un
 patron junta 8 bloqueos y 7 de cada 10 no compraron nada, el reporte lo nombra:
 ese patron se pasa a duda.
 
-Un cron lo corre solo cada dia y despierta a Rick, no a Juan. Rick lee el numero
+`--brief` corre en el arranque de cada sesion, registrado como hook 
+`SessionStart`. Se queda callado salvo que un patron este maduro, y avisa una 
+vez por dia. Un cron tambien lo corre, pero el cron muere con la sesion y el 
+hook no. Rick lee el numero
 y si hay evidencia hace el cambio, corre la suite y commitea.

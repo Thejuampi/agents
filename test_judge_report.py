@@ -85,6 +85,18 @@ def main():
     if report.spoke(result()):
         failures.append("a tool result must never read as the user")
 
+    counted()
+    if report.ripe_ones({"ask": [0] * 7}):
+        failures.append("seven blocks are not enough evidence to demote")
+
+    counted()
+    if report.ripe_ones({"ask": [0] * 8}) != [("ask", [0] * 8)]:
+        failures.append("eight blocks that bought nothing must name the pattern")
+
+    counted()
+    if report.ripe_ones({"ask": [9] * 8}):
+        failures.append("a pattern whose blocks bought work must never be demoted")
+
     print(f"{len(RUNS)} cases, {len(failures)} failures")
     for line in failures:
         print("  FAIL", line)
