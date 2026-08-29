@@ -249,6 +249,27 @@ labelled corpus this raises recall from 0.700 to 0.764 at unchanged precision
 itself, which accepts ``nothing else can move without this result'' as an
 answer and spends one turn collecting it.
 
+\subsection{A false positive the gate found on itself}
+
+The gate blocked the turn that reported the fix above. The matched phrase was
+	exttt{is (running|reviewing|writing) now}, and the sentence it matched was
+``Nothing is running now.'' The pattern had fired on a clause asserting the
+opposite of what it looks for. This is the failure mode behind the
+	exttt{wait} class measuring 0.07 precision, visible as a single instance
+because the system logs what it matched in the agent's own words rather than
+the regex.
+
+Patterns now skip a match governed by a negation within four words, stopping
+at the nearest clause break, so a distant negation in the same message still
+leaves the phrase live. The distinction matters: ``Nothing is running now''
+must not fire, while ``I did not finish the audit; I will report back when it
+lands'' must.
+
+Over the 854 closings, 37 change labels and 3 of those were real pushes; 19
+lose every firm label and fall through to the judge, which still sees them.
+The guard removes matches that were wrong by construction and costs almost no
+recall, because a negated stall phrase is rarely a stall.
+
 \subsection{Before and after the gate}
 
 The corpus splits at 2026-08-28, when the gate was installed. Pushes fall from
