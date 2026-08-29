@@ -25,10 +25,6 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-_spec = importlib.util.spec_from_file_location(
-    "background", os.path.join(HERE, "background.py"))
-background = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(background)
 BASE_PATTERNS = os.path.join(HERE, "stop-patterns.txt")
 
 FENCED = re.compile(r"```.*?```", re.DOTALL)
@@ -294,7 +290,7 @@ carried an ack pattern, and the two above this line were reports of finished
 work. The one below it was the real thing."""
 
 
-def offenders(message, cwd=None, acted=True, waiting=False):
+def offenders(message, cwd=None, acted=True):
     # Naming a trigger phrase is not using it. Talking about the hook, or
     # quoting someone, must not fire it.
     stripped = unquoted(message)
@@ -302,16 +298,6 @@ def offenders(message, cwd=None, acted=True, waiting=False):
     hits = []
     for label, rx in patterns_for(cwd or os.getcwd()):
         if label.startswith("ack") and not brief:
-            continue
-        if label.startswith(("wait", "idle")) and waiting:
-            # The wait class exists for an agent parked on the user's
-            # confirmation. With work actually in flight, waiting is the
-            # mechanism: four of the five firm hits on turns that had a task
-            # running were "running in the background" and "I'll wait for
-            # both". The launch is read from the tool calls, so this cannot
-            # be claimed by saying it. idle belongs with it: "still running"
-            # is what a correctly waiting agent says, and the gate fired on
-            # exactly that while its own measurement was in flight.
             continue
         found = rx.search(stripped)
         if found:
@@ -341,8 +327,7 @@ def main():
         return 0
 
     cwd = payload.get("cwd") or os.getcwd()
-    hits = offenders(message, cwd, acted_this_turn(transcript),
-                     background.waiting_on(transcript))
+    hits = offenders(message, cwd, acted_this_turn(transcript))
     if not hits:
         return 0
 

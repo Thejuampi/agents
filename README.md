@@ -130,34 +130,22 @@ Se arma solo desde el repo. Si el `AGENTS.md`, el `CLAUDE.md` o el archivo de
 proceso del árbol nombra ese ciclo, el checker aplica. En cualquier otro árbol
 se queda quieto y no cuesta nada.
 
-## Esperar no es parar
+## Esperar no es una excusa
 
-Medimos el guardia contra tus 883 cierres reales. De los que ningun patron ve,
-el juez trababa la mitad. Leerlos dio dos causas, y ninguna era pereza del
-agente.
+Antes era una exencion: trabajo lanzado, ningun patron levantado, turno
+liberado. Medido sobre las transcripciones, 56 turnos usaron ese pase y 12
+terminaron con Juan teniendo que empujar. 21% contra una base de 14%: la
+exencion soltaba turnos peores que el promedio.
 
-Una: paginas de error del harness. `API Error`, `You've hit your session
-limit`. El turno ya murio y el guardia le mandaba un recordatorio a nadie. Once
-por ciento de los bloqueos.
+Ahora esperar no excusa nada. Elige otro pedido. El trabajo lanzado avisa
+solo cuando termina, asi que el tiempo hasta entonces es del agente: que lo
+gaste en la pieza siguiente en vez de dejar el turno abierto. Si de verdad
+nada mas puede avanzar sin ese resultado, que diga que espera y por que nada
+mas arranca.
 
-Dos, la grande: el agente esperando trabajo que ya lanzo. "Waiting for the
-profiler", "I'll pick this back up once the Reviewer's response lands". El
-harness despierta la sesion sola cuando eso aterriza, asi que trabar ahi lo
-obliga a inventar trabajo mientras espera. Diecinueve por ciento.
-
-La espera se lee del transcript, nunca de la frase: prometer que se espera es
-gratis, lanzar una tarea no. Se abre con la llamada en background y se cierra
-con su `<task-notification>`, que trae el `tool-use-id` de quien la lanzo. La
-primera version buscaba un `tool_result` que faltara y midio cero: una llamada
-en background contesta al toque con su id.
-
-Al juez no se le cuenta. Se probo, y un 9b no sostiene la excepcion contra su
-propia regla de "ante la duda, STOP": o perdonaba el trabajo diferido o trababa
-toda espera. No hace falta. La separacion ya es limpia sin el, porque el
-trabajo diferido siempre deja un patron - "te la debo", "manana sigo", "queda
-pendiente" - y la espera pura no deja ninguno. Tarea en curso y cero patrones
-es un turno que sigue.
-
+`background.waiting_on` sigue leyendo el lanzamiento de las llamadas a
+herramientas, no de la prosa. Prometer que se espera es barato; lanzar una
+tarea no.
 ## El log privado
 
 `judge-log.jsonl`. Una linea por decision, que el agente no ve nunca.

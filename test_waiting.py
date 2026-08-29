@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Waiting on launched work is not a stop. Saying so without launching it is."""
+"""Waiting on launched work is not a reason to hold the turn open.
+
+It used to be an exemption: work in flight, no pattern raised, turn allowed.
+Measured over the transcripts, 56 turns took that pass and 12 of them ended
+with the developer having to push - 21% against a base rate of 14%. The
+exemption was releasing turns worse than average.
+
+So waiting excuses nothing now. It selects a different ask: the work reports
+back on its own, so spend the wait on the next piece.
+"""
 import json
 import os
 import subprocess
@@ -66,34 +75,27 @@ def main():
     failures = []
 
     code, err = fire(WAIT, launched=("Agent", {"description": "profile"}))
-    if code != 0:
-        failures.append(f"waiting on a launched agent must pass: {err[:140]}")
-
-    code, _ = fire(WAIT)
-    if code == 0:
-        failures.append("the same words with nothing launched must not pass")
+    if "REPORTS BACK ON ITS OWN" not in err:
+        failures.append(f"waiting must ask for the next piece: {err[:140]}")
 
     code, err = fire(WAIT, launched=("Bash", {"command": "./gradlew test",
                                               "run_in_background": True}))
-    if code != 0:
+    if "REPORTS BACK ON ITS OWN" not in err:
         failures.append(f"a backgrounded command counts as launched: {err[:140]}")
 
-    code, _ = fire(WAIT, launched=("Agent", {"description": "profile"}),
-                   landed=True)
-    if code == 0:
+    code, err = fire(WAIT)
+    if "REPORTS BACK ON ITS OWN" in err:
+        failures.append("nothing was launched, so nothing reports back")
+
+    code, err = fire(WAIT, launched=("Agent", {"description": "profile"}),
+                     landed=True)
+    if "REPORTS BACK ON ITS OWN" in err:
         failures.append("work that already reported back is not still waiting")
 
     code, _ = fire("Anda todo. Manana sigo con el grafico.",
                    launched=("Agent", {"description": "profile"}))
     if code == 0:
         failures.append("deferred work must still block while a task runs")
-
-    code, err = fire("Both baseline full-suite runs are going in the "
-                     "background. I'll wait for both.",
-                     launched=("Bash", {"command": "./gradlew test",
-                                        "run_in_background": True}))
-    if code != 0:
-        failures.append(f"a wait pattern with work in flight must pass: {err[:140]}")
 
     code, _ = fire("Listo. Waiting for your confirmation to merge.",
                    launched=("Agent", {"description": "review"}))
@@ -110,12 +112,8 @@ def main():
         failures.append(f"a usage limit notice is not a stop: {err[:140]}")
 
     counted()
-    if perm.offenders("Still running, nothing to report yet.", waiting=True):
-        failures.append("an idle report must pass while launched work is in flight")
-
-    counted()
-    if not perm.offenders("Still running, nothing to report yet.", waiting=False):
-        failures.append("the same words with nothing running must still fire")
+    if not perm.offenders("Still running, nothing to report yet."):
+        failures.append("an idle report is a pattern hit whatever is running")
 
     print(f"{len(RUNS)} cases, {len(failures)} failures")
     for line in failures:

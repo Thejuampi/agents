@@ -104,6 +104,11 @@ LLM_STOP = """KEEP GOING - THERE LOOKS TO BE WORK LEFT
 What you did stands. Permission was granted in advance and does not expire, so if anything is still open, take the step instead of announcing it, pick one instead of offering a menu, run it yourself instead of sending the user. You are more than able to finish this."""
 
 
+WAITING = """KEEP GOING - THE WORK YOU LAUNCHED REPORTS BACK ON ITS OWN
+
+You will be woken when it finishes, so the time until then is yours. What you did stands; spend the wait on the next piece instead of holding the turn open for it. If nothing else can move without that result, say what you are waiting on and why nothing else starts."""
+
+
 LOG = os.environ.get("STOP_LOG") or os.path.join(HERE, "judge-log.jsonl")
 
 
@@ -349,22 +354,12 @@ def main():
         return allow(state, transcript)
 
     sure, unsure = deterministic(data)
+    waiting = background.waiting_on(transcript)
     if sure:
         note(transcript, lane="pattern", firm=sure, weak=unsure,
              head=message[:120])
         return block(state, transcript, chain, message,
-                     "\n\n".join(sure), repeated)
-
-    if not unsure and background.waiting_on(transcript):
-        # Waiting on launched work, with not one pattern raised against the
-        # message. Decided here rather than by the model: telling the judge
-        # about the task was tried and it could not hold the exception
-        # against its own "when unsure, answer STOP" - it either excused
-        # deferred work or blocked every wait. The split is already clean
-        # without it. Deferred work always leaves a pattern ("te la debo",
-        # "manana sigo", "queda pendiente"); a pure wait leaves none.
-        note(transcript, lane="waiting", passed=True, head=message[:120])
-        return allow(state, transcript)
+                     WAITING if waiting else "\n\n".join(sure), repeated)
 
     asked = last_user(transcript)
     verdict, seconds = judge.stop_verdict(message, asked=asked)
@@ -383,21 +378,14 @@ def main():
         line = judge.why(message, asked=asked)
     note(transcript, lane="judge", verdict=verdict, sure=judge.sureness(),
          weak=unsure, seconds=round(seconds, 2), quote=line,
-         head=message[:120])
+         head=message[:120], waiting=waiting)
 
     if verdict == "STOP":
-        body = ("\n\n".join(unsure) if unsure
-                else LLM_STOP.format(why=QUOTE.format(line=line) if line else ""))
-        return block(state, transcript, chain, message, body, repeated)
-    return allow(state, transcript)
-    if verdict is None:
-        return block(state, transcript, chain, message,
-                     SILENT.format(host=judge.HOST), repeated)
-    if verdict == "STOP":
-        if unsure:
+        if waiting:
+            body = WAITING
+        elif unsure:
             body = "\n\n".join(unsure)
         else:
-            line = judge.why(message, asked=last_user(transcript))
             body = LLM_STOP.format(
                 why=QUOTE.format(line=line) if line else "")
         return block(state, transcript, chain, message, body, repeated)
