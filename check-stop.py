@@ -309,9 +309,14 @@ def openings(transcript):
     """Concrete next actions in this turn's own tool calls, or an empty list.
 
     A general question is easy to answer with a general no: over its first
-    blocks the proactive request bought no work three times in five, the worst
+    blocks the proactive request bought no work one time in two, the worst
     conversion in the gate. Naming what the turn changed, and what it did not
-    change with it, costs nothing and makes no an answer that needs evidence."""
+    change with it, costs nothing and makes no an answer that needs evidence.
+
+    An empty list now releases the turn instead of asking anyway. Over 1291
+    turns of real transcripts a candidate exists on 30% of them, so the
+    question is asked when it can point at something and the other 70% of
+    clean closings end where they used to end."""
     paths = []
     for entry in entries(transcript):
         if reader.spoke(entry):
@@ -536,7 +541,12 @@ def main():
     elif seen:
         return allow(state, transcript)
     else:
-        return block(state, transcript, chain, message, PROACTIVE,
+        near = openings(transcript)
+        if not near:
+            return allow(state, transcript)
+        return block(state, transcript, chain, message,
+                     PROACTIVE + NEAR.format(
+                         items="".join(chr(10) + "  - " + line for line in near)),
                      repeated, asked=True)
     return block(state, transcript, chain, message, body, repeated)
 

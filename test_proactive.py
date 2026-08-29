@@ -89,6 +89,9 @@ def extend(path, reply):
             {"type": "text", "text": reply}]}}) + "\n")
 
 
+WROTE = ("Write", {"file_path": "guard.py", "content": "x"})
+
+
 def chain(first, second, launched=None):
     """One session, one transcript: the ask and the answer it earned."""
     state = tempfile.NamedTemporaryFile(suffix=".state", delete=False).name
@@ -106,7 +109,7 @@ def chain(first, second, launched=None):
 def main():
     failures = []
 
-    (code, err), (after, _) = chain(DONE, NOTHING)
+    (code, err), (after, _) = chain(DONE, NOTHING, WROTE)
     if "PROACTIVELY" not in err:
         failures.append(f"a clean closing must be asked once: {err[:140]}")
     if code != 2:
@@ -114,7 +117,7 @@ def main():
     if after != 0:
         failures.append(f"an answered ask must release, exit {after}")
 
-    (_, first), (_, second) = chain(DONE, DONE)
+    (_, first), (_, second) = chain(DONE, DONE, WROTE)
     if "PROACTIVELY" in second:
         failures.append("the ask fires once per chain, never twice")
 
@@ -135,8 +138,13 @@ def main():
     if code != 0:
         failures.append("a harness error page is never asked anything")
 
+    code, err = fire(transcript(DONE), tempfile.NamedTemporaryFile(
+        suffix=".s", delete=False).name)
+    if code != 0:
+        failures.append("a clean closing with nothing to name must release")
+
     RUNS.append(None)
-    path = transcript(DONE)
+    path = transcript(DONE, WROTE)
     extend(path, NOTHING)
     with open(path, "a", encoding="utf-8") as handle:
         handle.write(json.dumps({"type": "user", "message": {
