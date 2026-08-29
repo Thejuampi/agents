@@ -135,7 +135,7 @@ def labels():
         for raw in handle:
             line = raw.strip().lstrip("-").strip()
             if line and not line.startswith("#") and ":" in line:
-                found.add(line.split(":")[0].strip())
+                found.add(line.split(":")[0].strip().rstrip("?"))
     return found
 
 
@@ -150,7 +150,7 @@ def classes(entry):
     for text in (entry.get("firm") or []) + (entry.get("weak") or []):
         for part in text.split("Matched: ")[-1].split(chr(10))[0].split(","):
             head = part.strip().split(":")[0].strip()
-            if head in known or head.rstrip("?") in known:
+            if head.rstrip("?") in known:
                 names.append(head)
     return names or ["judge"]
 

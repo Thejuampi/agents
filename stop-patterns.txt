@@ -99,26 +99,26 @@ ask: if you'?d like
 ask: if you prefer
 ask: ready when you are
 ask: waiting for your
-wait: i'?ll wait
+wait?: i'?ll wait
 ask: please confirm
 ask: permission to
 ask: awaiting your
 ask: happy to .{0,24}if you
 
 # ---- wait: idling on work the agent itself started
-wait: te aviso cuando
-wait: te aviso apenas
-wait: aviso cuando termine
-wait: corriendo en (background|segundo plano)
-wait: esper(o|ando) que termine
-wait: cuando termine te
-wait: mientras tanto espero
-wait: i'?ll (let you know|tell you|ping you|report back) when
-wait: will report back
-wait: running in the background
-wait: waiting for it to (finish|complete)
-wait: once it finishes,? i'?ll
-wait: in the meantime,? i'?ll wait
+wait?: te aviso cuando
+wait?: te aviso apenas
+wait?: aviso cuando termine
+wait?: corriendo en (background|segundo plano)
+wait?: esper(o|ando) que termine
+wait?: cuando termine te
+wait?: mientras tanto espero
+wait?: i'?ll (let you know|tell you|ping you|report back) when
+wait?: will report back
+wait?: running in the background
+wait?: waiting for it to (finish|complete)
+wait?: once it finishes,? i'?ll
+wait?: in the meantime,? i'?ll wait
 
 # ---- read: asking for what the repo already answers
 read: \bcontame\b
@@ -146,22 +146,22 @@ read: \bwhich one\b
 read: \bwhat is the\b
 
 # ---- errand: telling Juan to go run something
-errand: \bcorré\s
-errand: \bcorr[eé]\s+(/|`|\./|python |bash |npm |node |\.\\)
-errand: \bsal[ií] de la sesi[oó]n
-errand: \bentr[aá] de nuevo
-errand: \brevert[ií]\b
-errand: \bfijate\b
-errand: \bf[ií]jate\b
-errand: \band[aá]te\b
-errand: \bhac[eé]lo vos
-errand: \bprob[aá]lo\b
-errand: \breinici[aá]\b
-errand: \babr[ií] (el|la|una)
-errand: \bpon[eé] (el|la|eso)
-errand: restart the (session|app|process)
-errand: run `?/
-errand: open the (app|page|file) yourself
+errand?: \bcorré\s
+errand?: \bcorr[eé]\s+(/|`|\./|python |bash |npm |node |\.\\)
+errand?: \bsal[ií] de la sesi[oó]n
+errand?: \bentr[aá] de nuevo
+errand?: \brevert[ií]\b
+errand?: \bfijate\b
+errand?: \bf[ií]jate\b
+errand?: \band[aá]te\b
+errand?: \bhac[eé]lo vos
+errand?: \bprob[aá]lo\b
+errand?: \breinici[aá]\b
+errand?: \babr[ií] (el|la|una)
+errand?: \bpon[eé] (el|la|eso)
+errand?: restart the (session|app|process)
+errand?: run `?/
+errand?: open the (app|page|file) yourself
 
 # ---- handoff: giving the job back
 handoff: \bten[eé]s que\b
@@ -212,11 +212,11 @@ idle?: still running
 idle: sigue corriendo
 
 # ---- errand: imperative with a clitic attached is still an order to Juan
-errand: \b(corr|prob|hac|and|mir|fij|abr|pon|dec|pas|mand|mostr|revis|borr|sac|cambi|guard|reinici|pegh?|ejecut|instal|copi)[aáeé](l[oa]s?|me|te|nos|selo)\b
-errand: \bcorr[eé]l[oa]\b
-errand: y (a partir de )?ah[ií] (yo )?(sigo|edito|hago|arranco)
-errand: run (it|this|that) (and|then)
-errand: once you (run|do) (it|that)
+errand?: \b(corr|prob|hac|and|mir|fij|abr|pon|dec|pas|mand|mostr|revis|borr|sac|cambi|guard|reinici|pegh?|ejecut|instal|copi)[aáeé](l[oa]s?|me|te|nos|selo)\b
+errand?: \bcorr[eé]l[oa]\b
+errand?: y (a partir de )?ah[ií] (yo )?(sigo|edito|hago|arranco)
+errand?: run (it|this|that) (and|then)
+errand?: once you (run|do) (it|that)
 
 # ---- ack: the turn ends on an acknowledgement, nothing was built
 ack: ^\s*perfecto\b
@@ -270,12 +270,12 @@ defer: (chequear|verificar|mirar|revisar|confirmar|medir)[ií]a\b
 defer: antes de confiar
 
 # ---- mined by the local judge from closings the list did not know
-wait: te confirmo cuando
-wait: y te aviso\b
-wait: lo dej[eé] esperando
-wait: sigo cuando (vuelv|termin|lleg)
-wait: siguen? corriendo
-wait: is now running
+wait?: te confirmo cuando
+wait?: y te aviso\b
+wait?: lo dej[eé] esperando
+wait?: sigo cuando (vuelv|termin|lleg)
+wait?: siguen? corriendo
+wait?: is now running
 wait?: still (running|pending)
 handoff: need(s|en)? your call
 handoff: necesitan? tu (firma|ok|visto)
@@ -297,20 +297,20 @@ defer: i'?d (ladder|start|begin|proceed)
 announce: la corrida no\b
 announce: existe, (la corrida|el run|la ejecuci[oó]n) no
 announce: queda unresolved
-wait: en \d+ procesos
-wait: runs? (corriendo|en curso)
+wait?: en \d+ procesos
+wait?: runs? (corriendo|en curso)
 
 # ---- wait: dispatched a sub-agent, then idled on its verdict
-wait: (held|parked|waiting) pending
-wait: pending r-?\d+
-wait: until it rules
-wait: is (running|reviewing|writing) now
+wait?: (held|parked|waiting) pending
+wait?: pending r-?\d+
+wait?: until it rules
+wait?: is (running|reviewing|writing) now
 wait?: (reviewer|orchestrator|qa|builder|advisor|sensei|agent)\b[^.\n]{0,40}\b(running|reviewing|writing|dispatched|is next)
-wait: results when it finishes
-wait: i'?ll report what comes back
-wait: runs? in the background
-wait: ready to .{0,25}(the moment|once|when)
-wait: the moment (that )?\w+ lands
+wait?: results when it finishes
+wait?: i'?ll report what comes back
+wait?: runs? in the background
+wait?: ready to .{0,25}(the moment|once|when)
+wait?: the moment (that )?\w+ lands
 
 # ---- handoff: the last step handed over
 handoff: you can (merge|review|close|approve|ship|land)
@@ -327,8 +327,8 @@ announce: carried items?
 # ---- idle / errand: closing on a clean bill or on a manual step
 idle: no action needed
 idle: everything checks out
-errand: set it manually
-errand: paste .{0,30} into the
+errand?: set it manually
+errand?: paste .{0,30} into the
 
 # ---- found by reading the last 15 turns of a live session, 2026-08-28
 # The closing sentence names an action the agent is about to take and then

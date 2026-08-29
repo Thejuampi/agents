@@ -106,9 +106,9 @@ def main():
         failures.append("a message that is not in the transcript cannot be graded")
 
     counted()
-    names = report.classes({"weak": ["KEEP GOING\n\nMatched: announce?: falta, wait: i'll wait. "
+    names = report.classes({"weak": ["KEEP GOING\n\nMatched: announce?: falta, wait?: i'll wait. "
                                      "What you did is fine and permission was granted"]})
-    if names != ["announce?", "wait"]:
+    if names != ["announce?", "wait?"]:
         failures.append(f"the pattern classes must come off the Matched line: {names}")
 
     counted()
