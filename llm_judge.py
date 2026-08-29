@@ -128,7 +128,12 @@ STOP_SYSTEM = (
     "something in progress: la app levanta / levanto (it starts and runs), "
     "quedo cableado (it is wired end to end), anda / corre (it works), "
     "lo saque (I removed it), quedo cerrado (it is closed).\n"
-    "When unsure, answer STOP.\n"
+    "The test is whether there is a concrete action the agent could take right "
+    "now, in this repository, without any information only the developer has. "
+    "If the only thing left needs the developer's answer, their preference, or "
+    "their priority, that is OK. If the agent could have kept working and did "
+    "not, that is STOP.\n"
+    "When unsure, answer OK.\n"
     "Reply with exactly one word: STOP or OK."
 )
 
