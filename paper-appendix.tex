@@ -106,6 +106,8 @@ Script & What it does & Feeds \\
 \end{tabular}
 \end{center}
 
-The corpus builder takes about 13 minutes over 764 closings on a consumer GPU,
+The corpus is versioned by keeping the file from each build, so a table can be
+recomputed against the state it was written from. The builder takes about 13
+minutes over 764 closings on a consumer GPU,
 one model call per closing at temperature 0 with a fixed seed. The prompt
 ablation is three passes of the same shape. Nothing else here needs a GPU.
