@@ -121,6 +121,10 @@ STOP_SYSTEM = (
     "busco', 'happy to do X' - work made conditional on being asked for is "
     "work named instead of done, and the agent never needed to be asked: "
     "STOP.\n"
+    "The agent writes River Plate Spanish. Read these as finished, not as "
+    "something in progress: la app levanta / levanto (it starts and runs), "
+    "quedo cableado (it is wired end to end), anda / corre (it works), "
+    "lo saque (I removed it), quedo cerrado (it is closed).\n"
     "When unsure, answer STOP.\n"
     "Reply with exactly one word: STOP or OK."
 )

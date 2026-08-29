@@ -112,6 +112,24 @@ que es la parte medida en 17 de 17.
 Todo lo que sale del guardia entra en un título y dos párrafos. Un recordatorio
 largo se saltea igual que uno corto, y cuesta más.
 
+## El ciclo del repo
+
+`check-cycle.py` mira una cosa: un requisito cerrado sin docs y sin review.
+
+Pasó de verdad. Un agente construyó una tajada, la dio por terminada, y Juan
+tuvo que pedirle la documentación y los reviews aparte. La causa estaba
+escrita: el propio `AGENTS.md` del proyecto decía "menu, not a pipeline" y
+llamaba al review opcional. El agente no se saltó la regla, siguió la que
+estaba.
+
+El archivo ahora dice lo contrario — un requisito corre PRD → spec → build →
+review → repeat — y esta es la misma regla cableada, porque una regla que solo
+vive en un archivo depende de que alguien lo lea.
+
+Se arma solo desde el repo. Si el `AGENTS.md`, el `CLAUDE.md` o el archivo de
+proceso del árbol nombra ese ciclo, el checker aplica. En cualquier otro árbol
+se queda quieto y no cuesta nada.
+
 ## El tono
 
 Del otro lado hay alguien capaz que ya venía trabajando. Un mensaje que retea se
