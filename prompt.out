@@ -25,4 +25,6 @@ strict 50 41 s
 strict 100 77 s
 strict 150 104 s
 strict 200 144 s
-st
+strict 250 190 s
+
+strict 300 203 s
