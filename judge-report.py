@@ -248,6 +248,15 @@ def main():
     if bands:
         out += [""] + table("Por certeza del juez", bands)
 
+    named = {}
+    for entry, did in rows:
+        if not entry.get("ask"):
+            continue
+        key = "nombro algo" if entry.get("near") else "sin nombrar"
+        named.setdefault(key, []).append(did)
+    if len(named) > 1:
+        out += [""] + table("La pregunta proactiva", named)
+
     ripe = ripe_ones(by_class)
     if ripe:
         out += ["", "Ya hay evidencia para demoter:"]
