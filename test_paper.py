@@ -75,6 +75,12 @@ def main():
     if not splits:
         failures.append("the paper stopped stating the firm split")
 
+    cases += 1
+    for name, body in tex():
+        for line in body.splitlines():
+            if line.startswith("ef{") or line.startswith("extt"):
+                failures.append(f"{name} carries a broken macro: {line[:40]}")
+
     rows = corpus()
     pushes = sum(1 for r in rows if r.get("push"))
     results = dict(tex()).get("paper-results.tex", "")
