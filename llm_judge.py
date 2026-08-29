@@ -21,11 +21,20 @@ written by the party with an interest in the answer.
 """
 import json
 import os
+import shutil
+import subprocess
 import time
 import urllib.error
 import urllib.request
 
-HOST = os.environ.get("STOP_JUDGE_HOST", "http://127.0.0.1:11434")
+OWN = "http://127.0.0.1:11434"
+HOST = os.environ.get("STOP_JUDGE_HOST", OWN)
+
+WAKE = float(os.environ.get("STOP_JUDGE_WAKE") or 20)
+"""How long to wait for a daemon this hook started, in seconds.
+
+Zero disables the start. The daemon answers in about a second from cold on
+this machine; the rest of the budget is for a box that is already busy."""
 
 MODEL = "qwen3.5:9b"
 """Not read from the environment, and that is the point.
@@ -41,6 +50,9 @@ model still works; only the ambient override is gone.
 Footprint is 6.6GB. FLOOR below keeps that from landing on a full machine."""
 
 FLOOR = int(os.environ.get("STOP_JUDGE_FLOOR") or 8 * 1024 ** 3)
+
+DEADLINE = float(os.environ.get("STOP_JUDGE_DEADLINE") or 70)
+"""The whole judge, retries included, inside the harness' 90s hook budget."""
 
 SKIP = "SKIP"
 """Returned when the floor holds the load back.
@@ -216,6 +228,59 @@ def _room():
         return None
 
 
+def _alive():
+    """Whether Ollama itself is up, asked apart from the chat call.
+
+    The two failures look identical from _once and mean opposite things. A
+    server that is not running is a judge switched off, and check-stop.py
+    blocks on that on purpose. A server that is up but busy - another session
+    swapping a model in and out of one GPU - is a queue, and blocking there
+    punishes the session that happened to stop while a neighbour was loading.
+    That is not a hypothesis: on 2026-08-28 at 19:31 the Android session took
+    a NO VERDICT block while the DoorDash session was benchmarking three
+    models through the same daemon."""
+    try:
+        with urllib.request.urlopen(HOST + "/api/tags", timeout=3):
+            return True
+    except (urllib.error.URLError, OSError, ValueError, TimeoutError):
+        return False
+
+
+def _wake():
+    """Start Ollama when it is simply not running, and say whether it answered.
+
+    A judge that is switched off blocks every stop on the machine, which is the
+    correct policy and a terrible morning: on 2026-08-28 the daemon was down
+    and four test files failed for that one reason, with nothing to do about it
+    but type the command by hand. Nothing about that needed a human. The policy
+    is kept - an unreachable judge still blocks - and the one recoverable cause
+    of it is now recovered here.
+
+    Only for the daemon on this machine, and only at the default address. A
+    HOST pointed somewhere else is somebody else's server, and a test pointing
+    at a dead port is asking what happens when the judge is gone; starting a
+    daemon on the usual port would answer neither question."""
+    if HOST != OWN or WAKE <= 0:
+        return False
+    binary = shutil.which("ollama")
+    if not binary:
+        return False
+    try:
+        subprocess.Popen([binary, "serve"],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         creationflags=getattr(subprocess, "DETACHED_PROCESS", 0)
+                         | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+    except (OSError, ValueError):
+        return False
+    end = time.monotonic() + WAKE
+    while time.monotonic() < end:
+        if _alive():
+            return True
+        time.sleep(1)
+    return False
+
+
 def _loaded():
     """Whether the judge is already resident. A resident model costs nothing to
     call, so the floor does not apply to it - refusing there would silence the
@@ -230,25 +295,52 @@ def _loaded():
 
 
 def _once(body, timeout):
+    """Returns (text, seconds, refused).
+
+    refused is the third answer, and it is the one this machine actually gives.
+    Ollama replies 500 with "unable to allocate Vulkan0 buffer" when the card
+    has no room left - the Android emulator holds the GPU, llama-server dies on
+    the allocation, and the daemon stays up and reports it. That is neither a
+    verdict nor an unreachable judge. It is the machine saying no, and it must
+    not be retried: the retry is another 6.6GB load attempt against a full
+    card, which is the thing that took the CLI down three times in one day.
+
+    System memory does not see this at all. RAM read 17GB free while the card
+    was full, so the FLOOR check above passes and this is the only place the
+    refusal shows up."""
     request = urllib.request.Request(
         HOST + "/api/chat", body, {"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(request, timeout=timeout) as handle:
             data = json.loads(handle.read())
+    except urllib.error.HTTPError as failure:
+        try:
+            detail = json.loads(failure.read()).get("error", "")
+        except (ValueError, OSError):
+            detail = ""
+        return None, 0.0, "allocate" in detail or "not enough" in detail.lower()
     except (urllib.error.URLError, OSError, ValueError, TimeoutError):
-        return None, 0.0
+        return None, 0.0, False
     text = (data.get("message", {}).get("content") or "").strip().upper()
     if not text:
-        return None, 0.0
-    return text, data.get("total_duration", 0) / 1e9
+        return None, 0.0, False
+    return text, data.get("total_duration", 0) / 1e9, False
 
 
 def _chat(system, shots, message, timeout):
-    """Tried twice. The judge is not pinned and this card cannot hold it and a
-    27B coding model at once, so it gets evicted and the next call pays a cold
-    load - and a request that lands mid-load comes back an error. One retry
-    turns that into a pause. Without it an eviction reads as an unreachable
-    judge, and an unreachable judge blocks every session on the machine."""
+    """Three attempts against one wall clock.
+
+    Attempt one is the normal case. Attempt two covers eviction: the judge is
+    not pinned and this card cannot hold it and a 27B coding model at once, so
+    a request can land mid-load and come back an error. Attempt three is for a
+    daemon that is up but busy - a neighbouring session swapping models through
+    the same GPU - and it only happens when /api/tags answers, because a daemon
+    that is down is a judge switched off and check-stop.py blocks on that.
+
+    DEADLINE, not a per-attempt timeout, is what keeps this honest. The Stop
+    hook is given 90 seconds by the harness and is killed at 90 seconds, and a
+    killed hook enforces nothing. Every attempt is cut to the time actually
+    left, so the retries can never spend a budget they do not have."""
     turns = [{"role": "system", "content": system}]
     for text, label in shots:
         turns.append({"role": "user", "content": text})
@@ -265,10 +357,28 @@ def _chat(system, shots, message, timeout):
     room = _room()
     if room is not None and room < FLOOR and not _loaded():
         return SKIP, 0.0
-    text, seconds = _once(body, timeout)
-    if text is None:
+
+    if not _alive():
+        _wake()
+
+    end = time.monotonic() + DEADLINE
+
+    def left():
+        return min(timeout, end - time.monotonic())
+
+    text, seconds, refused = _once(body, left())
+    if refused:
+        return SKIP, 0.0
+    if text is None and left() > 5:
         time.sleep(2)
-        text, seconds = _once(body, timeout)
+        text, seconds, refused = _once(body, left())
+        if refused:
+            return SKIP, 0.0
+    if text is None and left() > 5 and _alive():
+        time.sleep(min(10, left() / 2))
+        text, seconds, refused = _once(body, left())
+        if refused:
+            return SKIP, 0.0
     return text, seconds
 
 

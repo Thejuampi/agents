@@ -8,6 +8,7 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOOK = os.path.join(HERE, "check-claims.py")
+NL = chr(10)
 
 RUNS = []
 
@@ -79,6 +80,22 @@ def main():
                         "`parseConsensus` era un wrapper y quedo borrado.")
     if code != 2:
         failures.append("BLOCKED must not launder a claim the tree refutes")
+
+    other = repo([("hooks/llm_judge.py", "def wake(): return 1" + NL)])
+    counted()
+    handle = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")
+    handle.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Edit", "input": {
+            "file_path": os.path.join(other, "hooks", "llm_judge.py")}}]}}) + NL)
+    handle.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "text", "text": "Agregue `llm_judge.py` para despertar el daemon."}]}}) + NL)
+    handle.close()
+    payload = json.dumps({"transcript_path": handle.name, "cwd": tree,
+                          "stop_hook_active": False})
+    done = subprocess.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
+    os.unlink(handle.name)
+    if done.returncode != 0:
+        failures.append(f"a file written outside the session repo is still in a tree: {done.stderr[:160]}")
 
     counted()
     payload = json.dumps({"transcript_path": HOOK, "cwd": tree, "stop_hook_active": True})

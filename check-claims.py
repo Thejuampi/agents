@@ -77,6 +77,62 @@ def last_text(path):
     return text
 
 
+def roots(transcript, cwd):
+    """Every tree this turn actually wrote into, starting with the session cwd.
+
+    A session is anchored to one repo and edits files outside it all the time -
+    this hook itself lives in ~/.claude while the session runs in a project. A
+    name resolved only against cwd is then reported as missing when it exists,
+    which is the same false fact the hook exists to catch, published by the
+    hook. The turn already says where it wrote; that is what is asked."""
+    found = [cwd]
+    for path in written(transcript):
+        top = git(["rev-parse", "--show-toplevel"], os.path.dirname(path)).strip()
+        if top and top not in found:
+            found.append(top)
+    return found
+
+
+def written(transcript):
+    seen = []
+    try:
+        with open(transcript, encoding="utf-8") as handle:
+            for line in handle:
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(entry, dict) or entry.get("type") != "assistant":
+                    continue
+                content = entry.get("message", {}).get("content")
+                if not isinstance(content, list):
+                    continue
+                for block in content:
+                    if not isinstance(block, dict) or block.get("type") != "tool_use":
+                        continue
+                    path = (block.get("input") or {}).get("file_path")
+                    if isinstance(path, str) and os.path.exists(path) and path not in seen:
+                        seen.append(path)
+    except OSError:
+        return []
+    return seen
+
+
+def touched(name, wrote):
+    """The claim answered from the turn itself, with no tree involved.
+
+    roots() needs the file to sit in a repo, and plenty of real work does not:
+    a scratch directory, a dotfile tree nobody ever ran git init on. The turn
+    already wrote the path down and the file is still on disk, so the claim is
+    backed. This is the cheapest true answer available and it is checked first."""
+    want = name.replace(chr(92), "/").strip("/")
+    for path in wrote:
+        flat = path.replace(chr(92), "/")
+        if flat.endswith("/" + want) or os.path.basename(flat) == want:
+            return True
+    return False
+
+
 def named(match):
     name = match.group(1)
     if not name or name in SKIP or len(name) <= 2 or name.isdigit():
@@ -130,16 +186,20 @@ def main():
     if not git(["rev-parse", "--is-inside-work-tree"], cwd).strip().startswith("true"):
         return 0
 
+    wrote = written(transcript)
+    trees = roots(transcript, cwd)
+
     bad = []
     for rx in CREATED:
         for match in rx.finditer(message):
             name = named(match)
-            if name and not exists(cwd, name):
+            if name and not touched(name, wrote) and not any(
+                    exists(root, name) for root in trees):
                 bad.append(f"  {name}: reported as added, not in the tree")
     for rx in DELETED:
         for match in rx.finditer(message):
             name = named(match)
-            if name and declared(cwd, name):
+            if name and any(declared(root, name) for root in trees):
                 bad.append(f"  {name}: reported as deleted, still there")
 
     seen = []
