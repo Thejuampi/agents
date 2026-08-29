@@ -21,31 +21,26 @@ CONSOLES = ("ConsoleWindowClass", "CASCADIA_HOSTING_WINDOW_CLASS",
             "PseudoConsoleWindow", "Windows.UI.Core.CoreWindow")
 
 
-def name_of(pid):
-    handle = kernel32.OpenProcess(QUERY, False, pid)
-    if not handle:
-        return "?"
-    buf = ctypes.create_unicode_buffer(1024)
-    size = w.DWORD(1024)
-    ok = kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size))
-    kernel32.CloseHandle(handle)
-    return os.path.basename(buf.value) if ok else "?"
-
-
 class ENTRY(ctypes.Structure):
     _fields_ = [("dwSize", w.DWORD), ("cntUsage", w.DWORD),
-                ("th32ProcessID", w.DWORD), ("th32DefaultHeapID", ctypes.POINTER(w.ULONG)),
+                ("th32ProcessID", w.DWORD),
+                ("th32DefaultHeapID", ctypes.POINTER(w.ULONG)),
                 ("th32ModuleID", w.DWORD), ("cntThreads", w.DWORD),
                 ("th32ParentProcessID", w.DWORD), ("pcPriClassBase", w.LONG),
                 ("dwFlags", w.DWORD), ("szExeFile", ctypes.c_char * 260)]
 
 
-def parents():
-    """Who started whom, from the process table itself.
+SNAPPROCESS = 2
 
-    A snapshot carries the parent id, and reading it costs no process. Asking
-    PowerShell the same question would add one to the count under test."""
-    snap = kernel32.CreateToolhelp32Snapshot(2, 0)
+
+def parents():
+    """Who started whom, read from the process table itself.
+
+    A snapshot carries the parent id, so the chain costs no process. Asking
+    PowerShell the same question would add one to the count under test. Read
+    only when a window actually appears: the desktop is polled 33 times a
+    second and the process table is not."""
+    snap = kernel32.CreateToolhelp32Snapshot(SNAPPROCESS, 0)
     tree = {}
     entry = ENTRY()
     entry.dwSize = ctypes.sizeof(ENTRY)
@@ -60,6 +55,7 @@ def parents():
 
 
 def lineage(pid, tree, depth=6):
+    """The window's owner and the processes above it, nearest first."""
     chain = []
     while pid in tree and depth > 0:
         up, name = tree[pid]
@@ -97,12 +93,14 @@ def main():
         handle.flush()
         while time.monotonic() < end:
             now = shot()
+            tree = None
             for hwnd, what in now.items():
                 if hwnd in known:
                     continue
                 cls, pid, title = what
-                handle.write(f"{time.strftime('%H:%M:%S')} {cls} pid={pid} "
-                             f"{name_of(pid)} {title!r}\n")
+                tree = tree if tree is not None else parents()
+                handle.write(f"{time.strftime('%H:%M:%S')} {cls} "
+                             f"{lineage(pid, tree)} {title!r}\n")
                 handle.flush()
             known = now
             time.sleep(0.03)
