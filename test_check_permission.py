@@ -114,6 +114,30 @@ MINED = [
 
 MUST_FIRE.extend(MINED)
 
+LIVE = [
+    "Now the presentation test, then run the suites.",
+    "Now the PRD, then build and run on the device.",
+    "Now build the APK and run it on the emulator.",
+    "Ambas ramas quedaron probadas en el telefono. Verifico la punta visible.",
+    "Verificado en pantalla. Limpio los eventos WMT que inyecte para la prueba.",
+    "Tres errores de lint son crashes reales bajo API 34. Los arreglo.",
+    "El script de firma escapa de mas. Lo arreglo.",
+    "APK de release firmado con llave propia. Verifico la firma y que corra.",
+    "Starting it and loading the judge.",
+    "Let me check the actual state of the key files before writing the revision.",
+    "I'm not re-running the suites now. The judge model holds 6.6 GB.",
+    "PRD actualizado. Deudas abiertas: la regresion 4.2 y el winsorizado.",
+]
+"""Read out of a live session's last fifteen turns, 2026-08-28.
+
+Twelve of those fifteen closings passed clean through the hook, and nine of
+them were the same shape: the last sentence names what the agent is about to
+do and the turn ends there. On a 60-message sample of everything thesenew 
+patterns catch, the local model agreed it was a stop 90% of the time."""
+MUST_FIRE.extend(LIVE)
+
+
+
 
 def run(message, acted=True):
     transcript = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")

@@ -61,9 +61,25 @@ def servers():
     return out.stdout.count("llama-server.exe")
 
 
+def waitfor(want, seconds=40):
+    """Wait for the process count to settle instead of photographing it.
+
+    Ollama answers the verdict before its child is fully up, and it reaps the
+    child a moment after the parent dies. Asserting on the instant either side
+    of those two events made this test fail once in a suite run and pass three
+    times alone, which is worse than having no test at all."""
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        if want(servers()):
+            return True
+        time.sleep(1)
+    return want(servers())
+
+
 judge = load("judge_live")
 judge.stop_verdict("Listo, suite verde, commit abc1234.")
-check("the model is up before the daemon is killed", servers() > 0, True)
+check("the model is up before the daemon is killed",
+      waitfor(lambda n: n > 0), True)
 
 subprocess.run(["taskkill", "/F", "/IM", "ollama.exe"], capture_output=True)
 check("killing the parent hard leaves the model server orphaned, holding the "
@@ -94,7 +110,8 @@ if os.path.exists(state):
 
 check("a stop with the daemon down still gets a verdict", done.returncode, 0)
 check("and the daemon is left running for the next session", alive(), True)
-check("and no orphan is left holding VRAM for the next load", servers() <= 1, True)
+check("and no orphan is left holding VRAM for the next load",
+      waitfor(lambda n: n <= 1), True)
 
 print(f"{cases} cases, {len(failures)} failures")
 for line in failures:

@@ -41,8 +41,10 @@ pendiente". Los que se midieron ruidosos llevan `?` en la clase dentro de
 `stop-patterns.txt` y son certeza baja: no condenan solos, pasan al modelo, y
 solo un OK claro los suelta. El resto frena por su cuenta.
 
-Sobre 5268 mensajes reales: 915 disparan, 628 son sentencia directa (69%) y
-287 van al modelo (31%).
+Sobre 5284 mensajes reales: 2383 disparan, 657 son sentencia directa y 1726
+van al modelo. De una muestra de 60 candidatos de certeza baja, el modelo
+confirmó el freno en el 90% y soltó el 10%: esos son los falsos positivos que
+el sistema de certeza evita.
 
 **3. El modelo local.** Lo que ningún patrón vio venir. Nada sale limpio sin
 pasar por acá. Si el modelo no contesta, el turno no pasa: un juez apagado es
