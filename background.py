@@ -5,9 +5,16 @@ Shared, because two lanes need the same fact and neither can import the other:
 check-stop.py loads check-permission.py, so the detection cannot live in
 either one.
 """
+import importlib.util
 import json
 import os
 import re
+
+_spec = importlib.util.spec_from_file_location(
+    "transcript", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "transcript.py"))
+reader = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(reader)
 
 
 def entries(transcript):
@@ -56,9 +63,7 @@ def waiting_on(transcript):
                 live.pop(done, None)
             if "<task-notification>" in (text or "").lower():
                 continue
-            if isinstance(content, str) or (isinstance(content, list) and any(
-                    isinstance(x, dict) and x.get("type") != "tool_result"
-                    for x in content)):
+            if reader.spoke(entry):
                 live.clear()
             continue
         if kind != "assistant" or not isinstance(content, list):

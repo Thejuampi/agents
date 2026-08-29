@@ -22,6 +22,12 @@ _spec = importlib.util.spec_from_file_location(
     "perm", os.path.join(HERE, "check-permission.py"))
 perm = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(perm)
+
+_bg = importlib.util.spec_from_file_location(
+    "background", os.path.join(HERE, "background.py"))
+bg = importlib.util.module_from_spec(_bg)
+_bg.loader.exec_module(bg)
+
 HOOK = os.path.join(HERE, "check-stop.py")
 
 RUNS = []
@@ -122,6 +128,20 @@ def main():
     counted()
     if not perm.offenders("Still running, nothing to report yet."):
         failures.append("an idle report is a pattern hit whatever is running")
+
+    counted()
+    handle = tempfile.NamedTemporaryFile("w", suffix=".jsonl",
+                                         delete=False, encoding="utf-8")
+    with handle:
+        handle.write(json.dumps({"type": "assistant", "message": {
+            "content": [{"type": "tool_use", "id": "bg1",
+                         "name": "Agent", "input": {}}]}}) + "\n")
+        handle.write(json.dumps({"type": "user", "message": {"content":
+            "Stop hook feedback: KEEP GOING - THERE LOOKS TO BE WORK LEFT"
+            }}) + "\n")
+    if not bg.waiting_on(handle.name):
+        failures.append("a block must not retire the work the turn launched")
+    os.unlink(handle.name)
 
     print(f"{len(RUNS)} cases, {len(failures)} failures")
     for line in failures:

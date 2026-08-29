@@ -14,11 +14,17 @@ It costs one model call per exchange, so it is run on demand rather than at
 session start."""
 import glob
 import importlib.util
+import importlib.util
 import json
 import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+_spec = importlib.util.spec_from_file_location(
+    "transcript", os.path.join(HERE, "transcript.py"))
+reader = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(reader)
 PROJECTS = os.path.expanduser("~/.claude/projects")
 
 
@@ -34,14 +40,7 @@ perm = load("perm", "check-permission.py")
 push = load("push", "judge_push.py")
 
 
-def spoke(entry):
-    if entry.get("type") != "user":
-        return False
-    content = entry.get("message", {}).get("content")
-    if isinstance(content, str):
-        return True
-    return isinstance(content, list) and any(
-        isinstance(b, dict) and b.get("type") != "tool_result" for b in content)
+spoke = reader.spoke
 
 
 def said(entry):

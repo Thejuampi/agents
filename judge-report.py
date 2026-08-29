@@ -11,12 +11,18 @@ A block that bought work is a block worth keeping. A block that bought
 another paragraph is a pattern to demote or a prompt to fix. Run it whenever
 you want the current numbers; the cron runs it on its own and pings Rick."""
 import glob
+import importlib.util
 import json
 import os
 import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+_spec = importlib.util.spec_from_file_location(
+    "transcript", os.path.join(HERE, "transcript.py"))
+reader = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(reader)
 LOG = os.environ.get("STOP_LOG") or os.path.join(HERE, "judge-log.jsonl")
 PROJECTS = os.path.expanduser("~/.claude/projects")
 WORKED = 3
@@ -56,24 +62,7 @@ def turns(path):
     return rows
 
 
-WAKE = "Stop hook feedback:"
-"""How this gate's own reminder comes back in.
-
-It arrives as a plain user string, so read loosely it looks like the
-developer speaking and closes the window the label is counted in. Every
-block then grades as zero, which is what the report showed: 14 of 14 bought
-nothing, including the ones that bought a full session of work."""
-
-
-def spoke(entry):
-    """A real user turn. Tool results wear the user role and are not the user."""
-    if entry.get("type") != "user":
-        return False
-    content = entry.get("message", {}).get("content")
-    if isinstance(content, str):
-        return WAKE not in content[:200]
-    return isinstance(content, list) and any(
-        isinstance(b, dict) and b.get("type") != "tool_result" for b in content)
+spoke = reader.spoke
 
 
 def texts(entry):
