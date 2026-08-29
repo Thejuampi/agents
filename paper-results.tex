@@ -10,17 +10,19 @@ Table~\ref{tab:clean} restates the headline figures). Where the two disagree
 the clean numbers are the answer, and the first pass is kept because the
 difference between them is one of the results.
 
-The 66 transcripts yield 854 closing pairs. Closings are long: the median is 565
-characters and the 90th percentile is 2866, which is already a warning about
-pattern matching, since a longer message gives a fixed pattern set more chances
-to fire on prose that is not a request.
+The 66 transcripts yield 764 closing pairs, from the 43 sessions that contain
+a closing at all; the other 23 are sessions with a single turn or none.
+Closings are long: the median is 1345 characters and the 90th percentile is
+3683, which is already a warning about pattern matching, since a longer
+message gives a fixed pattern set more chances to fire on prose that is not a
+request.
 
-Thirteen closings (1.5\%) are harness error pages rather than messages the agent
-chose to write: an API error or a usage-limit notice left as the last assistant
-text. These are excluded from every lane. They matter more than their share
-suggests: 4 of the 11 user pushes in the whole corpus follow one. The user was
-pushing past an infrastructure failure, and a gate that reads those as premature
-stopping is blocking a session that has already ended.
+Seventeen closings (2.0\%) are harness error pages rather than messages the
+agent chose to write: an API error or a usage-limit notice left as the last
+assistant text. These are excluded from every lane. They matter more than
+their share suggests: 2 of the 78 pushes follow one directly. The developer
+was pushing past an infrastructure failure, and a gate that reads those as
+premature stopping is blocking a session that has already ended.
 
 \subsection{What each lane fires on}
 

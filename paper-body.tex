@@ -26,7 +26,7 @@ We contribute:
         (Section~\ref{sec:system}).
   \item A weak-supervision label for premature stopping that requires no
         annotation: the user's own next message (Section~\ref{sec:setup}).
-  \item An evaluation over 747 clean closings from 66 sessions, including an
+  \item An evaluation over 747 clean closings from 43 sessions, including an
         ablation of every lane and every pattern class against that label (Section~\ref{sec:results}).
   \item A self-labeling loop that grades each intervention by what the agent
         did afterwards, and names patterns for demotion on its own
@@ -222,9 +222,9 @@ the numbers. Section~\ref{sec:loop} is built on that log.
 We use every session transcript on one developer's machine: 66 transcripts
 spanning 2026-08-03 to 2026-08-29, across several projects. From these we
 extract \emph{closing pairs}: the agent's final text message of a turn together
-with the user's next message. This yields 854 pairs, of which 747 survive
-the readers described in Section~\ref{sec:contamination}: the rest are
-harness noise or the gate talking to itself.
+with the user's next message. The first build of this yielded 854 pairs. The
+corrected readers of Section~\ref{sec:contamination} yield 764, of which 747
+are neither harness noise nor the gate talking to itself.
 
 The corpus is naturally split by a date. The gate was first installed on
 2026-08-28, so 55 transcripts are \emph{ungated} -- produced with no gate in the
