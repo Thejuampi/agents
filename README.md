@@ -225,3 +225,19 @@ Perillas, todas por variable de entorno:
 | `STOP_JUDGE_DEADLINE` | `70` | tope de segundos del juez; el harness corta a 90 |
 
 Para apagarlo del todo, sacá la línea de `settings.json`.
+
+## Las pruebas se juntan solas
+
+El log dice que decidio el guardia. No dice si acerto. Esa respuesta ya esta
+escrita unas lineas mas abajo en la misma transcripcion: un bloqueo despierta al
+agente, y el agente o va y trabaja o escribe otro parrafo y se para de nuevo.
+Las llamadas a herramientas despues del bloqueo son la etiqueta, y nadie la
+tiene que poner a mano.
+
+`judge-report.py` lee el log, busca cada mensaje bloqueado en su transcripcion y
+cuenta que paso despues. Agrupa por patron y por certeza del juez. Cuando un
+patron junta 8 bloqueos y 7 de cada 10 no compraron nada, el reporte lo nombra:
+ese patron se pasa a duda.
+
+Un cron lo corre solo cada dia y despierta a Rick, no a Juan. Rick lee el numero
+y si hay evidencia hace el cambio, corre la suite y commitea.

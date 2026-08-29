@@ -121,6 +121,7 @@ def note(transcript, **fields):
     demoting. Read it with judge-log.py."""
     fields["at"] = time.strftime("%Y-%m-%d %H:%M:%S")
     fields["session"] = os.path.basename(transcript or "")[:12]
+    fields["file"] = transcript or ""
     try:
         with open(LOG, "a", encoding="utf-8") as handle:
             handle.write(json.dumps(fields, ensure_ascii=False) + chr(10))
