@@ -88,6 +88,85 @@ nothing more. Precision is the quantity that matters here and this label cannot
 measure it, which is the entire reason for the loop in
 Section~\ref{sec:loop}.
 
+\subsection{A stronger label, and what it costs to trust it}
+\label{sec:pushlabel}
+
+Bare pushes are too rare to tune against. But the lexicon was only ever an
+approximation of the question we care about, which is whether the developer's
+reply asked for work the agent could have done on its own.
+
+We therefore ask that question directly, with a second local judge that reads
+the developer's reply rather than the agent's closing. It is given the closing
+for context and asked a single question: did the developer have to ask for work
+the agent could have done in the turn that just ended? A reply that pushes,
+picks from a menu the agent offered, or tells the agent to run what it just
+described is a push. A reply that supplies information the agent could not have
+had -- a preference, a priority, a fact from outside the repository, a
+correction -- is not.
+
+This judgement is deliberately not the gate's own. The gate's judge reads the
+agent's closing; this one reads the reply. Grading a gate with the prompt it
+decides by measures its consistency and nothing else.
+
+Two checks on the label before using it. It recovers 10 of the 11 bare pushes
+the lexicon found, without being given the lexicon. And on a held-out set of
+nine hand-written boundary cases -- including short, blunt replies that carry
+real information, which are the ones a length heuristic gets wrong -- it scores
+9 of 9.
+
+It labels 117 of the 841 non-noise closings as pushes: a base rate of
+\textbf{13.9\%}.
+
+\subsection{The gate fires far more often than the failure occurs}
+
+That base rate is the result that reframes everything above.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+Lane configuration & Fires on & Precision & Recall & F1 \\
+\midrule
+Base rate (the failure itself) & 117 & 0.139 & 1.00 & --- \\
+\midrule
+Firm patterns only      & 304 & 0.19 & 0.50 & 0.28 \\
+Any pattern             & 539 & 0.16 & 0.72 & 0.26 \\
+Judge only              & 569 & 0.15 & 0.75 & 0.26 \\
+Firm or judge (shipped) & 624 & 0.15 & 0.81 & 0.26 \\
+Firm and judge          & 249 & 0.21 & 0.44 & 0.28 \\
+\bottomrule
+\end{tabular}
+\caption{Every configuration against the push label. Precision at or near the
+base rate means the configuration carries almost no information about which
+turns ended early.}
+\label{tab:precision}
+\end{table}
+
+The shipped configuration fires on 74\% of closings and is right 15\% of the
+time, against a base rate of 13.9\%. It is barely above chance. Requiring both
+lanes to agree raises precision to 0.21 and halves recall, which is the only
+configuration that clearly beats the base rate, and it still fires on 30\% of
+all closings.
+
+Per class, precision ranges from 0.30 (\texttt{idle}) down to 0.07
+(\texttt{wait}) and 0.09 (\texttt{errand}) -- two classes that fire
+\emph{below} the base rate and are therefore worse than not firing. But
+demoting classes barely moves the shipped number, from 0.152 to 0.159 under a
+greedy search over all nine, because the judge fires on almost everything the
+patterns do and more.
+
+Nor does the judge's confidence rescue it. Sliced into four bands, precision is
+0.44 ($n = 9$), 0.16, 0.10 and 0.16 with increasing confidence: not monotonic,
+and flat everywhere the volume is.
+
+We want to be careful about what this does and does not show. The label is
+one-sided: a developer often absorbs a premature stop and simply answers, which
+counts as \textsc{new} and caps measurable precision below its true value. So
+0.15 is a floor rather than an estimate. What survives that caveat is the
+comparison of rates. The failure occurs on roughly one closing in seven and the
+gate intervenes on three in four. Whatever the true precision is, the gate is
+firing several times more often than the thing it is looking for happens.
+
 \subsection{Before and after the gate}
 
 The corpus splits at 2026-08-28, when the gate was installed. Pushes fall from
