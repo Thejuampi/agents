@@ -80,3 +80,32 @@ for each pattern class:\\
 The threshold of three tool calls exists because a woken agent commonly reads
 one or two files to re-establish context before deciding to stop again. Zero is
 too strict and would count that re-orientation as work.
+
+\section{Reproducing the numbers}
+
+Every table in this paper is produced by a script in the hook's own
+repository, run against the transcripts on the developer's machine. The
+corpus builder is the only one that calls the model; the rest read its stored
+labels and are arithmetic, so they run in seconds and give the same answer
+every time.
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Script & What it does & Feeds \\
+\midrule
+\texttt{corpus.py} & builds the labelled corpus and prints the base rate & Table~\ref{tab:clean} inputs \\
+\texttt{bench-lanes.py} & lane and class ablation with Wilson intervals & Table~\ref{tab:clean} \\
+\texttt{bench-split.py} & the same search scored on held-out sessions & transfer result \\
+\texttt{bench-prompt.py} & three closing instructions over the same rows & Table~\ref{tab:ab} \\
+\texttt{bench-sure.py} & the judge's confidence against the label & confidence bands \\
+\texttt{bench-contradiction.py} & delivery claims against the commands that ran & claim verification \\
+\texttt{judge-report.py} & grades each block by the tool calls it bought & block conversion \\
+\texttt{test\_paper.py} & fails when a number here stops matching the repo & all of it \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The corpus builder takes about 13 minutes over 764 closings on a consumer GPU,
+one model call per closing at temperature 0 with a fixed seed. The prompt
+ablation is three passes of the same shape. Nothing else here needs a GPU.
