@@ -36,11 +36,15 @@ def entries(transcript):
 BACKGROUND = ("agent", "task", "monitor", "croncreate", "schedulewakeup")
 
 
-STALE = 6
+STALE = 30
 """Closings a launch survives without its notification.
 
 A task killed from outside the session never reports, and a register that
-never forgets would answer "still waiting" for the rest of the day."""
+never forgets would answer "still waiting" for the rest of the day. The number
+has to clear a long job: the twelve minute run that exposed this had the agent
+close its turn eight times while the work was still going, and six was not
+enough. Thirty is about an hour of dense work, and every task the harness
+tracks reports back well before that."""
 
 
 NOTIFIED = re.compile(r"<tool-use-id>\s*([^<\s]+)", re.IGNORECASE)

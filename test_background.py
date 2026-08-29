@@ -56,11 +56,13 @@ check("a launched task is work in flight", flight(LAUNCH, SAID), True)
 check("the developer speaking does not finish the work",
       flight(LAUNCH, SAID, SPOKE, SAID), True)
 check("the notification does", flight(LAUNCH, SAID, DONE, SAID), False)
+check("a long job outlives the turns the agent closes while it runs",
+      flight(LAUNCH, *([SAID, SPOKE] * 8)), True)
 check("and a task killed from outside is forgotten, not waited on forever",
       flight(LAUNCH, *([SAID] * (background.STALE + 2))), False)
 check("a promise with nothing behind it is not waiting", flight(SAID), False)
 
-print(f"5 cases, {len(failures)} failures")
+print(f"6 cases, {len(failures)} failures")
 for line in failures:
     print("  " + line)
 sys.exit(1 if failures else 0)
