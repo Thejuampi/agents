@@ -7,16 +7,23 @@ continue, or hands the user a command the agent could have run itself. The
 user's reply is then one word. That word costs a round trip, breaks the
 user's attention, and carries no information the agent did not already have.
 
-The failure is not a capability failure. The same agent, woken with nothing
-more than ``keep going,'' usually finishes the work. It is a stopping-policy
-failure, and it is invisible to the agent, which believes each turn ended
-reasonably.
+The agent can do the work. Woken with nothing more than ``keep going,'' it
+usually finishes what it left. The failure sits in the stopping policy, and it
+is invisible to the agent, which believes each turn ended reasonably.
 
 This paper describes a gate that sits in the agent's stop path and re-wakes it
 when the closing message shows the pattern. That part is straightforward. The
 part that took the work, and the part we think transfers, is the second loop:
 how the gate discovers which of its own interventions were wrong, from signals
 already present in the transcript, with no human labeling.
+
+The headline is uncomfortable and we lead with it. The failure happens on about
+one closing in ten. The gate fires on three in four and is right about one in
+eight, which is the rate at which the failure occurs at all, and no lane
+configuration we measured separates from that rate at 95\%. The same
+transcripts then say the interventions are mostly worth making: 35 of 41
+graded blocks bought work. Both statements are measured, neither cancels the
+other, and the second is the one that keeps the gate switched on.
 
 We contribute:
 
