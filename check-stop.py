@@ -82,6 +82,7 @@ release = _load("release", "release.py")
 judge = _load("llm_judge", "llm_judge.py")
 background = _load("background", "background.py")
 reader = _load("transcript", "transcript.py")
+hints = _load("candidates", "candidates.py")
 
 REPEAT = """Block {n} of {cap}. {left} The same message will not read differently, so change the work instead."""
 
@@ -143,6 +144,16 @@ def floor_sure():
     Read at every call. A constant is read once per interpreter, and the checkers
     share one now, so a constant would answer for whoever imported first."""
     return float(os.environ.get("STOP_SURE_FLOOR") or 0.5)
+
+
+NEAR = """
+
+Two things this turn did and did not follow through on:
+{items}
+
+Neither is an accusation - they are read off your own tool calls, not off your
+work. If one of them is real, do it now. If both are already handled, say which
+and how, and the turn closes."""
 
 
 PROACTIVE = """ONE MORE LOOK - IS THERE SOMETHING WE CAN DO PROACTIVELY?
@@ -292,6 +303,23 @@ def last_user(transcript):
         if words:
             said = words
     return said
+
+
+def openings(transcript):
+    """Concrete next actions in this turn's own tool calls, or an empty list.
+
+    A general question is easy to answer with a general no: over its first
+    blocks the proactive request bought no work three times in five, the worst
+    conversion in the gate. Naming what the turn changed, and what it did not
+    change with it, costs nothing and makes no an answer that needs evidence."""
+    paths = []
+    for entry in entries(transcript):
+        if reader.spoke(entry):
+            paths = []
+            continue
+        if entry.get("type") == "assistant":
+            paths += hints.written(entry)
+    return hints.found(paths)
 
 
 def tools_this_turn(transcript):
@@ -481,7 +509,10 @@ def main():
              head=message[:120], asked=bool(chain.get("asked")))
         if chain.get("asked"):
             return allow(state, transcript)
-        return block(state, transcript, chain, message, PROACTIVE,
+        near = openings(transcript)
+        body = PROACTIVE if not near else PROACTIVE + NEAR.format(
+            items="".join(chr(10) + "  - " + line for line in near))
+        return block(state, transcript, chain, message, body,
                      repeated, asked=True)
 
     seen = bool(chain.get("asked"))
