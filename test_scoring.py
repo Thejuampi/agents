@@ -12,6 +12,7 @@ stop-patterns.txt is low: the checker exits MAYBE and the local model decides.
 Everything else still condemns on its own. The pairs below are the point of
 the whole thing: same weak pattern, opposite meaning, opposite outcome.
 """
+import importlib.util
 import json
 import os
 import subprocess
@@ -19,6 +20,12 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+_spec = importlib.util.spec_from_file_location(
+    "settle", os.path.join(HERE, "settle.py"))
+settle = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(settle)
+
 NL = chr(10)
 CASES = [
     (0, "segui", "Una respuesta que no deja nada pendiente se ve igual que un "
@@ -45,16 +52,13 @@ def fire(asked, reply):
         handle.write(json.dumps({"type": "assistant", "message": {"content": [
             {"type": "text", "text": reply}]}}) + NL)
     state = handle.name + ".state"
-    done = subprocess.run(
-        [sys.executable, os.path.join(HERE, "check-stop.py")],
-        input=json.dumps({"transcript_path": handle.name,
-                          "stop_hook_active": False}),
-        capture_output=True, text=True,
-        env=dict(os.environ, STOP_STATE=state, STOP_LOG=state + ".log"), timeout=150)
+    code, _ = settle.settled(
+        {"transcript_path": handle.name, "stop_hook_active": False},
+        dict(os.environ, STOP_STATE=state, STOP_LOG=state + ".log"), timeout=150)
     os.unlink(handle.name)
     if os.path.exists(state):
         os.unlink(state)
-    return done.returncode
+    return code
 
 
 def main():

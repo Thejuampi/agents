@@ -5,6 +5,7 @@ JSON payload on stdin, an exit code and a message out.
 The local model is real here. These assert the gate, not the model's taste, so
 they use messages a 9B has no trouble with.
 """
+import importlib.util
 import json
 import os
 import shutil
@@ -15,6 +16,11 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOOK = os.path.join(HERE, "check-stop.py")
+
+_spec = importlib.util.spec_from_file_location(
+    "settle", os.path.join(HERE, "settle.py"))
+settle = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(settle)
 
 
 def transcript(path, turns):
@@ -52,9 +58,7 @@ class Gate(unittest.TestCase):
         payload = json.dumps({"transcript_path": path, "cwd": self.repo,
                               "stop_hook_active": chained})
         env = dict(os.environ, STOP_STATE=self.state, STOP_LOG=self.state + ".log")
-        done = subprocess.run([sys.executable, HOOK], input=payload,
-                              capture_output=True, text=True, timeout=180, env=env)
-        return done.returncode, done.stderr
+        return settle.settled(json.loads(payload), env, timeout=180)
 
     def test_a_question_is_blocked_before_the_model_is_asked(self):
         code, out = self.run_hook([("user", "go"), ("tool", "Read"),

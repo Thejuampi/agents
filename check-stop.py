@@ -109,6 +109,15 @@ WAITING = """KEEP GOING - THE WORK YOU LAUNCHED REPORTS BACK ON ITS OWN
 You will be woken when it finishes, so the time until then is yours. What you did stands; spend the wait on the next piece instead of holding the turn open for it. If nothing else can move without that result, say what you are waiting on and why nothing else starts."""
 
 
+PROACTIVE = """ONE MORE LOOK - IS THERE SOMETHING WE CAN DO PROACTIVELY?
+
+Nothing in what you wrote looks unfinished, so this is not a correction. It is the last question before the turn closes: with the repo in front of you and permission already granted, is there a next action you can take right now?
+
+Look for the thing you would do next if nobody asked: the test that covers the case you just fixed, the doc that still describes the old behaviour, the neighbouring caller with the same bug, the measurement that would tell you whether the change worked. If you find one, take it - do not come back to propose it.
+
+If there is genuinely nothing, say what you checked and why nothing remains. That answer ends the turn."""
+
+
 LOG = os.environ.get("STOP_LOG") or os.path.join(HERE, "judge-log.jsonl")
 
 
@@ -280,11 +289,12 @@ def deterministic(data):
     return sure, unsure
 
 
-def block(state, transcript, chain, message, body, repeated):
+def block(state, transcript, chain, message, body, repeated, asked=False):
     count = chain.get("blocks", 0) + 1
     parts = release.mint() if count >= PHRASE_AFTER else []
     state[transcript] = {"blocks": count, "digest": digest_of(message),
-                         "phrase": parts}
+                         "phrase": parts,
+                         "asked": asked or chain.get("asked")}
     write_state(prune(state))
 
     out = [body]
@@ -378,15 +388,19 @@ def main():
         line = judge.why(message, asked=asked)
     note(transcript, lane="judge", verdict=verdict, sure=judge.sureness(),
          weak=unsure, seconds=round(seconds, 2), quote=line,
-         head=message[:120], waiting=waiting)
+         head=message[:120], waiting=waiting,
+         asked=bool(chain.get("asked")))
 
     if waiting:
         body = WAITING
     elif verdict == "STOP":
         body = "\n\n".join(unsure) if unsure else LLM_STOP.format(
             why=QUOTE.format(line=line) if line else "")
-    else:
+    elif chain.get("asked"):
         return allow(state, transcript)
+    else:
+        return block(state, transcript, chain, message, PROACTIVE,
+                     repeated, asked=True)
     return block(state, transcript, chain, message, body, repeated)
 
 

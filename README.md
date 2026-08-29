@@ -143,6 +143,19 @@ el mismo mensaje no. Medido sobre 854 cierres: 37 cambian de etiqueta y 3
 eran empujones reales; 19 pierden toda etiqueta firme y siguen yendo al
 juez, que igual los ve.
 
+## Un OK ya no cierra el turno
+
+El juez contesta una sola pregunta: si el agente paro antes de tiempo. Un
+turno sin nada mal adentro le sale OK, y eso no es lo mismo que un turno sin
+nada por hacer.
+
+Ahora un OK pregunta primero: hay algo que podamos hacer proactivamente. Una
+vez por cadena. El turno cierra en la pasada siguiente, cuando el agente miro
+y no pudo nombrar una accion. Medido sobre 854 cierres: 302 reciben la
+pregunta y 33 de esos eran empujones reales que el guardia dejaba pasar.
+
+El costo es un turno por cierre limpio. La respuesta "revise esto y no queda nada" lo cierra igual.
+
 ## Esperar no es una excusa
 
 Antes era una exencion: trabajo lanzado, ningun patron levantado, turno

@@ -8,6 +8,7 @@ somebody else's server, and the start switched off - and the last one kills the
 daemon for real and asks the hook to bring it back.
 """
 import importlib.util
+import importlib.util
 import json
 import os
 import subprocess
@@ -17,6 +18,12 @@ import time
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+_spec = importlib.util.spec_from_file_location(
+    "settle", os.path.join(HERE, "settle.py"))
+settle = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(settle)
+
 NL = chr(10)
 failures = []
 cases = 0
@@ -99,16 +106,14 @@ with handle:
     handle.write(json.dumps({"type": "assistant", "message": {"content": work}}) + NL)
     handle.write(json.dumps({"type": "assistant", "message": {"content": body}}) + NL)
 state = handle.name + ".state"
-done = subprocess.run(
-    [sys.executable, os.path.join(HERE, "check-stop.py")],
-    input=json.dumps({"transcript_path": handle.name, "stop_hook_active": False}),
-    capture_output=True, text=True, env=dict(os.environ, STOP_STATE=state, STOP_LOG=state + ".log"),
-    timeout=120)
+code, _ = settle.settled(
+    {"transcript_path": handle.name, "stop_hook_active": False},
+    dict(os.environ, STOP_STATE=state, STOP_LOG=state + ".log"), timeout=120)
 os.unlink(handle.name)
 if os.path.exists(state):
     os.unlink(state)
 
-check("a stop with the daemon down still gets a verdict", done.returncode, 0)
+check("a stop with the daemon down still gets a verdict", code, 0)
 check("and the daemon is left running for the next session", alive(), True)
 check("and no orphan is left holding VRAM for the next load",
       waitfor(lambda n: n <= 1), True)
