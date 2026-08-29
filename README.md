@@ -47,8 +47,16 @@ confirmó el freno en el 90% y soltó el 10%: esos son los falsos positivos que
 el sistema de certeza evita.
 
 **3. El modelo local.** Lo que ningún patrón vio venir. Nada sale limpio sin
-pasar por acá. Si el modelo no contesta, el turno no pasa: un juez apagado es
-un juez apagado, y esa es exactamente la falla que esto viene a evitar.
+pasar por acá mientras el juez esté prendido. Si el juez está apagado, el
+guardia no prende nada: se queda con sus patrones y con una pregunta
+proactiva, y la máquina queda en paz. Prender un modelo de 5,5 GB porque un
+turno terminó es una decisión del que usa la máquina, no del hook.
+
+Un veredicto que el juez no sostiene tampoco frena. La confianza sale de los
+logprobs de cada respuesta: en los 17 mensajes de oro que acierta, la más baja
+es 0,846, y todo bloqueo real del log está sobre 0,5. Debajo de `0.5` el
+veredicto pasa a ser la pregunta proactiva. Adivinar cuesta una mirada;
+acusar cuesta confianza.
 
 Tope: después de 6 bloqueos seguidos el guardia se corre. Siempre hay salida.
 
@@ -241,12 +249,17 @@ Perillas, todas por variable de entorno:
 | variable | default | qué hace |
 |---|---|---|
 | `STOP_JUDGE_HOST` | `http://127.0.0.1:11434` | dónde vive Ollama |
-| `STOP_JUDGE_WAKE` | `20` | segundos esperando al daemon; `0` no lo prende |
+| `STOP_JUDGE_WAKE` | `0` | segundos esperando a un daemon que el hook prenda; `0` no prende nada |
+| `STOP_SURE_FLOOR` | `0.5` | confianza mínima para que un STOP frene en vez de preguntar |
 | `STOP_JUDGE_FLOOR` | `8` GB | memoria libre mínima para cargar el modelo |
 | `STOP_JUDGE_KEEP` | `5m` | cuánto queda caliente entre paradas |
 | `STOP_JUDGE_DEADLINE` | `70` | tope de segundos del juez; el harness corta a 90 |
 
 Para apagarlo del todo, sacá la línea de `settings.json`.
+
+Los tests que hablan con el modelo, y el que mata el daemon para verlo volver,
+corren solo con `STOP_TEST_LIVE=1`. La suite de todos los días no toca la
+placa: cuesta 42 procesos, todos `git` de andamiaje, y ni un byte de VRAM.
 
 ## Las pruebas se juntan solas
 

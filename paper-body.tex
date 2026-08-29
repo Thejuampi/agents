@@ -105,12 +105,10 @@ eventually emitted from memory rather than from the message.
 
 The second lane is 298 regular expressions over the agent's own words, grouped
 into nine classes by what the closing is doing rather than by what it says:
-	exttt{ask}, 	exttt{announce}, 	exttt{defer}, 	exttt{wait},
-	exttt{handoff}, 	exttt{errand}, 	exttt{read}, 	exttt{idle} and
-	exttt{ack}. Appendix~
-ef{app:classes} gives the full table. The grouping
-matters because the loop of Section~
-ef{sec:loop} tunes classes rather than
+\texttt{ask}, \texttt{announce}, \texttt{defer}, \texttt{wait},
+\texttt{handoff}, \texttt{errand}, \texttt{read}, \texttt{idle} and
+\texttt{ack}. Appendix~\ref{app:classes} gives the full table. The grouping
+matters because the loop of Section~\ref{sec:loop} tunes classes rather than
 individual expressions: one regular expression rarely fires often enough to be
 judged on its own.
 
@@ -140,13 +138,57 @@ corpus the Spanish word \emph{falta} appears both as ``work is missing'' and as
 ``it was missing and I fixed it.'' No amount of pattern engineering separates
 those; reading the sentence does.
 
-Two implementation details proved necessary rather than cosmetic. First, all
+The judge reports how much probability mass it put on the token it chose, read
+from the logprobs that accompany every response. That number was recorded from
+the first verdict and used for nothing for two weeks. It separates cleanly: over
+the 17 held-out messages the judge labels correctly, its lowest score is 0.846,
+and every block in the production log scores above 0.5. The one verdict below
+that threshold was a false accusation, scoring 0.228 on a message that closed
+cleanly. A \textsc{stop} below 0.5 is therefore not delivered as a block; it is
+delivered as the proactive question of Section~\ref{sec:proactive}, which buys
+the same second look without telling the agent it left work behind. Guessing
+costs a look; accusing costs trust.
+
+A judge that cannot be reached is treated the same way. An earlier version
+blocked every stop when the model was silent, on the argument that a switched-off
+judge is precisely the failure the gate exists to prevent, and it started the
+daemon itself to avoid that state. Both halves were wrong in the same direction.
+Starting a 5.5GB model server because a turn ended is a decision belonging to
+whoever owns the machine: on 2026-08-29 the gate did it on a busy workstation,
+which ran out of memory and had to be restarted. The gate now starts nothing,
+and a silent judge degrades to the pattern lanes plus one proactive question.
+
+Two further implementation details proved necessary rather than cosmetic. First, all
 judge requests are serialized behind a machine-wide lock: the serving daemon
 batches concurrent requests, and batching changes the answer, so two test suites
 running at once produced different verdicts on identical input. Second, when the
 judge is asked to quote the offending sentence back to the agent, the prompt is
 strictly extractive and forbids translation; without that, the model paraphrased
 the sentence into English and the quote failed validation.
+
+\subsection{The last question before the turn closes}
+\label{sec:proactive}
+
+An \textsc{ok} from the judge used to end the turn. It no longer does. Every
+closing the three lanes find clean receives one further prompt, which states
+plainly that nothing looks unfinished and then asks whether there is a next
+action available right now: the test that covers the case just fixed, the
+document that still describes the old behaviour, the neighbouring caller with
+the same defect, the measurement that would say whether the change worked. The
+turn ends when the agent answers that it looked and found nothing, or when it
+goes and does the thing it found.
+
+The asymmetry is deliberate. A block says the agent left work behind, and it is
+wrong whenever the closing was clean. This question makes no such claim, so it
+costs one paragraph when there is nothing to do and buys a whole unit of work
+when there is. It is asked once per closing: the state file records that the
+question was put, and the answer to it is released without a second look.
+
+That property is what makes it the right home for two other cases. A block the
+judge scores below its confidence floor arrives here instead of as an
+accusation, and so does a stop the judge never answered because it was switched
+off. In both the gate is uncertain, and a question is what uncertainty is
+entitled to.
 
 \subsection{The message the agent receives}
 \label{sec:tone}
