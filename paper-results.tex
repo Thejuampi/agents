@@ -353,7 +353,48 @@ stops 24, and among the 6 stopped below 0.75 exactly three are finished reports
 and three are real cuts. A threshold there buys one correct release and pays for
 it with one lost catch.
 
-The confidence is therefore logged and used by nobody. It is informative to a
-maintainer reading a specific case and not safe to act on automatically, and we
-think the distinction is worth naming: a signal can be genuine, reproducible,
-and still not be a decision rule.
+That analysis assumed the only alternative to blocking was releasing, and under
+that assumption the conclusion held: the confidence was logged and used by
+nobody. A signal can be genuine, reproducible, and still not be a decision rule
+when both outcomes it chooses between are expensive.
+
+The proactive question changed the arithmetic by adding a third outcome that is
+cheap when wrong. A verdict the judge cannot support no longer has to choose
+between accusing the agent and waving it through; it can ask. With that outcome
+available the threshold moves down to where it costs nothing: every block in
+the production log scores above 0.5, and over the 17 held-out messages the
+judge labels correctly its lowest score is 0.846. The single verdict below 0.5
+was a false accusation, scoring 0.228 on a message that closed cleanly and had
+committed its work.
+
+We report this as a caution about our own earlier reading. The threshold was
+not unusable; the two outcomes we had to spend it on were. Widening the action
+space, rather than sharpening the signal, is what made the signal actionable.
+
+\subsection{What the gate costs the machine it runs on}
+
+A gate that runs on every turn is a resident cost, and we did not measure it
+until it stopped the machine. Each stop started nine Python interpreters, one
+per checker, and the dead-code checker asked git once per symbol the turn had
+added, up to 120 processes on a single closing. On Windows a console program
+started from a console-less parent gets a console of its own, so the cost was
+visible: consoles opening and closing over the editor while the developer
+worked.
+
+Three changes removed it. The checkers share one interpreter, keeping the
+contract that a checker is a file dropped in a directory. The git questions are
+asked once each and batched, sixty symbols to a call, and only when the closing
+claims delivery: a turn that reads code and a turn that is still iterating ask
+git nothing at all. The measured cost of a stop is now 0 processes while
+iterating and 3 when the agent says the work is done, against 9 to 129 before.
+The suite fell from 133 processes to 42, and the remaining 42 are the checkers
+under test doing the thing they are tested for.
+
+The judge is the other half. An earlier version started the Ollama daemon when
+it found none, which loads a 5.5GB model server on a machine that never asked
+for one. On 2026-08-29 it did that on a busy workstation during a test run that
+had outlived its own cancellation; the machine ran out of memory and had to be
+restarted. The gate now starts nothing, and the tests that need the model are
+opt-in, like the git ones. This is not a footnote about our hardware. A guard
+that degrades the machine it guards will be switched off, and a gate that is
+switched off has whatever accuracy you like.
