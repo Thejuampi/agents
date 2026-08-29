@@ -227,9 +227,13 @@ corrected readers of Section~\ref{sec:contamination} yield 764, of which 747
 are neither harness noise nor the gate talking to itself.
 
 The corpus is naturally split by a date. The gate was first installed on
-2026-08-28, so 55 transcripts are \emph{ungated} -- produced with no gate in the
-stop path -- and 11 are \emph{gated}. Ungated transcripts are the ones the gate
-never influenced, and all evaluation against the outcome label is run on them.
+2026-08-28, so of the 43 sessions that carry a closing, 32 are \emph{ungated}
+- produced with no gate in the stop path - and 11 are \emph{gated}.
+Ungated transcripts are the ones the gate never influenced. The lane
+ablations run over the whole clean corpus, because a gated closing is still a
+closing the developer answered; what the split is for is the era comparison,
+and for reading the gate's misses, which is only honest where the gate was
+not shaping the text.
 
 \subsection{A label nobody had to write}
 
