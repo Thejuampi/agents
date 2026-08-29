@@ -49,7 +49,7 @@ STATE = os.environ.get("STOP_STATE") or os.path.join(HERE, ".stop-state.json")
 BLOCKED_CHECKER = os.path.join(HERE, "check-blocked.py")
 MAX_BLOCKS = 6
 MAYBE = 3
-PHRASE_AFTER = 1
+PHRASE_AFTER = 2
 
 
 def _load(name, filename):
@@ -62,71 +62,43 @@ def _load(name, filename):
 release = _load("release", "release.py")
 judge = _load("llm_judge", "llm_judge.py")
 
-REPEAT = """This is block {n} of {cap} on the same chain. {left}
+REPEAT = """Block {n} of {cap}. {left} Repeating the message does not clear it."""
 
-Repeating the message does not clear it. Running the work does."""
+SAME = """You sent the same closing word for word; it does not read differently the second time."""
 
-SAME = """You sent the same closing message again, word for word. The hook does
-not read it differently the second time."""
-
-PHRASE = """If you are truly blocked - continuing under any assumption would be
-unsafe or would waste the work - write BLOCKED:, one sentence naming the single
-thing you need, and then this line exactly:
+PHRASE = """If you are truly blocked - continuing under any assumption would be unsafe or would waste the work - write BLOCKED:, one sentence naming the single thing you need, and then this line exactly:
 
     {phrase}
 
-The phrase is new, it belongs to this block only, and it is not in any file you
-can read. It buys you a hearing, nothing more: the blocker is then audited
-against what actually ran this turn, and the local model decides whether it is
-real. A blocker that reads well and is not true does not pass."""
+It is new, it belongs to this block, and it is in no file you can read. It buys a hearing: the blocker is then audited against what ran this turn."""
 
 NO_PHRASE = """STOP HOOK - BLOCKED: IS NOT A PASSWORD
 
-You wrote BLOCKED: without the release phrase for this block, so the claim was
-not read.
-
-The phrase is issued by this hook, once you have been sent back and have done
-the work in front of you. It cannot be found by reading the hook. Typing the
-word BLOCKED: is not an escape and never was.
-
-Go back and do the work. If the blocker is real it will still be there, and by
-then you will have the phrase and something that actually failed to point at."""
+You wrote BLOCKED: without this block's release phrase, so the claim was not read. The phrase is issued by this hook after you have been sent back and done the work. Go do it; if the blocker is real it will still be there, and you will have something that actually failed to point at."""
 
 FAKE = """STOP HOOK - THE BLOCKER DID NOT SURVIVE THE AUDIT
 
-You quoted the phrase, so the claim was read. It was then judged on what ran
-this turn rather than on how it was written, and it did not hold.
-
 {why}
 
-A blocker is something this machine cannot give you - a device, a credential, a
-decision that is genuinely the owner's - that you already walked into and hit.
-It is not a preference you would like confirmed, and it is not an ambiguity you
-could settle by reading the repo, choosing the reasonable default, and moving.
+A blocker is something this machine cannot give you and you already walked into. It is not a preference you want confirmed, and not an ambiguity you could settle by reading the repo. Choose the default, say which, keep going."""
 
-Choose the default. Say which one you chose. Keep going."""
+QUOTE = """
+The local model read your message and points at this line of yours: "{line}"
+"""
+"""What the judge saw, in the agent's own words.
+
+A verdict with no evidence reads as a machine being difficult, and the next
+thing an agent does with that is argue. Its own sentence quoted back ends
+the argument: there is nothing to dispute about a line it wrote."""
+
 
 SILENT = """STOP HOOK - NO VERDICT, NO EXIT
 
-The local model at {host} did not answer, so nothing has cleared this stop.
-
-The checks are not optional and an unreachable judge is not a pass. Start the
-model, or keep working - both end the turn honestly. Neither one is stopping
-here."""
+The local model at {host} did not answer, and an unreachable judge is not a pass. Start it, or keep working - both end the turn honestly."""
 
 LLM_STOP = """STOP HOOK - YOU STOPPED WHEN YOU COULD HAVE KEPT WORKING
-
-No pattern matched, so a local model read the closing message on its own terms.
-It found a turn handed back: a question, a next step named instead of taken, a
-pending item, or a report that nothing happened.
-
-You have permission already. It was granted in advance and it does not expire.
-Do not announce the next step. Do it. Do not ask whether to proceed. Proceed.
-Do not hand the work back as a menu of options. Pick one and build it.
-Do not send the user to run something you can run yourself.
-
-Changes can be reverted. Mistakes can be fixed. Time never comes back.
-A stop spends the only thing that cannot be recovered."""
+{why}
+Permission was granted in advance and does not expire. Take the step instead of announcing it, pick one instead of offering a menu, run it yourself instead of sending the user. Time is the only thing a stop cannot recover."""
 
 
 def read_state():
@@ -346,7 +318,12 @@ def main():
         return block(state, transcript, chain, message,
                      SILENT.format(host=judge.HOST), repeated)
     if verdict == "STOP":
-        body = "\n\n".join(unsure) if unsure else LLM_STOP
+        if unsure:
+            body = "\n\n".join(unsure)
+        else:
+            line = judge.why(message, asked=last_user(transcript))
+            body = LLM_STOP.format(
+                why=QUOTE.format(line=line) if line else "")
         return block(state, transcript, chain, message, body, repeated)
     return allow(state, transcript)
 

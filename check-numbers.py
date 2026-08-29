@@ -41,18 +41,9 @@ DIGITS = re.compile(r"\d[\d.,]*")
 
 REMINDER = """STOP HOOK - NUMBERS YOU DID NOT MEASURE
 
-Your closing message reports these, and nothing in this session's output ever
-printed them:
-
 {items}
 
-A number in a report is a claim the reader cannot check. Counting methods with
-a regex, or carrying a total from an earlier run, is not measuring. Run the
-thing, read the number it prints, and report that one.
-
-Run it now and report the number you read. If a count genuinely cannot be
-produced here, drop it from the report - a report without a number beats a
-report with an invented one."""
+Nothing in this session printed them. Run the thing and quote what it says, or drop the number - a figure nobody measured is the one a reader trusts most and checks least."""
 
 
 def blocks(path):

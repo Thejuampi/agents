@@ -53,22 +53,7 @@ def unquoted(message, code=True):
 
 REMINDER = """STOP HOOK - YOU DO NOT NEED PERMISSION
 
-Your closing message matched: {hits}
-
-You have permission already. It was granted in advance and it does not expire.
-Do not announce the next step. Do it. Do not ask whether to proceed. Proceed.
-Do not hand the work back as a menu of options. Pick one and build it.
-Do not send the user to run something you can run yourself.
-
-Do not ask for what this repo already answers. Read it:
-{sources}
-
-Do not close a turn reporting that nothing happened. Go find the work.
-
-Changes can be reverted. Mistakes can be fixed. Time never comes back.
-A stop spends the only thing that cannot be recovered.
-
-Go back and do the work you just described. Report when it runs."""
+Matched: {hits}. Permission was granted in advance and does not expire. Take the step instead of naming it, pick one instead of offering a menu, run it yourself instead of sending the user, and answer from the repo instead of asking what it already says: {sources}"""
 
 
 def read_patterns(path):
@@ -157,7 +142,7 @@ def sources_in(cwd):
                 break
     found.append(("the git history", "git log"))
     found.append(("the running app", "build it and use it"))
-    return "\n".join(f"  - {label}: {where}" for label, where in found)
+    return ", ".join(where for _, where in found)
 
 
 def last_assistant_text(path):
@@ -275,12 +260,29 @@ def weak(label):
     return label.rstrip().endswith("?")
 
 
+def quoted_hit(found):
+    """The agent's own words, not the regex that found them.
+
+    A reminder that prints the raw pattern tells the reader what the machine
+    is, when what it needs to know is which of its own sentences tripped
+    it."""
+    text = found.group(0).strip().lstrip(".!?").strip()
+    if not text:
+        return found.re.pattern[:40]
+    if len(text) > 60:
+        return text[:60].rsplit(" ", 1)[0].rstrip(" .,;:") + "..."
+    return text.rstrip(" .,;:")
+
+
 def offenders(message, cwd=None, acted=True):
     # Naming a trigger phrase is not using it. Talking about the hook, or
     # quoting someone, must not fire it.
     stripped = unquoted(message)
-    hits = [f"{label}: {rx.pattern}" for label, rx in patterns_for(cwd or os.getcwd())
-            if rx.search(stripped)]
+    hits = []
+    for label, rx in patterns_for(cwd or os.getcwd()):
+        found = rx.search(stripped)
+        if found:
+            hits.append(f"{label}: {quoted_hit(found)}")
     if ends_on_a_question(message):
         hits.append("shape: closing question")
     if ends_on_nothing(message, acted):

@@ -29,19 +29,11 @@ PATH_LIKE = re.compile(r"[\w./\:-]+\.(?:kt|java|py|ts|tsx)")
 
 SKIP_NAMES = {"main", "invoke", "toString", "equals", "hashCode", "copy", "it", "run"}
 
-REMINDER = """STOP HOOK - DEAD CODE IN YOUR OWN DIFF
-
-These symbols were added in this working tree and nothing outside their own
-file and the tests ever names them:
+REMINDER = """STOP HOOK - CODE NOTHING CALLS
 
 {items}
 
-Code with no caller ships zero value. Tests passing does not change that.
-Take each one to a caller that actually runs - the composition root, the
-refresh pass, the screen - before you report anything.
-
-If a symbol is a genuine entry point (framework callback, serialized shape,
-reflective use), say which and why in one line, and move on."""
+Nothing outside its own file and its tests names it. Wire it to the visible end in this same turn, or delete it - unwired code is dead code, and it reads as progress for as long as nobody looks."""
 
 
 def git(args, cwd):

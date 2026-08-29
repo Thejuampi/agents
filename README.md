@@ -101,6 +101,17 @@ agarra 18 de 20; el 0.8b, 11.
 
 Si Ollama está apagado, el guardia lo prende solo y espera hasta 20 segundos.
 
+Cuando el juez es el que traba, el agente recibe la frase que lo delató, en sus
+propias palabras. Un veredicto sin prueba se lee como una máquina caprichosa, y
+lo primero que hace un agente con eso es discutir. Su propia línea citada cierra
+la discusión. El modelo la copia del mensaje; si lo que devuelve no está ahí
+escrito, no se muestra nada. Se pregunta aparte, después del veredicto: dejar
+que un 9b escriba prosa y etiqueta en la misma respuesta corrompe la etiqueta,
+que es la parte medida en 17 de 17.
+
+Todo lo que sale del guardia entra en un título y dos párrafos. Un recordatorio
+largo se saltea igual que uno corto, y cuesta más.
+
 Ocupa 6.6 GB. Si a la máquina le quedan menos de 8 GB libres, el guardia no lo
 carga y deja pasar el turno: trabar todas las sesiones detrás de memoria que no
 va a aparecer es peor que perder un control.

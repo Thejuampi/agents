@@ -104,22 +104,9 @@ def exercised(head, root):
 
 REMINDER = """STOP HOOK - YOU CALLED IT DONE AND THE TREE DISAGREES
 
-Your closing message claims the work is finished. Missing evidence:
-
 {gaps}
 
-Green unit tests prove the code compiles under the test task. They do not
-prove the app builds, that anybody ran it, that a live endpoint answered, or
-that the work survives this machine. A report that skips those is a bill the
-user only sees at release.
-
-Close the gaps yourself, now, before you report again. Run the build. Run the
-app or hit the real endpoint. Commit what you wrote. Then say what happened.
-
-If a gap is genuinely out of reach here - no device, no credentials, no
-network - say so with the release phrase the Stop hook issued, and the one
-thing you need. It is then audited. Do not reach for it to close a gap you
-could close yourself."""
+Green unit tests prove the code compiles, not that the app builds, that anybody ran it, or that a live endpoint answered. Close those gaps yourself now - build it, run it, commit it - and then report what happened."""
 
 
 def commands(path):

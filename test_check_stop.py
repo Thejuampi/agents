@@ -74,17 +74,12 @@ class Gate(unittest.TestCase):
         self.assertEqual(2, code)
         self.assertIn("NOT A PASSWORD", out)
 
-    def test_the_first_block_hands_out_a_phrase(self):
-        code, out = self.run_hook([("user", "go"), ("tool", "Read"),
-                                   ("say", "Should I continue?")], name="p.jsonl")
-        self.assertEqual(2, code)
-        self.assertIn("this line exactly", out)
+    def test_the_second_block_hands_out_a_phrase(self):
+        self.assertIn("this line exactly", self.blocks_twice("p.jsonl")[1])
 
     def test_a_fake_blocker_does_not_survive_the_phrase(self):
         name = "fake.jsonl"
-        _, first = self.run_hook([("user", "go"), ("tool", "Read"),
-                                  ("say", "Shall I proceed?")], name=name)
-        phrase = self.phrase_from(first)
+        phrase = self.phrase_from(self.blocks_twice(name)[1])
         code, out = self.run_hook(
             [("user", "go"), ("tool", "Read"),
              ("say", "BLOCKED: I cannot responsibly choose between these two "
@@ -95,9 +90,7 @@ class Gate(unittest.TestCase):
 
     def test_a_real_blocker_with_the_phrase_ends_the_turn(self):
         name = "real.jsonl"
-        _, first = self.run_hook([("user", "go"), ("tool", "Read"),
-                                  ("say", "Shall I proceed?")], name=name)
-        phrase = self.phrase_from(first)
+        phrase = self.phrase_from(self.blocks_twice(name)[1])
         code, out = self.run_hook(
             [("user", "go"), ("tool", "Bash"), ("tool", "Bash"), ("tool", "Bash"),
              ("say", "BLOCKED: the upload needs the production API token. "
@@ -105,6 +98,16 @@ class Gate(unittest.TestCase):
                      "environment.\n\n" + phrase)],
             chained=True, name=name)
         self.assertEqual(0, code, out)
+
+    def blocks_twice(self, name):
+        """The release phrase arrives on the second block, so a test that needs
+        one has to earn it: get sent back, come back with the same kind of
+        closing, get sent back again."""
+        turns = [("user", "go"), ("tool", "Read"), ("say", "Shall I proceed?")]
+        first = self.run_hook(turns, name=name)[1]
+        second = self.run_hook(turns + [("say", "Shall I go ahead?")],
+                               chained=True, name=name)[1]
+        return first, second
 
     def phrase_from(self, text):
         for line in text.splitlines():

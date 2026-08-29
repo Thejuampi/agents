@@ -29,17 +29,11 @@ spec.loader.exec_module(perm)
 MARK = re.compile(r"BLOCKED:", re.IGNORECASE)
 STREAK = 3
 
-REMINDER = """STOP HOOK - THE BLOCKER DOES NOT HOLD UP
+REMINDER = """STOP HOOK - THE BLOCKER DOES NOT HOLD
 
-You wrote BLOCKED: and that ends the turn. It has to be earned:
+{items}
 
-{gaps}
-
-The escape is for the thing you cannot do here - no device, no credential, no
-network - after you tried. It is not a way to end a turn.
-
-Take the blocker back to the point where something actually failed. If it does
-fail, say the one thing you need and what you ran to find that out."""
+A blocker is a wall you walked into, not one you expect: a device, a credential, a decision that is genuinely the user's. Try it, and if it really stops you, come back with what failed."""
 
 
 def claims(path):
@@ -114,7 +108,7 @@ def main():
     if not gaps:
         return 0
 
-    sys.stderr.write(REMINDER.format(gaps="\n".join(gaps)) + "\n")
+    sys.stderr.write(REMINDER.format(items="\n".join(gaps)) + "\n")
     return 2
 
 

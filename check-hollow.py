@@ -52,21 +52,9 @@ HOLLOW = re.compile(
 
 REMINDER = """STOP HOOK - A SUCCESS NOBODY CAN SEE
 
-Your closing message says the work is good and, in the same message, says the
-result is empty:
+{items}
 
-{hits}
-
-Machinery that runs and produces nothing is not proven. It is untested against
-the only case that matters. A user opening the app sees the empty half, never
-the mechanism.
-
-Find one input where the value comes out and show it. If the source really has
-nothing, the feature is not done - it needs the other source, the fallback, or
-the honest empty state on screen. Build that instead.
-
-Do not report this as working again until a real value appears in the output
-you paste."""
+You declared it working and named the empty part in the same breath. Wire it to something a user can look at, then say it works."""
 
 
 def evidence(message):
@@ -103,7 +91,7 @@ def main():
     if not hits:
         return 0
 
-    sys.stderr.write(REMINDER.format(hits="\n".join(hits)) + "\n")
+    sys.stderr.write(REMINDER.format(items="\n".join(hits)) + "\n")
     return 2
 
 

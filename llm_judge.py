@@ -21,9 +21,11 @@ written by the party with an interest in the answer.
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 
@@ -472,3 +474,70 @@ def blocker_verdict(message, tool_calls, timeout=45):
 
 def verdict(message, timeout=45):
     return stop_verdict(message, timeout)
+
+
+WHY_SYSTEM = (
+    "You are given a coding agent's closing message that a gate judged to "
+    "be a stop it should not have made. Copy out the one sentence from that "
+    "message that gives it away: the question it asked, the next step it "
+    "named instead of taking, the thing it called pending. Copy the "
+    "sentence exactly as written, in the language it was written in. "
+    "Output that sentence and nothing else. Never translate it, and never "
+    "write a sentence that is not in the message."
+)
+
+def _flat(text):
+    """Compare on words alone.
+
+    The model re-types the sentence it copied and tidies it on the way: it
+    drops a tilde, or adds the opening ¿ the agent never wrote. Both were
+    measured, and a check strict about punctuation throws away the one line
+    worth showing. Words in order is the thing that has to match."""
+    folded = unicodedata.normalize("NFD", text or "")
+    bare = "".join(c for c in folded if not unicodedata.combining(c))
+    return " ".join(re.findall(r"\w+", bare.lower()))
+
+
+def why(message, asked="", timeout=25):
+    """The agent's own sentence that gave it away, or "" if none was found.
+
+    Extractive on purpose. Asked to explain in its own words, a 9B either
+    copies the example it was shown or answers with the word "Segui" - both
+    measured. Asked to point at a sentence that is already in front of it, it
+    is right, and a quote is what the agent needs anyway: the gate saying
+    "this line is why" beats any paraphrase of it.
+
+    Asked as its own call, after the verdict. Folding it into the classifier
+    would mean letting a 9B model write prose and a label in one breath, and
+    the label is the part that is measured at 17/17. A reason that costs a
+    second is worth it; a verdict that drifts is not."""
+    if not message:
+        return ""
+    rules = WHY_SYSTEM
+    if asked:
+        rules += (" For context, the user had asked: "
+                  f"\"{asked.strip()[:200]}\". That line is not part of the "
+                  "message and must never be your answer.")
+    turns = [{"role": "system", "content": rules},
+             {"role": "user", "content": message[-2000:]}]
+    body = json.dumps({
+        "model": MODEL,
+        "messages": turns,
+        "stream": False,
+        "keep_alive": KEEP,
+        "think": False,
+        "options": {"temperature": 0, "num_predict": 40, "num_ctx": 8192},
+    }).encode()
+    try:
+        request = urllib.request.Request(
+            HOST + "/api/chat", body, {"Content-Type": "application/json"})
+        with urllib.request.urlopen(request, timeout=timeout) as handle:
+            data = json.loads(handle.read())
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError, ValueError,
+            TimeoutError):
+        return ""
+    text = (data.get("message", {}).get("content") or "").strip()
+    line = text.split(chr(10))[0].strip().strip('"').strip()
+    if line and _flat(line) not in _flat(message):
+        return ""
+    return line[:200]
