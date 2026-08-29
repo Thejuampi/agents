@@ -13,10 +13,14 @@ import importlib.util
 import os
 import sys
 
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location("push", os.path.join(HERE, "judge_push.py"))
-push = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(push)
+push = mod.load("judge_push.py")
 
 CASES = [
     (True, "I could add the cache or shorten the TTL. Which would you prefer?",

@@ -1,10 +1,32 @@
 #!/usr/bin/env python3
 """Builds throwaway git repos and checks the dead-code hook on each."""
+import importlib.util
 import json
 import os
 import subprocess
 import sys
 import tempfile
+
+_seed = importlib.util.spec_from_file_location(
+    "_hook_seed", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "seedrepo.py"))
+seedrepo = importlib.util.module_from_spec(_seed)
+_seed.loader.exec_module(seedrepo)
+
+_settle = importlib.util.spec_from_file_location(
+    "_hook_settle", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "settle.py"))
+settle = importlib.util.module_from_spec(_settle)
+_settle.loader.exec_module(settle)
+
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
+spawn = mod.load("spawn.py")
+
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOOK = os.path.join(HERE, "check-dead-code.py")
@@ -17,37 +39,28 @@ LOCALS = "package a\n\nfun main() {\n    var scoredRows = listOf(1)\n    println
 
 
 def repo(files):
-    root = tempfile.mkdtemp()
-    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
-    subprocess.run(["git", "config", "user.email", "t@t"], cwd=root, check=True)
-    subprocess.run(["git", "config", "user.name", "t"], cwd=root, check=True)
-    with open(os.path.join(root, "seed.txt"), "w") as handle:
-        handle.write("seed\n")
-    subprocess.run(["git", "add", "-A"], cwd=root, check=True)
-    subprocess.run(["git", "commit", "-qm", "seed"], cwd=root, check=True)
-    for name, body in files.items():
-        path = os.path.join(root, name)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as handle:
-            handle.write(body)
-    return root
+    return seedrepo.seeded(files)
 
 
-def log(root, written):
+CLAIM = "Listo. La suite corre completa, 0 fallas."
+
+
+def log(root, written, claim=CLAIM):
     """The session record. Two agents share a tree, so a checker that blames
     on nothing but the diff blames the wrong one."""
     handle = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")
     blocks = [{"type": "tool_use", "name": "Write",
                "input": {"file_path": os.path.join(root, name)}} for name in written]
+    blocks.append({"type": "text", "text": claim})
     handle.write(json.dumps({"type": "assistant", "message": {"content": blocks}}) + "\n")
     handle.close()
     return handle.name
 
 
-def run(root, written=None):
-    path = log(root, written) if written is not None else ""
+def run(root, written=None, claim=CLAIM):
+    path = log(root, written, claim) if written is not None else ""
     payload = json.dumps({"cwd": root, "transcript_path": path, "stop_hook_active": False})
-    done = subprocess.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
+    done = settle.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
     if path:
         os.unlink(path)
     return done.returncode, done.stdout + done.stderr
@@ -74,6 +87,11 @@ def main():
             failures.append(f"{name}: missing {want_text!r} in output")
 
     root = repo({"src/main/a/Thing.kt": ORPHAN})
+    code, out = run(root, written=["src/main/a/Thing.kt"], claim="Escribi el helper, sigo con el caller.")
+    if code != 0:
+        failures.append(f"a turn that is still iterating pays nothing: {out[:160]}")
+
+    root = repo({"src/main/a/Thing.kt": ORPHAN})
     code, out = run(root, written=["src/main/a/Other.kt"])
     if code != 0:
         failures.append(f"another session's orphan is not mine: {out[:160]}")
@@ -85,7 +103,7 @@ def main():
 
     root = repo({"src/main/a/Thing.kt": ORPHAN})
     payload = json.dumps({"cwd": root, "stop_hook_active": True})
-    done = subprocess.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
+    done = settle.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
     if done.returncode != 0:
         failures.append("stop_hook_active must never re-fire")
 

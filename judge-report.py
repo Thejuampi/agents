@@ -17,12 +17,15 @@ import os
 import sys
 import time
 
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-_spec = importlib.util.spec_from_file_location(
-    "transcript", os.path.join(HERE, "transcript.py"))
-reader = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(reader)
+reader = mod.load("transcript.py")
 LOG = os.environ.get("STOP_LOG") or os.path.join(HERE, "judge-log.jsonl")
 PROJECTS = os.path.expanduser("~/.claude/projects")
 WORKED = 3

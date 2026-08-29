@@ -12,12 +12,15 @@ import importlib.util
 import os
 import sys
 
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-_spec = importlib.util.spec_from_file_location(
-    "corpus", os.path.join(HERE, "corpus.py"))
-corpus = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(corpus)
+corpus = mod.load("corpus.py")
 
 WAKE = {"type": "user", "message": {"content":
         "Stop hook feedback: KEEP GOING - THERE LOOKS TO BE WORK LEFT"}}

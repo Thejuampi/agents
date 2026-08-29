@@ -7,11 +7,24 @@ import subprocess
 import sys
 import tempfile
 
+_settle = importlib.util.spec_from_file_location(
+    "_hook_settle", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "settle.py"))
+settle = importlib.util.module_from_spec(_settle)
+_settle.loader.exec_module(settle)
+
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
+spawn = mod.load("spawn.py")
+
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-spec = importlib.util.spec_from_file_location("report", os.path.join(HERE, "judge-report.py"))
-report = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(report)
+report = mod.load("judge-report.py")
 
 RUNS = []
 
@@ -66,8 +79,8 @@ def brief_over(blocks, tools, twice=False):
     env = dict(os.environ, STOP_LOG=log.name, PYTHONIOENCODING="utf-8")
     hook = os.path.join(HERE, "judge-report.py")
     if twice:
-        subprocess.run([sys.executable, hook, "--brief"], env=env, capture_output=True)
-    done = subprocess.run([sys.executable, hook, "--brief"], env=env,
+        settle.run([sys.executable, hook, "--brief"], env=env, capture_output=True)
+    done = settle.run([sys.executable, hook, "--brief"], env=env,
                           capture_output=True, text=True)
     os.unlink(path)
     os.unlink(log.name)

@@ -8,14 +8,43 @@ with nothing left to do. Those are different questions.
 So OK no longer closes anything on its own. It asks once whether a next action
 exists, and releases on the pass after that: the turn ends when the worker
 looked and could not name one."""
+import importlib.util
 import json
 import os
 import subprocess
 import sys
 import tempfile
 
+_live = importlib.util.spec_from_file_location(
+    "_hook_live", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "live.py"))
+live = importlib.util.module_from_spec(_live)
+_live.loader.exec_module(live)
+
+if not live.wanted():
+    live.skip()
+
+_settle = importlib.util.spec_from_file_location(
+    "_hook_settle", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "settle.py"))
+settle = importlib.util.module_from_spec(_settle)
+_settle.loader.exec_module(settle)
+
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
+spawn = mod.load("spawn.py")
+
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOOK = os.path.join(HERE, "check-stop.py")
+
+_spec = importlib.util.spec_from_file_location("gate", HOOK)
+gate = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(gate)
 
 RUNS = []
 
@@ -44,7 +73,7 @@ def transcript(reply, launched=None, asked="segui"):
 
 def fire(path, state, again=False):
     RUNS.append(None)
-    done = subprocess.run([sys.executable, HOOK],
+    done = settle.run([sys.executable, HOOK],
                           input=json.dumps({"transcript_path": path,
                                             "cwd": HERE,
                                             "stop_hook_active": again}),
@@ -105,6 +134,16 @@ def main():
                    tempfile.NamedTemporaryFile(suffix=".s", delete=False).name)
     if code != 0:
         failures.append("a harness error page is never asked anything")
+
+    RUNS.append(None)
+    path = transcript(DONE)
+    extend(path, NOTHING)
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"type": "user", "message": {
+            "content": "Stop hook feedback: KEEP GOING"}}) + "\n")
+    if gate.last_user(path) != "segui":
+        failures.append("the judge must be told what the developer asked, not what the gate said")
+    os.unlink(path)
 
     print(f"{len(RUNS)} cases, {len(failures)} failures")
     for line in failures:

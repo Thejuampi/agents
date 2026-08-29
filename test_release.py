@@ -5,10 +5,14 @@ import importlib.util
 import os
 import unittest
 
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location("release", os.path.join(HERE, "release.py"))
-release = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(release)
+release = mod.load("release.py")
 
 
 class Phrase(unittest.TestCase):

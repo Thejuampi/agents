@@ -14,13 +14,25 @@ import sys
 import tempfile
 import unittest
 
+_live = importlib.util.spec_from_file_location(
+    "_hook_live", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "live.py"))
+live = importlib.util.module_from_spec(_live)
+_live.loader.exec_module(live)
+
+if not live.wanted():
+    live.skip()
+
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOOK = os.path.join(HERE, "check-stop.py")
 
-_spec = importlib.util.spec_from_file_location(
-    "settle", os.path.join(HERE, "settle.py"))
-settle = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(settle)
+settle = mod.load("settle.py")
 
 
 def transcript(path, turns):

@@ -11,12 +11,28 @@ message that quotes the whole trigger vocabulary inside backticks, fences and
 quotation marks, and require silence. A checker that objects here reads text
 it was never meant to own.
 """
+import importlib.util
 import glob
 import json
 import os
 import subprocess
 import sys
 import tempfile
+
+_settle = importlib.util.spec_from_file_location(
+    "_hook_settle", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "settle.py"))
+settle = importlib.util.module_from_spec(_settle)
+_settle.loader.exec_module(settle)
+
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
+spawn = mod.load("spawn.py")
+
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -64,7 +80,7 @@ def main():
                 if os.path.basename(p) not in SKIP]
     failures = []
     for checker in checkers:
-        done = subprocess.run([sys.executable, checker], input=payload,
+        done = settle.run([sys.executable, checker], input=payload,
                               capture_output=True, text=True)
         if done.returncode != 0:
             first = (done.stderr.strip().splitlines() or [""])[0]

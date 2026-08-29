@@ -1,10 +1,32 @@
 #!/usr/bin/env python3
 """Builds throwaway repos and checks the hook only fires on hollow done claims."""
+import importlib.util
 import json
 import os
 import subprocess
 import sys
 import tempfile
+
+_seed = importlib.util.spec_from_file_location(
+    "_hook_seed", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "seedrepo.py"))
+seedrepo = importlib.util.module_from_spec(_seed)
+_seed.loader.exec_module(seedrepo)
+
+_settle = importlib.util.spec_from_file_location(
+    "_hook_settle", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "settle.py"))
+settle = importlib.util.module_from_spec(_settle)
+_settle.loader.exec_module(settle)
+
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
+spawn = mod.load("spawn.py")
+
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOOK = os.path.join(HERE, "check-done-claim.py")
@@ -23,13 +45,7 @@ REAL = ("El tope de costo quedo cerrado y cableado hasta la tarjeta. "
 
 
 def repo():
-    root = tempfile.mkdtemp()
-    for args in (["init", "-q"], ["config", "user.email", "t@t"], ["config", "user.name", "t"]):
-        subprocess.run(["git"] + args, cwd=root, capture_output=True)
-    open(os.path.join(root, "seed.txt"), "w").write("seed\n")
-    subprocess.run(["git", "add", "-A"], cwd=root, capture_output=True)
-    subprocess.run(["git", "commit", "-qm", "seed"], cwd=root, capture_output=True)
-    return root
+    return seedrepo.seeded()
 
 
 def transcript(root, message, files, ran):
@@ -55,7 +71,7 @@ def run(root, message, files=(), ran=(), active=False):
         open(full, "w").write("class Thing\n")
     path = transcript(root, message, files, ran)
     payload = json.dumps({"transcript_path": path, "cwd": root, "stop_hook_active": active})
-    done = subprocess.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
+    done = settle.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
     os.unlink(path)
     return done.returncode, done.stderr
 
@@ -73,8 +89,8 @@ def main():
 
     root = repo()
     open(os.path.join(root, "Hedge.kt"), "w").write("class Thing\n")
-    subprocess.run(["git", "add", "-A"], cwd=root, capture_output=True)
-    subprocess.run(["git", "commit", "-qm", "w"], cwd=root, capture_output=True)
+    spawn.run(["git", "add", "-A"], cwd=root, capture_output=True)
+    spawn.run(["git", "commit", "-qm", "w"], cwd=root, capture_output=True)
     code, err = run(root, REAL, files=["Hedge.kt"],
                     ran=["./gradlew assembleDebug", "adb install app.apk"])
     if code != 0:
@@ -113,7 +129,7 @@ def main():
         + lines[-1] + "\n")
     counted()
     payload = json.dumps({"transcript_path": path, "cwd": root, "stop_hook_active": False})
-    done = subprocess.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
+    done = settle.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
     os.unlink(path)
     if done.returncode != 0:
         failures.append(f"source outside the repo is not this repo deliverable: {done.stderr[:120]}")
@@ -130,8 +146,8 @@ def main():
 
     root = repo()
     open(os.path.join(root, "Hedge.kt"), "w").write("class Thing\n")
-    subprocess.run(["git", "add", "-A"], cwd=root, capture_output=True)
-    subprocess.run(["git", "commit", "-qm", "w"], cwd=root, capture_output=True)
+    spawn.run(["git", "add", "-A"], cwd=root, capture_output=True)
+    spawn.run(["git", "commit", "-qm", "w"], cwd=root, capture_output=True)
     code, err = run(root, REAL, files=["Hedge.kt"],
                     ran=["./gradlew assembleDebug", "curl -s http://localhost:8080/health"])
     if code != 0:
@@ -140,8 +156,8 @@ def main():
     root = repo()
     open(os.path.join(root, "Hedge.kt"), "w").write("class Thing\n")
     open(os.path.join(root, "smoke.py"), "w").write("print(1)\n")
-    subprocess.run(["git", "add", "-A"], cwd=root, capture_output=True)
-    subprocess.run(["git", "commit", "-qm", "w"], cwd=root, capture_output=True)
+    spawn.run(["git", "add", "-A"], cwd=root, capture_output=True)
+    spawn.run(["git", "commit", "-qm", "w"], cwd=root, capture_output=True)
     code, err = run(root, REAL, files=["Hedge.kt"],
                     ran=["./gradlew assembleDebug", "python smoke.py"])
     if code != 0:
@@ -149,8 +165,8 @@ def main():
 
     root = repo()
     open(os.path.join(root, "Hedge.kt"), "w").write("class Thing\n")
-    subprocess.run(["git", "add", "-A"], cwd=root, capture_output=True)
-    subprocess.run(["git", "commit", "-qm", "w"], cwd=root, capture_output=True)
+    spawn.run(["git", "add", "-A"], cwd=root, capture_output=True)
+    spawn.run(["git", "commit", "-qm", "w"], cwd=root, capture_output=True)
     code, err = run(root, REAL, files=["Hedge.kt"],
                     ran=["./gradlew assembleDebug",
                          'curl -s -b /tmp/yc.txt -A "$UA" '

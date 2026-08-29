@@ -17,10 +17,14 @@ consistency."""
 import importlib.util
 import os
 
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-_spec = importlib.util.spec_from_file_location("llm_judge", os.path.join(HERE, "llm_judge.py"))
-judge = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(judge)
+judge = mod.load("llm_judge.py")
 
 SYSTEM = (
     "You read one exchange between a developer and a coding agent. You are "

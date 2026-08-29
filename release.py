@@ -20,11 +20,13 @@ import os
 import re
 import secrets
 
-_spec = importlib.util.spec_from_file_location(
-    "perm_for_release",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "check-permission.py"))
-_perm = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_perm)
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
+_perm = mod.load("check-permission.py")
 
 WORDS = (
     "anvil basalt cinder dovetail ember flint granite harbor ingot jetty "

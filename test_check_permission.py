@@ -7,6 +7,21 @@ import subprocess
 import sys
 import tempfile
 
+_settle = importlib.util.spec_from_file_location(
+    "_hook_settle", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "settle.py"))
+settle = importlib.util.module_from_spec(_settle)
+_settle.loader.exec_module(settle)
+
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
+spawn = mod.load("spawn.py")
+
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOOK = os.path.join(HERE, "check-permission.py")
 
@@ -171,7 +186,7 @@ def run(message, acted=True):
     transcript.write(json.dumps(entry) + "\n")
     transcript.close()
     payload = json.dumps({"transcript_path": transcript.name, "stop_hook_active": False})
-    done = subprocess.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
+    done = settle.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
     os.unlink(transcript.name)
     return done.returncode, done.stderr
 
@@ -204,7 +219,7 @@ def main():
         failures.append("baseline offender did not fire")
 
     payload = json.dumps({"transcript_path": HOOK, "stop_hook_active": True})
-    done = subprocess.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
+    done = settle.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
     if done.returncode != 0:
         failures.append("stop_hook_active must never re-fire")
 

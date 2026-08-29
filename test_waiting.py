@@ -16,17 +16,35 @@ import sys
 import tempfile
 
 import importlib.util
+
+_live = importlib.util.spec_from_file_location(
+    "_hook_live", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "live.py"))
+live = importlib.util.module_from_spec(_live)
+_live.loader.exec_module(live)
+
+if not live.wanted():
+    live.skip()
+
+_settle = importlib.util.spec_from_file_location(
+    "_hook_settle", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "settle.py"))
+settle = importlib.util.module_from_spec(_settle)
+_settle.loader.exec_module(settle)
+
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
+spawn = mod.load("spawn.py")
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-_spec = importlib.util.spec_from_file_location(
-    "perm", os.path.join(HERE, "check-permission.py"))
-perm = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(perm)
+perm = mod.load("check-permission.py")
 
-_bg = importlib.util.spec_from_file_location(
-    "background", os.path.join(HERE, "background.py"))
-bg = importlib.util.module_from_spec(_bg)
-_bg.loader.exec_module(bg)
+bg = mod.load("background.py")
 
 HOOK = os.path.join(HERE, "check-stop.py")
 
@@ -69,7 +87,7 @@ def fire(reply, launched=None, landed=False, asked="segui"):
         handle.write(json.dumps({"type": "assistant", "message": {"content": [
             {"type": "text", "text": reply}]}}) + NL)
     state = handle.name + ".state"
-    done = subprocess.run([sys.executable, HOOK],
+    done = settle.run([sys.executable, HOOK],
                           input=json.dumps({"transcript_path": handle.name,
                                             "cwd": HERE,
                                             "stop_hook_active": False}),

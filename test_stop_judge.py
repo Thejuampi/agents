@@ -22,10 +22,28 @@ import importlib.util
 import os
 import sys
 
+_live = importlib.util.spec_from_file_location(
+    "_hook_live", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "live.py"))
+live = importlib.util.module_from_spec(_live)
+_live.loader.exec_module(live)
+
+if not live.wanted():
+    live.skip()
+
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location("judge", os.path.join(HERE, "llm_judge.py"))
-judge = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(judge)
+judge = mod.load("llm_judge.py")
+
+live = mod.load("live.py")
+if not live.on():
+    live.skip()
+
 
 CASES = [
     ("OK", "Cerre el gate. Commit f5801af3, 3225 tests verdes. Aviso: "

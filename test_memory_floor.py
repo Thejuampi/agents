@@ -15,6 +15,24 @@ import subprocess
 import sys
 import tempfile
 
+_live = importlib.util.spec_from_file_location(
+    "_hook_live", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "live.py"))
+live = importlib.util.module_from_spec(_live)
+_live.loader.exec_module(live)
+
+if not live.wanted():
+    live.skip()
+
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
+spawn = mod.load("spawn.py")
+
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 NL = chr(10)
 
@@ -81,7 +99,7 @@ def fire(message, floor, host):
     state = handle.name + ".state"
     environment = dict(os.environ, STOP_STATE=state, STOP_LOG=state + ".log",
                        STOP_JUDGE_FLOOR=str(floor), STOP_JUDGE_HOST=host)
-    done = subprocess.run(
+    done = spawn.run(
         [sys.executable, os.path.join(HERE, "check-stop.py")],
         input=json.dumps({"transcript_path": handle.name,
                           "stop_hook_active": False}),

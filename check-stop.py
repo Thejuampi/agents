@@ -44,17 +44,30 @@ exit: after MAX_BLOCKS the hook stands down no matter what it sees.
 """
 import glob
 import hashlib
+import io
 import importlib.util
 import json
 import re
 import os
-import subprocess
 import sys
 import time
 
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 SELF = os.path.basename(os.path.abspath(__file__))
-STATE = os.environ.get("STOP_STATE") or os.path.join(HERE, ".stop-state.json")
+def state_path():
+    """Read at call time, not at import.
+
+    The tests run this gate in this same process now, and each of them
+    points it at its own scratch file. A constant fixed at import would
+    hand every test the first test's state."""
+    return (os.environ.get("STOP_STATE")
+            or os.path.join(HERE, ".stop-state.json"))
 BLOCKED_CHECKER = os.path.join(HERE, "check-blocked.py")
 MAX_BLOCKS = 6
 MAYBE = 3
@@ -62,15 +75,13 @@ PHRASE_AFTER = 2
 
 
 def _load(name, filename):
-    spec = importlib.util.spec_from_file_location(name, os.path.join(HERE, filename))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return mod.load(filename)
 
 
 release = _load("release", "release.py")
 judge = _load("llm_judge", "llm_judge.py")
 background = _load("background", "background.py")
+reader = _load("transcript", "transcript.py")
 
 REPEAT = """Block {n} of {cap}. {left} The same message will not read differently, so change the work instead."""
 
@@ -116,6 +127,24 @@ WAITING = """KEEP GOING - THE WORK YOU LAUNCHED REPORTS BACK ON ITS OWN
 You will be woken when it finishes, so the time until then is yours. What you did stands; spend the wait on the next piece instead of holding the turn open for it. If nothing else can move without that result, say what you are waiting on and why nothing else starts."""
 
 
+def floor_sure():
+    """How much of its own mass the judge must put on a block.
+
+    The number came off the logprobs from the first day and decided nothing. It
+    turns out to separate cleanly: on the 17 gold messages the judge gets right,
+    its lowest score is 0.846, and every block in the log scores above 0.5. The
+    one verdict below that was a false accusation - "Sin faltantes: la suite corre
+    entera, commit abc1234" scored 0.228 and got called unfinished work.
+
+    A shaky STOP is not released either. It becomes the proactive question, which
+    asks for the same second look without telling the agent it left work behind.
+    Guessing costs a look; accusing costs trust.
+
+    Read at every call. A constant is read once per interpreter, and the checkers
+    share one now, so a constant would answer for whoever imported first."""
+    return float(os.environ.get("STOP_SURE_FLOOR") or 0.5)
+
+
 PROACTIVE = """ONE MORE LOOK - IS THERE SOMETHING WE CAN DO PROACTIVELY?
 
 Nothing in what you wrote looks unfinished, so this is not a correction. It is the last question before the turn closes: with the repo in front of you and permission already granted, is there a next action you can take right now?
@@ -125,7 +154,8 @@ Look for the thing you would do next if nobody asked: the test that covers the c
 If there is genuinely nothing, say what you checked and why nothing remains. That answer ends the turn."""
 
 
-LOG = os.environ.get("STOP_LOG") or os.path.join(HERE, "judge-log.jsonl")
+def log_path():
+    return os.environ.get("STOP_LOG") or os.path.join(HERE, "judge-log.jsonl")
 
 
 def note(transcript, **fields):
@@ -144,7 +174,7 @@ def note(transcript, **fields):
     fields["session"] = os.path.basename(transcript or "")[:12]
     fields["file"] = transcript or ""
     try:
-        with open(LOG, "a", encoding="utf-8") as handle:
+        with open(log_path(), "a", encoding="utf-8") as handle:
             handle.write(json.dumps(fields, ensure_ascii=False) + chr(10))
     except OSError:
         pass
@@ -152,7 +182,7 @@ def note(transcript, **fields):
 
 def read_state():
     try:
-        with open(STATE, encoding="utf-8") as handle:
+        with open(state_path(), encoding="utf-8") as handle:
             data = json.load(handle)
         return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
@@ -161,7 +191,7 @@ def read_state():
 
 def write_state(state):
     try:
-        with open(STATE, "w", encoding="utf-8") as handle:
+        with open(state_path(), "w", encoding="utf-8") as handle:
             json.dump(state, handle)
     except OSError:
         pass
@@ -220,20 +250,29 @@ def harness_noise(message):
 
 
 def last_user(transcript):
-    """What the user said last, which is the only thing a reply can be wrong
-    about. Tool results wear the user role too and are not the user."""
+    """What the developer said last, which is the only thing a reply
+    can be wrong about.
+
+    Tool results wear the user role, and so does this gate's own reminder.
+    Counting the reminder meant that after any block the judge was told the
+    developer had asked for the reminder, and it scored the closing against
+    that instead of the request - on every wake, which is the case the judge
+    exists for."""
     said = ""
     for entry in entries(transcript):
-        if entry.get("type") != "user":
+        if not reader.spoke(entry):
             continue
         content = entry.get("message", {}).get("content")
         if isinstance(content, str):
-            said = content
+            words = reader.reply_of(content)
         elif isinstance(content, list):
-            joined = " ".join(b.get("text", "") for b in content
-                              if isinstance(b, dict) and b.get("type") == "text").strip()
-            if joined:
-                said = joined
+            words = reader.reply_of(" ".join(
+                b.get("text", "") for b in content
+                if isinstance(b, dict) and b.get("type") == "text"))
+        else:
+            words = None
+        if words:
+            said = words
     return said
 
 
@@ -262,18 +301,52 @@ def digest_of(text):
     return hashlib.sha1((text or "").encode("utf-8", "replace")).hexdigest()
 
 
+LOADED = {}
+
+
 def run_checker(path, data):
-    """The chain policy lives here, so the children are asked the plain
+    """Ask one checker, in this process.
+
+    Each checker used to be its own interpreter: nine of them started and
+    torn down on every single stop, which cost about a second of startup and,
+    on Windows, opened nine console windows over whatever the developer was
+    looking at. They are pure functions over a payload, so none of that
+    bought anything.
+
+    The contract that made them separate files is kept. A checker still reads
+    a payload on stdin, still writes its objection to stderr and still
+    returns an exit code, so dropping a new check-*.py in this directory
+    still works with no registration. Only the process is gone.
+
+    The chain policy lives here, so the children are asked the plain
     question. Each of them still guards itself when wired up directly, and
     that guard would silence the whole chain if the flag were forwarded."""
+    module = LOADED.get(path)
+    if module is None:
+        name = os.path.basename(path)[:-3].replace("-", "_")
+        try:
+            module = _load(name, os.path.basename(path))
+        except Exception:
+            return 0, ""
+        LOADED[path] = module
+    if not hasattr(module, "main"):
+        return 0, ""
+
+    said = io.StringIO()
     payload = json.dumps(dict(data, stop_hook_active=False))
+    heard, spoke = sys.stdin, sys.stderr
+    sys.stdin, sys.stderr = io.StringIO(payload), said
     try:
-        done = subprocess.run([sys.executable, path], input=payload,
-                              capture_output=True, text=True, timeout=60)
-    except (OSError, subprocess.SubprocessError):
-        return ""
-    if done.returncode in (2, MAYBE) and done.stderr.strip():
-        return done.returncode, done.stderr.strip()
+        code = module.main()
+    except SystemExit as done:
+        code = done.code
+    except Exception:
+        code = 0
+    finally:
+        sys.stdin, sys.stderr = heard, spoke
+
+    if code in (2, MAYBE) and said.getvalue().strip():
+        return code, said.getvalue().strip()
     return 0, ""
 
 
@@ -386,11 +459,16 @@ def main():
         return allow(state, transcript)
     if verdict is None:
         note(transcript, lane="judge", verdict="silent", weak=unsure,
-             head=message[:120])
-        return block(state, transcript, chain, message,
-                     SILENT.format(host=judge.HOST), repeated)
+             head=message[:120], asked=bool(chain.get("asked")))
+        if chain.get("asked"):
+            return allow(state, transcript)
+        return block(state, transcript, chain, message, PROACTIVE,
+                     repeated, asked=True)
 
     seen = bool(chain.get("asked"))
+    shaky = verdict == "STOP" and not unsure and judge.sureness() < floor_sure()
+    if shaky:
+        verdict = "OK"
     asking = verdict == "OK" and not waiting and not seen
     line = ""
     if verdict == "STOP" and not unsure:
@@ -398,7 +476,7 @@ def main():
     note(transcript, lane="judge", verdict=verdict, sure=judge.sureness(),
          weak=unsure, seconds=round(seconds, 2), quote=line,
          head=message[:120], waiting=waiting,
-         asked=seen, ask=asking)
+         asked=seen, ask=asking, shaky=shaky)
 
     if waiting:
         body = WAITING

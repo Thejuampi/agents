@@ -19,9 +19,12 @@ Two judgements, two very different failure modes:
 Both are given the transcript facts, not only the prose, because the message is
 written by the party with an interest in the answer.
 """
+import importlib.util
 import contextlib
 import json
 import math
+import errno
+import socket
 import os
 import re
 import shutil
@@ -32,14 +35,29 @@ import unicodedata
 import urllib.error
 import urllib.request
 
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
+spawn = mod.load("spawn.py")
+
 OWN = "http://127.0.0.1:11434"
 HOST = os.environ.get("STOP_JUDGE_HOST", OWN)
 
-WAKE = float(os.environ.get("STOP_JUDGE_WAKE") or 20)
-"""How long to wait for a daemon this hook started, in seconds.
+WAKE = float(os.environ.get("STOP_JUDGE_WAKE") or 0)
+"""How long to wait for a daemon this hook started, in seconds. Zero never starts one.
 
-Zero disables the start. The daemon answers in about a second from cold on
-this machine; the rest of the budget is for a box that is already busy."""
+It used to start one. A stop that found no daemon launched `ollama serve`,
+which loads 5.5GB into the card and holds several gigabytes of RAM, and it did
+it on a machine that had not asked for any of it. On 2026-08-29 that box ran
+out of memory, processes crashed and it took a reboot.
+
+A judge is a thing the developer switches on. When Ollama is up the gate uses
+it; when it is not, the gate degrades to its patterns and one proactive
+question, and the machine is left alone. Set the variable to a number of
+seconds to get the old behaviour back."""
 
 MODEL = "qwen3.5:9b"
 """Not read from the environment, and that is the point.
@@ -266,8 +284,26 @@ def _alive():
     try:
         with urllib.request.urlopen(HOST + "/api/tags", timeout=3):
             return True
-    except (urllib.error.URLError, OSError, ValueError, TimeoutError):
-        return False
+    except (urllib.error.URLError, OSError, ValueError, TimeoutError) as why:
+        return busy(why)
+
+
+REFUSED = (errno.ECONNREFUSED, 10061)
+"""A daemon that is loading a model is up, and it answers nothing.
+
+Refused means nobody is listening: the port is free and the daemon is gone.
+A timeout means the socket was accepted and the answer is late, which is what
+a 9B model looks like while it reaches the card. Reading the second as the
+first started a second `ollama serve` on a port already taken; it died at once
+and flashed a console over the editor, every stop, for as long as the load
+took."""
+
+
+def busy(why):
+    reason = getattr(why, "reason", why)
+    if isinstance(reason, socket.timeout) or isinstance(why, TimeoutError):
+        return True
+    return getattr(reason, "errno", None) not in REFUSED
 
 
 def _orphans():
@@ -284,7 +320,7 @@ def _orphans():
     orphan by definition. The path filter keeps a llama-server somebody else
     started out of it."""
     try:
-        alive = subprocess.run(["tasklist", "/FI", "IMAGENAME eq ollama.exe"],
+        alive = spawn.run(["tasklist", "/FI", "IMAGENAME eq ollama.exe"],
                                capture_output=True, text=True, timeout=10)
     except (OSError, subprocess.SubprocessError):
         return
@@ -295,7 +331,7 @@ def _orphans():
         return
     home = os.path.dirname(os.path.abspath(binary)).replace(chr(92), "/").lower()
     try:
-        listing = subprocess.run(
+        listing = spawn.run(
             ["powershell", "-NoProfile", "-Command",
              "Get-CimInstance Win32_Process -Filter \"Name='llama-server.exe'\" "
              "| ForEach-Object { $_.ProcessId.ToString() + '|' + $_.ExecutablePath }"],
@@ -309,7 +345,7 @@ def _orphans():
         if not path.replace(chr(92), "/").lower().startswith(home):
             continue
         try:
-            subprocess.run(["taskkill", "/F", "/PID", pid],
+            spawn.run(["taskkill", "/F", "/PID", pid],
                            capture_output=True, timeout=10)
         except (OSError, subprocess.SubprocessError):
             pass
@@ -336,11 +372,9 @@ def _wake():
         return False
     _orphans()
     try:
-        subprocess.Popen([binary, "serve"],
-                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL,
-                         creationflags=getattr(subprocess, "DETACHED_PROCESS", 0)
-                         | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+        spawn.detached([binary, "serve"],
+                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL)
     except (OSError, ValueError):
         return False
     end = time.monotonic() + WAKE

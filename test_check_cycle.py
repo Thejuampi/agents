@@ -1,10 +1,26 @@
 #!/usr/bin/env python3
 """The cycle checker arms itself off the repo and only asks for what is missing."""
+import importlib.util
 import json
 import os
 import subprocess
 import sys
 import tempfile
+
+_settle = importlib.util.spec_from_file_location(
+    "_hook_settle", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "settle.py"))
+settle = importlib.util.module_from_spec(_settle)
+_settle.loader.exec_module(settle)
+
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
+spawn = mod.load("spawn.py")
+
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOOK = os.path.join(HERE, "check-cycle.py")
@@ -45,7 +61,7 @@ def run(root, files=(), review=False, message=DONE):
             {"type": "text", "text": message}]}}) + "\n")
     payload = json.dumps({"transcript_path": handle.name, "cwd": root,
                           "stop_hook_active": False})
-    done = subprocess.run([sys.executable, HOOK], input=payload,
+    done = settle.run([sys.executable, HOOK], input=payload,
                           capture_output=True, text=True)
     os.unlink(handle.name)
     return done.returncode, done.stderr

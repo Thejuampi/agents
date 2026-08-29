@@ -1,10 +1,26 @@
 #!/usr/bin/env python3
 """A real blocker passes. A declared one does not."""
+import importlib.util
 import json
 import os
 import subprocess
 import sys
 import tempfile
+
+_settle = importlib.util.spec_from_file_location(
+    "_hook_settle", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "settle.py"))
+settle = importlib.util.module_from_spec(_settle)
+_settle.loader.exec_module(settle)
+
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
+spawn = mod.load("spawn.py")
+
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOOK = os.path.join(HERE, "check-blocked.py")
@@ -39,7 +55,7 @@ def transcript(messages, acted=True):
 def fire(path, active=False):
     counted()
     payload = json.dumps({"transcript_path": path, "cwd": HERE, "stop_hook_active": active})
-    done = subprocess.run([sys.executable, HOOK], input=payload,
+    done = settle.run([sys.executable, HOOK], input=payload,
                           capture_output=True, text=True)
     return done.returncode, done.stderr
 

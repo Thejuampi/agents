@@ -8,21 +8,28 @@ somebody else's server, and the start switched off - and the last one kills the
 daemon for real and asks the hook to bring it back.
 """
 import importlib.util
-import importlib.util
 import json
 import os
+import socket
 import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
+
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
+spawn = mod.load("spawn.py")
+
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-_spec = importlib.util.spec_from_file_location(
-    "settle", os.path.join(HERE, "settle.py"))
-settle = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(settle)
+settle = mod.load("settle.py")
 
 NL = chr(10)
 failures = []
@@ -62,8 +69,32 @@ off = load("judge_off")
 check("zero turns the start off", off._wake(), False)
 os.environ.pop("STOP_JUDGE_WAKE")
 
+reading = load("judge_reading")
+check("a daemon loading a model is late, not gone - starting a second one "
+      "against a taken port is what flashed a console over the editor",
+      reading.busy(urllib.error.URLError(socket.timeout())), True)
+check("a bare timeout reads the same way",
+      reading.busy(TimeoutError()), True)
+check("refused means nobody is listening, which is the one case worth waking",
+      reading.busy(urllib.error.URLError(ConnectionRefusedError(10061, "x"))),
+      False)
+
+LIVE = os.environ.get("STOP_TEST_LIVE") == "1"
+"""The rest kills the Ollama daemon on this machine and waits for it to come back.
+
+That is a true test of the one recoverable death, and it costs a 5.5GB model
+reload and a handful of consoles opening over whatever the developer is
+looking at. Paying that on every suite run, while iterating on something else
+entirely, buys nothing. It runs when somebody asks for it."""
+
+if not LIVE:
+    print(f"{cases} cases, 0 failures"
+          " (daemon restart skipped, set STOP_TEST_LIVE=1 to run it)")
+    sys.exit(0)
+
+
 def servers():
-    out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq llama-server.exe"],
+    out = spawn.run(["tasklist", "/FI", "IMAGENAME eq llama-server.exe"],
                          capture_output=True, text=True)
     return out.stdout.count("llama-server.exe")
 
@@ -83,12 +114,13 @@ def waitfor(want, seconds=40):
     return want(servers())
 
 
+os.environ["STOP_JUDGE_WAKE"] = "20"
 judge = load("judge_live")
 judge.stop_verdict("Listo, suite verde, commit abc1234.")
 check("the model is up before the daemon is killed",
       waitfor(lambda n: n > 0), True)
 
-subprocess.run(["taskkill", "/F", "/IM", "ollama.exe"], capture_output=True)
+spawn.run(["taskkill", "/F", "/IM", "ollama.exe"], capture_output=True)
 check("killing the parent hard leaves the model server orphaned, holding the "
       "card - this is what made the judge answer SKIP for an hour",
       servers() > 0, True)

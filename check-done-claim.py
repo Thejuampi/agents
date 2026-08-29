@@ -17,11 +17,15 @@ import re
 import subprocess
 import sys
 
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-spec = importlib.util.spec_from_file_location("dead", os.path.join(HERE, "check-dead-code.py"))
-dead = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(dead)
+dead = mod.load("check-dead-code.py")
 
 FENCED = re.compile(r"```.*?```", re.DOTALL)
 CODE = re.compile(r"`[^`\n]*`")
@@ -33,14 +37,7 @@ def unquoted(message):
     a backtick inside a quoted span swallows the closing quote."""
     return QUOTED.sub(" ", CODE.sub(" ", FENCED.sub(" ", message)))
 
-CLAIM = re.compile(
-    r"\blisto\b|\bqueda (listo|cerrado|cableado)|cerrado y|cableado hasta|"
-    r"\bterminad[oa]\b|\bcompleto\b|suite completa|0 fallas|0 failures|"
-    r"todo verde|all green|\bship(ped|s)?\b|de punta a punta|"
-    r"\bdone\b|\bit works\b|ya funciona|funciona\b.{0,20}\bahora\b|"
-    r"\bexit 0\b|build successful",
-    re.IGNORECASE,
-)
+CLAIM = mod.load("claim.py").CLAIM
 
 BUILD = re.compile(
     r"assemble|:app:build|gradlew[^\n|;]*\bbuild\b|npm run build|yarn build|"
@@ -156,10 +153,7 @@ def main():
         return 0
 
     transcript = payload.get("transcript_path") or ""
-    spec2 = importlib.util.spec_from_file_location(
-        "perm", os.path.join(HERE, "check-permission.py"))
-    perm = importlib.util.module_from_spec(spec2)
-    spec2.loader.exec_module(perm)
+    perm = mod.load("check-permission.py")
     message = perm.last_assistant_text(transcript)
     if not message:
         return 0
@@ -167,7 +161,7 @@ def main():
         return 0
 
     cwd = payload.get("cwd") or os.getcwd()
-    if not dead.git(["rev-parse", "--is-inside-work-tree"], cwd).strip().startswith("true"):
+    if not dead.inside_repo(cwd):
         return 0
 
     touched = dead.touched_files(transcript)

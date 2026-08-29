@@ -5,11 +5,23 @@ symbol that nothing outside its own file and its tests ever names?
 A phrase list catches an agent that says it left work open. This catches the
 one that does not say it. Exit 2 + stderr re-wakes the model with the list.
 """
+import importlib.util
 import json
 import os
 import re
 import subprocess
 import sys
+
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
+spawn = mod.load("spawn.py")
+claim = mod.load("claim.py")
+perm = mod.load("check-permission.py")
+
 
 KOTLIN = re.compile(
     r"^\+(?:@\w+(?:\([^)]*\))?\s+)*"
@@ -36,12 +48,52 @@ REMINDER = """KEEP GOING - THIS CODE HAS NOBODY CALLING IT YET
 The piece itself is fine. Nothing outside its own file and its tests names it, so a reader cannot see it work. Wire it to the visible end in this same turn, or drop it - you are one step from having it count."""
 
 
+def inside_repo(cwd):
+    """Whether this is a work tree, asked of the disk.
+
+    rev-parse answers the same question and costs a process. On Windows the
+    git wrapper starts children of its own, and those do not inherit the flag
+    that keeps a console hidden, so every stop flashed windows over the
+    editor. A directory walk is free and cannot flash anything."""
+    here = os.path.abspath(cwd or os.getcwd())
+    while True:
+        if os.path.exists(os.path.join(here, ".git")):
+            return True
+        parent = os.path.dirname(here)
+        if parent == here:
+            return False
+        here = parent
+
+
+ASKED = {}
+"""One answer per question per stop.
+
+The checkers share this interpreter now, so the same question asked twice is
+the same process started twice. A stop was running rev-parse once for every
+caller that wanted to know it was in a repository."""
+
+
 def git(args, cwd):
+    key = (tuple(args), cwd)
+    if key in ASKED:
+        return ASKED[key]
     try:
-        done = subprocess.run(["git"] + args, cwd=cwd, capture_output=True, text=True, timeout=20)
+        done = spawn.run(["git"] + args, cwd=cwd, capture_output=True,
+                         text=True, timeout=20)
     except (OSError, subprocess.SubprocessError):
+        ASKED[key] = ""
         return ""
-    return done.stdout if done.returncode == 0 else ""
+    ASKED[key] = done.stdout if done.returncode == 0 else ""
+    return ASKED[key]
+
+
+WRITERS = {"write", "edit", "multiedit",
+           "notebookedit", "bash", "powershell"}
+"""Tools that can leave a file different from how they found it.
+
+This counted any call carrying a file_path, and Read carries one. A turn
+that only looked at code was read as a turn that wrote it, which is wrong on
+its own terms and made every such stop run git for nothing."""
 
 
 def touched_files(path):
@@ -61,6 +113,8 @@ def touched_files(path):
                     continue
                 for block in content:
                     if not isinstance(block, dict) or block.get("type") != "tool_use":
+                        continue
+                    if str(block.get("name") or "").lower() not in WRITERS:
                         continue
                     payload = block.get("input") or {}
                     target = payload.get("file_path")
@@ -127,19 +181,40 @@ def added_symbols(cwd, touched):
     return {n: p for n, p in found.items() if n not in SKIP_NAMES and len(n) > 2}
 
 
+BATCH = 60
+"""How many symbols go into one git grep.
+
+This asked git once per symbol, and a turn is allowed to add 120 of them, so
+a single stop could start 120 processes. git takes as many patterns as you
+give it; the line number comes back with each hit, which is enough to say
+which symbol was found where."""
+
+
 def orphans(cwd, symbols):
-    dead = []
-    for name, path in symbols.items():
+    names = list(symbols)
+    seen = {name: set() for name in names}
+    for start in range(0, len(names), BATCH):
+        chunk = names[start:start + BATCH]
+        args = ["git", "grep", "--untracked", "-n", "-w"]
+        for name in chunk:
+            args += ["-e", name]
+        args += ["--", ".", ":!*[Tt]est*", ":!*spec*"]
         try:
-            done = subprocess.run(
-                ["git", "grep", "--untracked", "-l", "-w", "-e", name,
-                 "--", ".", ":!*[Tt]est*", ":!*spec*"],
-                cwd=cwd, capture_output=True, text=True, timeout=20,
-            )
+            done = spawn.run(args, cwd=cwd, capture_output=True, text=True,
+                             timeout=30)
         except (OSError, subprocess.SubprocessError):
             continue
-        hits = {h.replace("\\", "/") for h in done.stdout.split() if h}
-        hits.discard(path.replace("\\", "/"))
+        for line in done.stdout.splitlines():
+            path, _, rest = line.partition(":")
+            _, _, text = rest.partition(":")
+            for name in chunk:
+                if re.search(r"\b" + re.escape(name) + r"\b", text):
+                    seen[name].add(path.replace(chr(92), "/"))
+
+    dead = []
+    for name, path in symbols.items():
+        hits = set(seen.get(name) or ())
+        hits.discard(path.replace(chr(92), "/"))
         if not hits:
             dead.append(f"  {name}  ({path})")
     return dead
@@ -155,10 +230,17 @@ def main():
         return 0
 
     cwd = payload.get("cwd") or os.getcwd()
-    if not git(["rev-parse", "--is-inside-work-tree"], cwd).strip().startswith("true"):
+    message = perm.last_assistant_text(payload.get("transcript_path") or "")
+    if not message or not claim.CLAIM.search(perm.unquoted(message)):
+        return 0
+
+    if not inside_repo(cwd):
         return 0
 
     touched = touched_files(payload.get("transcript_path") or "")
+    if not touched:
+        return 0
+
     symbols = added_symbols(cwd, touched)
     if not symbols or len(symbols) > 120:
         return 0
