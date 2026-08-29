@@ -338,7 +338,7 @@ errand: paste .{0,30} into the
 # no other pattern saw. Low confidence on purpose - the same shape is also a
 # report ('Corro la suite: 2090 verdes.'), so the model reads it.
 announce?: (?:^|[.!?]\s)(Starting|Building|Running|Wiring|Fixing|Adding|Checking|Loading|Installing|Rebuilding|Re-running)\b[^.!?\n]{0,70}[.!?]?\s*$
-announce?: (?:^|[.!?]\s)(arreglo|limpio|fuerzo|busco|saco|cierro|agrego|conecto|cableo|borro|escribo|ajusto|separo|muevo|mido|paso|dejo|hago|sigo|verifico|reviso|compruebo|corro|levanto|instalo|armo|pruebo|arranco)\b[^.!?\n]{0,90}[.!?]?\s*$
+announce?: (?:^|[.!?]\s)(arreglo|limpio|fuerzo|busco|saco|cierro|agrego|conecto|cableo|borro|escribo|ajusto|separo|muevo|mido|paso|dejo|hago|sigo|verifico|reviso|compruebo|corro|levanto|instalo|armo|pruebo|arranco)\b[^.!?\n]{0,150}[.!?]?\s*$
 
 # Refusing to run the thing, with a reason. Rare and unambiguous.
 announce: \b(i'?m not|i am not|no voy a|no pienso)\s+(re-?)?(running|run|correr|volver a correr|ejecutar)\b
@@ -352,12 +352,12 @@ announce: \b(what remains|lo que queda abierto|deudas? abiertas?|queda como deud
 # A plan of two steps, and the turn ends on it: 'Now the PRD, then build and
 # run on the device.' 23 hits over 5280 real messages, none of them caught by
 # anything else, and not one of them was a report. This one condemns.
-announce: (?:^|[.!?]\s)Now\b[^.\n]{0,60}?,?\s*then\b[^.!?\n]{0,90}[.!?]?\s*$
+announce: (?:^|[.!?]\s)Now\b[^.\n]{0,60}?,?\s*then\b[^.!?\n]{0,150}[.!?]?\s*$
 
 # The work named with a pronoun and left there: 'Lo arreglo.', 'Los borro.'
 # 59 unseen hits. Low confidence: the same words also report work in flight
 # ('Lo reviso mientras te contesto').
-announce?: (?:^|[.!?]\s)(L[oa]s?|Les?)\s+(arreglo|limpio|fuerzo|busco|saco|cierro|agrego|conecto|cableo|borro|escribo|ajusto|separo|muevo|mido|paso|dejo|hago|sigo|verifico|reviso|compruebo|corro|levanto|instalo|armo|pruebo|arranco)\b[^.!?\n]{0,90}[.!?]?\s*$
+announce?: (?:^|[.!?]\s)(L[oa]s?|Les?)\s+(arreglo|limpio|fuerzo|busco|saco|cierro|agrego|conecto|cableo|borro|escribo|ajusto|separo|muevo|mido|paso|dejo|hago|sigo|verifico|reviso|compruebo|corro|levanto|instalo|armo|pruebo|arranco)\b[^.!?\n]{0,150}[.!?]?\s*$
 
 # 'Let me check', 'let me run' - permission asked for a thing already allowed,
 # 274 unseen hits. Low confidence: it also shows up mid-report before the
@@ -366,4 +366,26 @@ ask?: \blet me (check|see|look|try|run|verify|confirm|fix)\b
 
 # 'Now build the APK and run it on the emulator.' - the same plan without
 # the word then. Low confidence: 'Now it prints once.' is a report.
-announce?: (?:^|[.!?]\s)Now\b[^.!?\n]{0,90}[.!?]?\s*$
+announce?: (?:^|[.!?]\s)Now\b[^.!?\n]{0,150}[.!?]?\s*$
+
+# ---- hunted out of the live session with watch-escapes.py, 2026-08-28
+# Six closings walked past every pattern and the model called all six a stop.
+
+# A debt admitted and left. One hit in 5306 messages and it is unmistakable.
+announce: \b(te l[oa]s? debo|queda(n)? a deber|lo dejo a deber|i owe you)\b
+
+# The whole message is a shrug. Twelve hits, none caught by anything else.
+idle: ^\s*(No response requested\.?|Sin novedad\.?|Nada que reportar\.?)\s*$
+
+# 'the move stays unpriced', 'sigue vacio' - a thing left broken in the
+# report. Low: it is also how you honestly describe state you cannot change.
+announce?: \b(stays|remains|sigue|queda|siguen|quedan)\s+(unpriced|unfixed|unwired|broken|empty|open|sin\s+\w+|vac[ií][oa]s?|roto|abiert[oa]s?)\b
+
+# More closings that name the move: 'Moving straight to Stage 7 now.',
+# 'Writing plan.v2.md now.', 'Abro el aviso completo:', 'Leo resultados:'
+announce?: (?:^|[.!?]\s)(Going|Dropping|Moving|Switching|Turning|Heading|Pulling|Pushing|Writing|Reading|Testing)\b[^.!?\n]{0,150}[.!?]?\s*$
+announce?: (?:^|[.!?]\s)(Miro|Leo|Abro|Cambio|Quito|Sumo|Uso|Copio|Mando|Traigo|Vuelvo)\b[^.!?\n]{0,150}[.!?]?\s*$
+
+# 'still depends on', 'sigue dependiendo de' - the thing it did not fix,
+# named at the end of a report.
+announce?: \b(still depends on|sigue dependiendo de|todavía depende de)\b

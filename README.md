@@ -75,6 +75,20 @@ y uno de ellos acusó al archivo que lo estaba arreglando.
 
 Un control que nunca atrapó nada y acusa inocentes hace daño neto.
 
+## Cazar fugas
+
+```sh
+python watch-escapes.py <transcript.jsonl> [--since N]
+```
+
+Lee una sesión entera como la leería un revisor: cada cierre, qué dijeron los
+patrones, y para los que pasaron limpios, qué dice el modelo. Un mensaje que
+pasó limpio y el modelo llama STOP es una fuga. Los que ya frenaron no
+interesan: esos ya tuvieron su respuesta.
+
+Así se encontraron las últimas ocho formas. En la sesión que corría al lado:
+seis fugas en el primer barrido, cero en el tercero.
+
 ## El modelo local
 
 Ollama en tu máquina, `qwen3.5:9b`. El transcript nunca sale de acá y un
