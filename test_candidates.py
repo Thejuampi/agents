@@ -48,11 +48,17 @@ check("reading a file is not writing one",
       hints.written({"type": "assistant", "message": {"content": [
           {"type": "tool_use", "id": "t1", "name": "Read",
            "input": {"file_path": "a/Thing.kt"}}]}}), [])
+shell = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "t1", "name": "Bash",
+     "input": {"command": "cat > src/a/Thing.kt <<EOF" + chr(10) + "x"}}]}}
+check("a file written through the shell counts as written",
+      hints.written(shell), ["src/a/Thing.kt"])
+
 check("a windows path is read the same as any other",
       hints.written(wrote("G:" + chr(92) + "repo" + chr(92) + "a.py")),
       ["G:/repo/a.py"])
 
-print(f"6 cases, {len(failures)} failures")
+print(f"7 cases, {len(failures)} failures")
 for line in failures:
     print("  " + line)
 sys.exit(1 if failures else 0)

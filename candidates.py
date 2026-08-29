@@ -19,6 +19,17 @@ TEST = re.compile(r"(^|/)tests?(/|_)|/spec/|(^|/)test_|(test|spec)s?[.][a-z]+$",
 DOC = (".md", ".rst", ".adoc", ".txt")
 
 
+SHELL = re.compile(r'(?:^|[>\s"])([\w./:-]+[.](?:kt|java|py|ts|tsx|md|rst|txt|go|rs|cs|swift))')
+"""A path a shell command wrote to.
+
+Half the writing in a session never touches the Write tool: it is a heredoc,
+a sed, a redirect. This turn wrote four files that way and the proactive
+question came back empty, which is how the gap was found."""
+
+WRITERS = ("write", "edit", "multiedit", "notebookedit")
+SHELLS = ("bash", "powershell")
+
+
 def written(entry):
     """Files this assistant message wrote, from the tool calls themselves."""
     content = entry.get("message", {}).get("content")
@@ -28,12 +39,17 @@ def written(entry):
     for block in content:
         if not isinstance(block, dict) or block.get("type") != "tool_use":
             continue
-        if str(block.get("name") or "").lower() not in (
-                "write", "edit", "multiedit", "notebookedit"):
-            continue
-        path = (block.get("input") or {}).get("file_path")
-        if isinstance(path, str):
-            out.append(path.replace(chr(92), "/"))
+        name = str(block.get("name") or "").lower()
+        payload = block.get("input") or {}
+        if name in WRITERS:
+            path = payload.get("file_path")
+            if isinstance(path, str):
+                out.append(path.replace(chr(92), "/"))
+        elif name in SHELLS:
+            command = payload.get("command")
+            if isinstance(command, str):
+                out += [m.replace(chr(92), "/")
+                        for m in SHELL.findall(command)]
     return out
 
 
