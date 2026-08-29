@@ -336,14 +336,27 @@ is one turn per clean closing, which the request bounds by accepting
 
 \subsection{Before and after the gate}
 
-The corpus splits at 2026-08-28, when the gate was installed. Pushes fall from
-10 of 664 ungated closings (1.5\%) to 1 of 190 gated ones (0.5\%).
+The corpus splits at 2026-08-28, when the gate was installed. Under a strict
+regular expression for an explicit correction, pushes fall from 10 of 664
+ungated closings (1.5\%) to 1 of 190 gated ones (0.5\%): the direction the
+gate is for, and not significant, with a two-sided Fisher exact test at
+$p = 0.47$.
 
-The direction is what the gate is for, and the result is not significant: a
-two-sided Fisher exact test gives $p = 0.47$. With a base rate near one percent,
-detecting a halving at conventional power would need several thousand closings
-per arm. We report it because the effect size is the one worth powering a future
-study on, not because this study establishes it.
+Under the model-judged label this paper uses everywhere else, the effect
+disappears. 611 ungated closings carry 64 pushes (10.5\%) and 136 gated ones
+carry 14 (10.3\%), for $p = 1.0$. The two labels are counting different
+things - one an explicit rebuke, the other any reply that asks for work the
+agent could have done - and they disagree about whether anything changed.
+
+We report the second as the answer, because it is the label the rest of the
+paper is scored against and because it is the larger sample. It says this
+study does not detect an effect of the gate on how often the developer has to
+ask. The comparison is observational either way: the eras differ in what was
+being worked on, and the gated era is the one where the gate was being built,
+which is not a neutral workload. What the exercise establishes is the size a
+future study would have to be - with a base rate near ten percent and a
+halving to detect, several hundred closings per arm rather than the 136 we
+have.
 
 \subsection{The judge's confidence}
 
