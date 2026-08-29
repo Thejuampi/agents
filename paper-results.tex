@@ -451,3 +451,72 @@ count alone is not the fact that matters; which tools ran probably is, and
 that is a larger change than this experiment tested.
 
 We report both because the alternative is a paper in which every idea worked.
+
+\subsection{What a block buys}
+
+Precision against the push label asks whether the gate was right. It does not
+ask whether the block helped, and those are different questions: a block that
+fires on a closing the developer would have accepted still buys work if the
+agent goes and does something. The system labels this for itself. A block
+wakes the agent, and the tool calls it makes before the developer next speaks
+are the answer.
+
+Over 31 graded blocks, 26 bought work and 5 bought none: an 84\%
+conversion. The rate is not uniform across lanes.
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Lane & Blocks & Bought nothing \\
+\midrule
+judge & 11 & 9\% \\
+announce & 6 & 0\% \\
+announce? & 6 & 0\% \\
+proactive & 5 & 60\% \\
+ask & 4 & 0\% \\
+wait & 3 & 33\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The pattern lanes convert every block they win. The proactive question, the
+newest lane and the one that fires on closings nothing is wrong with, buys
+nothing three times in five - by a distance the worst in the system, and the
+cost of putting a question to every clean closing.
+
+So the question was made specific. It now names what the turn's own tool
+calls show it left behind: source files written with no test written beside
+them, code changed with nothing in the documentation moving with it. The
+items are read off the record rather than inferred, which makes a denial
+answerable with evidence instead of a shrug. Whether that lifts the
+conversion is the measurement to make once enough blocks have accumulated;
+we report the mechanism and the baseline it has to beat.
+
+\subsection{Verifying claims instead of reading intent}
+
+Every measurement so far scores the gate against one weak label: whether the
+developer pushed back. That label answers whether a human had to ask, and a
+false claim only enters it when the human noticed. A claim can be checked
+without a label at all. The agent wrote that it committed; the turn either
+ran a commit or it did not, and the transcript holds both halves.
+
+We extracted first-person delivery claims from every closing and matched them
+against the commands the session ran. Of 43 closings claiming a commit, 1 has
+no commit anywhere in the session. Of 83 claiming a green suite, 5 have no
+test run. Scoped to the turn that made the claim rather than the session, the
+numbers are 6 and 29, which measures reporting on evidence gathered earlier
+rather than a claim that is untrue.
+
+A first version of the extractor counted the word commit anywhere and read
+41\% of claims as contradicted. That number was a bad regular
+expression, not a finding: an agent naming somebody else's commit, or
+offering to make one, was scored as claiming it had. We report it because the
+correction is the whole lesson - a verification lane is only as good as the
+claim extractor, and a loose extractor manufactures the finding it is looking
+for.
+
+The conclusion is negative and useful. Contradicted claims occur on 0.5\%
+of closings, so this lane cannot lift precision: there is almost nothing there
+to catch. The agent in these transcripts overstates what it did far less often
+than it stops with work available, and those are separate failures needing
+separate mechanisms.
