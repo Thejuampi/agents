@@ -422,7 +422,10 @@ claims delivery: a turn that reads code and a turn that is still iterating ask
 git nothing at all. The measured cost of a stop is now 0 processes while
 iterating and 3 when the agent says the work is done, against 9 to 129 before.
 The suite fell from 133 processes to 42, and the remaining 42 are the checkers
-under test doing the thing they are tested for.
+under test doing the thing they are tested for. That count is now defended
+rather than remembered: the runner keeps a ledger of every child any suite
+starts, and the last test in the suite reads the total and fails past a
+budget. A number that broke the machine once is a number a test should own.
 
 The judge is the other half. An earlier version started the Ollama daemon when
 it found none, which loads a 5.5GB model server on a machine that never asked
