@@ -679,3 +679,33 @@ of closings, so this lane cannot lift precision: there is almost nothing there
 to catch. The agent in these transcripts overstates what it did far less often
 than it stops with work available, and those are separate failures needing
 separate mechanisms.
+
+\subsection{The configuration this work leaves behind}
+
+The changes above are small and they are in the same direction, so it is worth
+stating what the gate is when the paper ends.
+
+\begin{center}
+\begin{tabular}{lrrlr}
+\toprule
+Configuration & Fires on & Prec. & 95\% CI & Recall \\
+\midrule
+At corpus build & 556 & 0.119 & [0.094, 0.148] & 0.846 \\
+Two classes demoted & 534 & 0.122 & [0.097, 0.153] & 0.833 \\
+Three rules added & 536 & 0.125 & [0.100, 0.156] & 0.859 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The gate fires 20 fewer times out of 747, catches one more push, and its
+precision interval still covers the base rate. Nobody should read this as the
+gate having been fixed. What it is is a loop that ran: a label nobody wrote,
+a measurement, two changes the measurement asked for, and the same measurement
+repeated. The interesting figure is not 0.125. It is that both changes were
+decided in an afternoon, by a person reading twelve messages and a table, on
+data that was already on the disk.
+
+The proactive question is outside this table because the push label cannot
+score it: it fires on closings the developer accepted, which are negatives by
+construction. It is scored by the second label instead, and it is the lane
+with the most room left.
