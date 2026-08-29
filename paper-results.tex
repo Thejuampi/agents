@@ -714,34 +714,53 @@ demoting a class instead of deleting it.
 
 \subsection{The configuration this work leaves behind}
 
-The changes above are small and they are in the same direction, so it is worth
-stating what the gate is when the paper ends.
+The corpus was rebuilt once more with every change of this section in place,
+so the end state is measured rather than assembled from parts. It carries 749
+clean closings and 82 pushes, a base rate of 10.9\% [8.9, 13.4].
 
 \begin{center}
 \begin{tabular}{lrrlr}
 \toprule
-Configuration & Fires on & Prec. & 95\% CI & Recall \\
+Corpus & Fires on & Prec. & 95\% CI & Recall \\
 \midrule
 At corpus build & 556 & 0.119 & [0.094, 0.148] & 0.846 \\
-Two classes demoted & 534 & 0.122 & [0.097, 0.153] & 0.833 \\
-Three rules added & 536 & 0.125 & [0.100, 0.156] & 0.859 \\
+Rebuilt after the changes & 499 & 0.136 & [0.109, 0.169] & 0.829 \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The gate fires 20 fewer times out of 747, catches one more push, and its
-precision interval still covers the base rate. The pattern lane on its own
-moves further than the gate does, from 0.123 to 0.137 [0.104, 0.178] on 329
-fires, which is the most precise configuration in this paper and still not
-separated from a base rate of 0.104. That is the whole shape of the result in
-one line. Nobody should read this as the
-gate having been fixed. What it is is a loop that ran: a label nobody wrote,
-a measurement, two changes the measurement asked for, and the same measurement
-repeated. The interesting figure is not 0.125. It is that both changes were
-decided in an afternoon, by a person reading twelve messages and a table, on
-data that was already on the disk.
+The gate fires 57 fewer times out of about 750 and its precision rises from
+0.119 to 0.136, which is 26 caught pushes out of 68 rather than 66 out of 556.
+Recall falls by 0.017. The interval still covers the base rate, so the
+honest reading is a direction and not a win.
 
-The proactive question is outside this table because the push label cannot
-score it: it fires on closings the developer accepted, which are negatives by
-construction. It is scored by the second label instead, and it is the lane
-with the most room left.
+Rebuilding also answered the question the first pass could not. The judge now
+stores the probability of its own verdict token, so its confidence can be
+scored against the label instead of inspected by hand.
+
+\begin{center}
+\begin{tabular}{lrrl}
+\toprule
+Judge \textsc{stop} by certainty & Fires & Prec. & 95\% CI \\
+\midrule
+0.00-0.50 & 18 & 0.389 & [0.203, 0.614] \\
+0.50-0.75 & 101 & 0.089 & [0.048, 0.161] \\
+0.75-0.90 & 111 & 0.153 & [0.098, 0.232] \\
+0.90-1.00 & 177 & 0.141 & [0.098, 0.200] \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The signal is not monotonic and the surprise is at the bottom. The 18 stops
+the judge is least sure of are its most precise slice by a distance: 0.389
+against a base rate of 0.109, nearly four times the rate. Certainty above 0.5
+carries no ordering at all - three bands inside 0.089 to 0.153, all
+overlapping.
+
+That vindicates the confidence floor and reverses the reason for it. The floor
+was added to stop the gate accusing an agent on a verdict it could not
+support. What the label says is that those verdicts are the ones most often
+right, and the floor keeps them: it routes them to the question rather than
+to a release. Had the floor been implemented as a release, as the obvious
+reading of a low confidence suggests, it would have thrown away the best rows
+in the corpus.
