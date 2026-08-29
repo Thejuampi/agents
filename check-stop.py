@@ -390,20 +390,22 @@ def main():
         return block(state, transcript, chain, message,
                      SILENT.format(host=judge.HOST), repeated)
 
+    seen = bool(chain.get("asked"))
+    asking = verdict == "OK" and not waiting and not seen
     line = ""
     if verdict == "STOP" and not unsure:
         line = judge.why(message, asked=asked)
     note(transcript, lane="judge", verdict=verdict, sure=judge.sureness(),
          weak=unsure, seconds=round(seconds, 2), quote=line,
          head=message[:120], waiting=waiting,
-         asked=bool(chain.get("asked")))
+         asked=seen, ask=asking)
 
     if waiting:
         body = WAITING
     elif verdict == "STOP":
         body = "\n\n".join(unsure) if unsure else LLM_STOP.format(
             why=QUOTE.format(line=line) if line else "")
-    elif chain.get("asked"):
+    elif seen:
         return allow(state, transcript)
     else:
         return block(state, transcript, chain, message, PROACTIVE,

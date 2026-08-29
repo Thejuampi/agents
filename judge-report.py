@@ -115,15 +115,41 @@ def locate(entry):
     return ""
 
 
+PATTERNS = os.path.join(HERE, "stop-patterns.txt")
+SHAPES = ("shape", "judge", "waiting", "proactive")
+
+
+def labels():
+    """The class names that exist, so a block cannot invent one.
+
+    A reminder quotes the repository files it wants read, and those names sit
+    on the same line as the match. Read loosely they became classes of their
+    own, and the report advised demoting README.md."""
+    found = set(SHAPES)
+    try:
+        handle = open(PATTERNS, encoding="utf-8")
+    except OSError:
+        return found
+    with handle:
+        for raw in handle:
+            line = raw.strip().lstrip("-").strip()
+            if line and not line.startswith("#") and ":" in line:
+                found.add(line.split(":")[0].strip())
+    return found
+
+
 def classes(entry):
+    if entry.get("ask"):
+        return ["proactive"]
     if entry.get("waiting"):
         return ["waiting"]
 
+    known = labels()
     names = []
     for text in (entry.get("firm") or []) + (entry.get("weak") or []):
         for part in text.split("Matched: ")[-1].split(chr(10))[0].split(","):
             head = part.strip().split(":")[0].strip()
-            if head and " " not in head:
+            if head in known or head.rstrip("?") in known:
                 names.append(head)
     return names or ["judge"]
 
@@ -131,7 +157,8 @@ def classes(entry):
 def graded():
     rows = []
     for entry in decisions():
-        if entry.get("passed") or entry.get("verdict") in ("skip", "OK"):
+        if entry.get("passed") or (entry.get("verdict") in ("skip", "OK")
+                                   and not entry.get("ask")):
             continue
         path = locate(entry)
         if not path:

@@ -156,6 +156,10 @@ pregunta y 33 de esos eran empujones reales que el guardia dejaba pasar.
 
 El costo es un turno por cierre limpio. La respuesta "revise esto y no queda nada" lo cierra igual.
 
+La pregunta se mide como cualquier otro bloqueo. El reporte la grada como
+clase propia, `proactive`, asi que en unos dias dice sola si compro trabajo o
+solo compro un parrafo mas.
+
 ## Esperar no es una excusa
 
 Antes era una exencion: trabajo lanzado, ningun patron levantado, turno

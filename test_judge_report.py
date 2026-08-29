@@ -136,6 +136,19 @@ def main():
                        "firm": ["Matched: ask: querés que"]}) != ["waiting"]:
         failures.append("a block sent while work runs is graded as its own class")
 
+    counted()
+    if report.classes({"ask": True, "verdict": "OK"}) != ["proactive"]:
+        failures.append("the question an OK earns is graded on its own")
+
+    counted()
+    if not report.classes({"verdict": "OK", "ask": False}):
+        failures.append("a released OK still falls back to a class")
+
+    counted()
+    if report.classes({"firm": [
+            "Matched: ask: queres que, README.md, AGENTS.md"]}) != ["ask"]:
+        failures.append("a file the reminder quotes is not a class")
+
     print(f"{len(RUNS)} cases, {len(failures)} failures")
     for line in failures:
         print("  FAIL", line)
