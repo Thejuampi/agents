@@ -528,10 +528,11 @@ def main():
     line = ""
     if verdict == "STOP" and not unsure:
         line = judge.why(message, asked=asked)
+    near = openings(transcript) if asking else []
     note(transcript, lane="judge", verdict=verdict, sure=judge.sureness(),
          weak=unsure, seconds=round(seconds, 2), quote=line,
-         head=message[:120], waiting=waiting,
-         asked=seen, ask=asking, shaky=shaky)
+         head=message[:120], waiting=waiting, near=near,
+         asked=seen, ask=asking and bool(near), shaky=shaky)
 
     if waiting:
         body = WAITING
@@ -541,7 +542,6 @@ def main():
     elif seen:
         return allow(state, transcript)
     else:
-        near = openings(transcript)
         if not near:
             return allow(state, transcript)
         return block(state, transcript, chain, message,
