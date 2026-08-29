@@ -414,9 +414,12 @@ expression.
 
 \paragraph{Confidence is a router before it is a decision.} Per-pattern
 confidence is what makes the local model affordable, because it decides which
-messages are worth a model at all. The judge's own confidence, by contrast,
-turned out to be publishable and not actionable. A signal can be real, be
-logged, be informative to a maintainer, and still not be safe to threshold.
+messages are worth a model at all. The judge's own confidence was informative
+and unsafe to threshold, because dropping a low-confidence STOP loses real
+pushes. It became usable when the action space grew a third option: a STOP
+under the floor is put as the question instead of as an accusation, and the
+turn is neither blocked nor released. A weak signal that cannot pick between
+two actions can still pick a third.
 
 \paragraph{Interventions leave labels.} Any system that interrupts an agent gets
 a natural experiment for free: the agent's behaviour after the interruption. We
