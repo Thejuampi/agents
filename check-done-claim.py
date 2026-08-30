@@ -26,6 +26,7 @@ _mod.loader.exec_module(mod)
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 dead = mod.load("check-dead-code.py")
+host = mod.load("host.py")
 
 FENCED = re.compile(r"```.*?```", re.DOTALL)
 CODE = re.compile(r"`[^`\n]*`")
@@ -82,7 +83,7 @@ def steps(command):
             out.append(head)
     return out
 
-SOURCE = (".kt", ".java", ".py", ".ts", ".tsx", ".swift", ".go", ".rs", ".cs")
+SOURCE = (".kt", ".java", ".py", ".ts", ".tsx", ".swift", ".go", ".rs", ".cs", ".md", ".tex")
 
 
 def exercised(head, root):
@@ -109,25 +110,15 @@ The code is written and that is the hard part. Green unit tests prove it compile
 def commands(path):
     """Every shell command this session ran. The record of what was verified."""
     out = []
-    try:
-        with open(path, encoding="utf-8") as handle:
-            for line in handle:
-                try:
-                    entry = json.loads(line)
-                except ValueError:
-                    continue
-                if not isinstance(entry, dict):
-                    continue
-                content = entry.get("message", {}).get("content")
-                if not isinstance(content, list):
-                    continue
-                for block in content:
-                    if isinstance(block, dict) and block.get("type") == "tool_use":
-                        command = (block.get("input") or {}).get("command")
-                        if isinstance(command, str):
-                            out.append(command)
-    except OSError:
-        return []
+    for entry in host.entries(path):
+        content = entry.get("message", {}).get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "tool_use":
+                command = (block.get("input") or {}).get("command")
+                if isinstance(command, str):
+                    out.append(command)
     return out
 
 
@@ -154,7 +145,7 @@ def main():
 
     transcript = payload.get("transcript_path") or ""
     perm = mod.load("check-permission.py")
-    message = perm.last_assistant_text(transcript)
+    message = perm.closing_of(payload)
     if not message:
         return 0
     if not CLAIM.search(unquoted(message)):

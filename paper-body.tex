@@ -12,18 +12,20 @@ usually finishes what it left. The failure sits in the stopping policy, and it
 is invisible to the agent, which believes each turn ended reasonably.
 
 This paper describes a gate that sits in the agent's stop path and re-wakes it
-when the closing message shows the pattern. That part is straightforward. The
-part that took the work, and the part we think transfers, is the second loop:
-how the gate discovers which of its own interventions were wrong, from signals
-already present in the transcript, with no human labeling.
+when the closing message shows the pattern. Building the gate was
+straightforward. Evaluating it was not, because evaluation needs labels and
+labels need a reader. Both labels this system needs were already lying in the
+transcript: the developer's own reply, and the agent's own behaviour after a
+block. Neither costs an annotation.
 
-The headline is uncomfortable and we lead with it. The failure happens on about
-one closing in ten. The gate fires on three in four and is right about one in
-eight, which is the rate at which the failure occurs at all, and no lane
-configuration we measured separates from that rate at 95\%. The same
-transcripts then say the interventions are mostly worth making: 35 of 41
-graded blocks bought work. Both statements are measured, neither cancels the
-other, and the second is the one that keeps the gate switched on.
+Firing and pushing are associated: when the gate speaks, the next human
+line is more often a push. That still does not make a single fire
+trustworthy. On the stored tables a fire is a real early-stop about one
+time in seven; on the live regex file, about one time in five. Four of
+five fires are still false alarms. Of the blocks we could grade, 55 of
+63 made the agent do more work. The gate is imprecise about when to speak
+and useful when it does. Section~\ref{sec:metrics} defines the four
+counts. Section~\ref{sec:results} holds the tables.
 
 We contribute:
 
@@ -31,31 +33,36 @@ We contribute:
   \item A three-lane gate that spends a regular expression before it spends a
         model, and a model before it spends the user's attention
         (Section~\ref{sec:system}).
-  \item A weak-supervision label for premature stopping that requires no
-        annotation: the user's own next message (Section~\ref{sec:setup}).
-  \item An evaluation over 747 clean closings from 43 sessions, including an
-        ablation of every lane and every pattern class against that label (Section~\ref{sec:results}).
+  \item Two labels that require no annotation -- the developer's next message,
+        and the agent's tool calls after a block -- and an evaluation of every
+        lane against them on 749 closings from 43 sessions
+        (Sections~\ref{sec:setup} and~\ref{sec:results}).
   \item A self-labeling loop that grades each intervention by what the agent
         did afterwards, and names patterns for demotion on its own
         (Section~\ref{sec:loop}).
-  \item Negative results, in full, including two failed attempts to obtain a
-        usable confidence signal from the judge (Section~\ref{sec:negative}).
+  \item A scored option tree on Stop. The pick rule is graded on seven
+        fixtures. The word leftover is graded on the frozen 749, extra
+        false positives zero (Section~\ref{sec:tree}).
 \end{enumerate}
 
 \section{Background and related work}
+\label{sec:related}
 
-\paragraph{Where the gate runs.} Claude Code exposes a \emph{Stop hook}: a
-program invoked when the agent finishes a turn. Exit status 0 lets the turn
-end. Exit status 2 discards the ending and wakes the agent with the hook's
-message on standard error. The hook sees the full transcript path, the working
-directory, and a flag marking whether it is already inside a re-wake chain. It
-is, in effect, an interposition point on the agent's stopping decision.
+A practitioner running agents will already know most of these names.
+This section is a map of where the gate sits, not a survey. The claim
+that matters for the rest of the paper is small: we score the moment
+the agent tries to leave, not the patch it produced, and we do it with
+labels the transcript already holds.
 
 \paragraph{Model-as-judge.} Using one language model to score another's output
 is now standard practice, and its failure modes are documented: position bias,
 verbosity bias, and self-preference \cite{zheng2023judging}. Our judge is
 smaller than the agent it judges by roughly two orders of magnitude, which
 removes self-preference and forces the prompt to carry the whole task.
+Language models carry some signal about their own correctness
+\cite{kadavath2022know}, and self-consistency across samples is a usable
+proxy \cite{wang2022selfconsistency}. Section~\ref{sec:negative} reports that
+both failed here at 9B scale, and that token log-probabilities did not.
 
 \paragraph{Self-critique and refinement.} Self-Refine \cite{madaan2023selfrefine}
 and Reflexion \cite{shinn2023reflexion} have a model improve its own output
@@ -65,33 +72,145 @@ matters: the agent has already decided it is done, so a self-critique would be
 asking the party that made the error to detect it. The gate is deliberately
 external.
 
-\paragraph{Process supervision.} Rewarding intermediate steps rather than final
-answers improves reliability \cite{lightman2023verify}. Premature stopping is a
-process defect with a correct final answer -- the work the agent did is fine --
-so it is invisible to outcome supervision.
-
 \paragraph{Weak supervision.} Snorkel \cite{ratner2017snorkel} builds training
 labels from noisy programmatic labeling functions rather than annotators. Our
-pattern lane is a set of labeling functions in exactly that sense, and
+pattern lane is a set of labeling functions in exactly that sense:
+regular expressions that vote ``this stop looks premature.''
 Section~\ref{sec:loop} adds the piece Snorkel assumes you have: an estimate of
 each function's accuracy, obtained here from the agent's later behaviour.
 
-\paragraph{Calibration.} Language models carry some signal about their own
-correctness \cite{kadavath2022know}, and self-consistency across samples is a
-usable proxy \cite{wang2022selfconsistency}. Section~\ref{sec:negative} reports
-that both failed here at 9B scale, and that token log-probabilities did not.
+\paragraph{Guardrail cascades.} Production filtering stacks run cheap
+programmable rails before a model call, and NeMo Guardrails
+\cite{rebedea2023nemo} is the reference implementation: a rail language, a
+dialogue manager, and an LLM behind them. Our three lanes are that pattern
+turned inward. The rails guard what the agent says to the world; this one
+guards whether the agent is allowed to stop talking. The difference that
+matters for evaluation is the cost asymmetry. A blocked toxic answer is
+cheap to be wrong about, and a blocked closing costs the developer a turn,
+which is why this paper spends its length on whether a wake was deserved
+rather than on catching every miss.
+
+\paragraph{Interruption cost.} Mixed-initiative interfaces have long been
+designed around the expected cost of speaking up: Horvitz
+\cite{horvitz1999mixed} makes the decision to interrupt an expected-utility
+calculation over the user's attention, and empirical work puts a measurable
+price on a badly timed interruption \cite{mark2008cost}. Our cost model is
+that argument with the roles swapped. The gate interrupts the agent rather
+than the person, so a wrong wake is paid in machine time and in the trust the
+agent's next turn spends defending itself, and the developer is interrupted
+only when the gate stays silent and the work is left undone.
+
+\paragraph{Agent loops.} Reasoning-and-acting loops \cite{yao2023react} and
+the benchmarks built on them \cite{jimenez2024swebench} score an agent by
+whether the final artifact passes. Stopping early is invisible to that scoring
+when the harness simply ends the episode, and it is the folk complaint of every
+practitioner running such a loop under standing permission. Process
+supervision \cite{lightman2023verify} still misses it: the work already done
+can be fine, so a correct final answer hides a process defect. We could find
+no measurement of its rate, which is the gap the first label here fills.
+
+\paragraph{Premature stop in coding agents.}
+Outcome-only benchmarks hide the stop. SWE-bench scores a patch
+\cite{jimenez2024swebench}, and a plausible patch can still be the wrong
+one: Wang, Pradel and Liu find that 7.8\% of patches counted as correct
+fail the developer suite, inflating reported resolution by 6.2 points
+\cite{wang2025solved}. SWE-EVO then asks for long-horizon evolution
+across many files, and records a named failure they call giving up
+prematurely: the agent stops while a reasonable next step remains
+\cite{le2025sweevo}. Agent-as-a-Judge evaluates the process, not only
+the artifact \cite{zhuge2024agentjudge}. Our gate sits in a different
+place. We do not score the patch. We score the moment the agent tries
+to leave, using the developer's next message as the label, on a machine
+that is already running the agent.
+
+\paragraph{Why a small local judge.}
+LLM-as-judge work is now a field of its own
+\cite{zheng2023judging}. The failure modes we care about here are
+self-preference and cost. A 27B judge on the same card as the agent is
+two orders of magnitude smaller than the model it interrupts, which
+removes self-preference and forces the instruction to carry the task.
+The cost is prefill, not decode: a one-token verdict still reads the
+whole closing. Section~\ref{sec:prefill} measures that curve.
+
+
 
 \section{System}
 \label{sec:system}
 
+
+Claude Code exposes a \emph{Stop hook}: a program invoked when the agent
+finishes a turn. In one sentence, the hook either lets the agent sleep or
+wakes it with a short message. Exit status 0 lets the turn end. Exit
+status 2 discards the ending and wakes the agent with the hook's message
+on standard error. The hook sees the full transcript path, the working
+directory, and a flag marking whether it is already inside a re-wake
+chain.
+
+The same orchestrator is the Stop hook on Grok Build. A small adapter
+(\texttt{host.py}) reads the harness from the payload: Claude's snake\_case
+transcript path, or Grok's camelCase envelope. Claude continues on exit
+status 2. Grok does not: a JSON object on standard output wins, and
+\texttt{\{"decision":"block"\}} is what re-wakes the agent. Exit 2 with an
+empty standard output ends the turn anyway, which is how the first Grok port
+looked installed and did nothing. The gate writes that object only when it
+has detected Grok. One file,
+\texttt{stop.json}, is the Stop spec both harnesses load.
+The payload closing wins over the transcript file: Claude writes that
+file late, so the message that just ended can be missing from it.
+Lane 1 reads that same payload closing, so a stale file cannot hide a
+firm hit.
+
+The product is the main agent. \texttt{SubagentStop} is out of scope on
+purpose. A child is meant to be short-lived; a block that keeps it working
+can run eight extra rounds, load the judge, and hold the parent. That
+failure is worse than a short early stop.
+
 The gate is eight checkers and one local model behind a single orchestrator:
-5389 lines of Python and 18 test files. Three lanes decide, cheapest first, and
-a lane that decides ends the turn's evaluation.
+about 6,600 lines of Python and 32 test files. Three lanes decide, cheapest
+first, and a lane that decides ends the turn's evaluation
+(Figure~\ref{fig:lanes}). A working turn skips the judge only after four
+hours of wall time, and only when Lane 1 has no firm hit. The 27B stays
+the 27B. An earlier skip at 400 characters and three tool calls released
+leftover work. That threshold is gone. Firm leftover still blocks, including
+after four hours.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  font=\small,
+  box/.style={draw, rectangle, rounded corners=1pt,
+              align=center, inner sep=6pt, text width=8.4cm},
+  arr/.style={-{Stealth}, thick}]
+\node[box] (in) {Agent closing};
+\node[box, below=4.5mm of in] (l0)
+  {Lane 0 --- audit \texttt{BLOCKED:}\\[-1pt]
+   \footnotesize fail $\rightarrow$ block \quad pass $\rightarrow$ continue};
+\node[box, below=4.5mm of l0] (l1)
+  {Lane 1 --- 341 patterns, cheapest first\\[-1pt]
+   \footnotesize firm hit $\rightarrow$ block \quad doubt or miss $\rightarrow$ continue};
+\node[box, below=4.5mm of l1] (l2)
+  {Lane 2 --- 27B local judge, one token\\[-1pt]
+   \footnotesize \textsc{stop} $\geq 0.5$ $\rightarrow$ block \quad else $\rightarrow$ continue};
+\node[box, below=4.5mm of l2] (q)
+  {A candidate in this turn's tool calls?\\[-1pt]
+   \footnotesize yes $\rightarrow$ one question \quad no $\rightarrow$ release};
+\draw[arr] (in) -- (l0);
+\draw[arr] (l0) -- (l1);
+\draw[arr] (l1) -- (l2);
+\draw[arr] (l2) -- (q);
+\end{tikzpicture}
+\caption{The stop path. A lane that decides ends the evaluation. Two labels
+are read afterwards from the same transcript: the developer's next message
+(was the stop premature?) and the tool calls after a block (did it buy work?).}
+\label{fig:lanes}
+\end{figure}
 
 \subsection{Lane 0: auditing the escape hatch}
 
-A closing message that begins with \texttt{BLOCKED:} is exempt from every other
-check. An agent that cannot proceed must be able to say so, and a gate that
+When the agent is actually stuck, it needs a door that is not a leftover
+question and not a named next step. A closing that begins with
+\texttt{BLOCKED:} is that door, and it is exempt from every other check.
+An agent that cannot proceed must be able to say so, and a gate that
 punishes a genuine blocker teaches the agent to lie about its state.
 
 That exemption is also the cheapest escape in the system, and it was used as
@@ -110,11 +229,16 @@ eventually emitted from memory rather than from the message.
 
 \subsection{Lane 1: patterns as labeling functions}
 
-The second lane is 299 regular expressions over the agent's own words, grouped
+The second lane is 341 regular expressions over the agent's own words, grouped
 into nine classes by what the closing is doing rather than by what it says:
 \texttt{ask}, \texttt{announce}, \texttt{defer}, \texttt{wait},
 \texttt{handoff}, \texttt{errand}, \texttt{read}, \texttt{idle} and
-\texttt{ack}. Appendix~\ref{app:classes} gives the full table. The grouping
+\texttt{ack}. Appendix~\ref{app:classes} gives the full table. A tenth class,
+\texttt{shape}, comes from the checker rather than from the pattern file: it
+reads the form of the closing, a question at the end, a line that ends on a
+colon, a short turn that ran no tool, and it carries no lexicon at all. It is
+the class that appears in every per-class result below, and the one class the
+loop never proposed for demotion. The grouping
 matters because the loop of Section~\ref{sec:loop} tunes classes rather than
 individual expressions: one regular expression rarely fires often enough to be
 judged on its own.
@@ -130,15 +254,52 @@ table rule was added.
 
 \paragraph{Patterns carry a confidence.} A class written \texttt{ask:} decides
 on its own. A class written \texttt{ask?:} raises a doubt and defers to the
-model. Of 299 patterns, 222 are firm and 77 are doubts. This split is what makes
+model. Of 341 patterns, 264 are firm and 77 are doubts. This split is what makes
 a local model affordable: most closings never reach it, and the ones that do are
 the ones a regular expression was going to get wrong.
 
+\subsection{A scored path after a failed one}
+\label{sec:tree-system}
+
+Work forks. The agent scores options and takes one. When that path
+fails, the next highest remaining option is still work. A stop that
+leaves it on the table is leftover of the same kind as naming a next
+step.
+
+\texttt{check-tree.py} reads a small JSON tree next to the session
+transcript (\texttt{decisions.json}), or at
+\texttt{.grok/decisions.json} in the working directory. Each node has
+an id, a label, a score in $[0,1]$, a status
+(\texttt{open}/\texttt{taken}/\texttt{failed}/\texttt{skipped}), and a
+list of neighbours. The pick rule is judgment encoded as a short
+procedure, not a formula:
+
+\begin{itemize}
+  \item After a failed last node, take the highest remaining open
+        node. Among nodes in a $0.7$ band of that best score, prefer a
+        neighbour of last.
+  \item A low-score node waits while a higher-score node is open,
+        unless it sits next to last.
+  \item After a successful last node, take only a high neighbour.
+        Distant alternatives stay unused.
+\end{itemize}
+
+A closing that names leftover options with no tree file still fires.
+The orchestrator logs the pick on every stop, so a reader can see
+which node the gate named.
+
 \subsection{Lane 2: a small local judge}
 
-The third lane is a 9B parameter model served locally through Ollama, pinned by
-version, answering with exactly one token: \textsc{stop} or \textsc{ok}. It runs
-at temperature 0 with a fixed seed.
+The third lane is a local model served through Ollama, pinned by version,
+answering with exactly one token: \textsc{stop} or \textsc{ok}. It runs at
+temperature 0 with a fixed seed. Two sizes appear in the tables, and they
+are easy to mix up. The 9B judge is what the stored campaign was measured
+on. The shipped judge is a 27B Qwen 3.8, quantized to 13GB (Q3\_K\_L, 8k
+context) on a 16GB card, behind a 14GB free-RAM floor. The 9B prompt on
+that 27B fires more and is less precise. A shorter criterion-first prompt
+reverses the pooled result (Section~\ref{sec:scale}). The 9B could not
+hold an exception; waiting moved out of the prompt rather than into a
+larger model. Do not scale the model. Scale around it.
 
 The judge exists for one distinction a regular expression cannot make. In this
 corpus the Spanish word \emph{falta} appears both as ``work is missing'' and as
@@ -146,24 +307,19 @@ corpus the Spanish word \emph{falta} appears both as ``work is missing'' and as
 those; reading the sentence does.
 
 The judge reports how much probability mass it put on the token it chose, read
-from the logprobs that accompany every response. That number was recorded from
-the first verdict and used for nothing for two weeks. It separates cleanly: over
-the 17 held-out messages the judge labels correctly, its lowest score is 0.846,
-and every block in the production log scores above 0.5. The one verdict below
-that threshold was a false accusation, scoring 0.228 on a message that closed
-cleanly. A \textsc{stop} below 0.5 is therefore not delivered as a block; it is
-delivered as the proactive question of Section~\ref{sec:proactive}, which buys
-the same second look without telling the agent it left work behind. Guessing
-costs a look; accusing costs trust.
+from the logprobs that accompany every response. A \textsc{stop} below 0.5
+is not delivered as a block; it is delivered as the proactive question of
+Section~\ref{sec:proactive}, which buys the same second look without telling the
+agent it left work behind. Guessing costs a look; accusing costs trust.
 
 A judge that cannot be reached is treated the same way. An earlier version
-blocked every stop when the model was silent, on the argument that a switched-off
-judge is precisely the failure the gate exists to prevent, and it started the
-daemon itself to avoid that state. Both halves were wrong in the same direction.
-Starting a 5.5GB model server because a turn ended is a decision belonging to
-whoever owns the machine: on 2026-08-29 the gate did it on a busy workstation,
-which ran out of memory and had to be restarted. The gate now starts nothing,
-and a silent judge degrades to the pattern lanes plus one proactive question.
+blocked every stop when the model was silent, and it started the daemon itself
+to avoid that state. Both halves were wrong in the same direction. Starting a
+5.5GB model server because a turn ended is a decision belonging to whoever owns
+the machine: on 2026-08-29 the gate did it on a busy workstation, which ran out
+of memory and had to be restarted. The gate now starts nothing, and a silent
+judge degrades to the pattern lanes plus one proactive question. A claimed
+\texttt{BLOCKED:} with no judge falls back to the transcript audit.
 
 Two further implementation details proved necessary rather than cosmetic. First, all
 judge requests are serialized behind a machine-wide lock: the serving daemon
@@ -185,10 +341,9 @@ with it. The turn ends when the agent answers that it looked and found
 nothing, or when it goes and does the thing it found.
 
 The candidates are read off the record rather than inferred, and a turn that
-leaves none is released without a question. That gate on the question is
-measured rather than assumed: a candidate exists on 30\% of real turns, and
-the first blocks of the unconditional version bought no work half the time,
-the worst conversion of any lane (Section~\ref{sec:results}).
+leaves none is released without a question. A candidate exists on 30\% of real
+turns, and the first blocks of the unconditional version bought no work half
+the time, the worst conversion of any lane (Section~\ref{sec:results}).
 
 The asymmetry is deliberate. A block says the agent left work behind, and it is
 wrong whenever the closing was clean. This question makes no such claim, so it
@@ -210,6 +365,13 @@ revisions and the final form is deliberate: it states that the work already done
 stands, that permission was granted in advance and does not expire, and that if
 anything remains the agent should take the step rather than name it.
 
+Length is part of the design and is enforced by the suite. Each template carries
+a word budget, from 20 for the repeat notice to 75 for the proactive question,
+and a test fails when one runs over or when a phrase from the padding list
+reappears. Every revision so far has added a clarifying sentence, so the budget
+makes the next one displace a sentence already there. A message the agent skims
+is a message that decides nothing.
+
 The reasoning is mechanical rather than courteous. An agent that reads an
 accusation spends the woken turn defending itself, which is precisely the
 outcome the block was meant to prevent. We observed this directly with earlier,
@@ -229,18 +391,18 @@ the numbers. Section~\ref{sec:loop} is built on that log.
 We use every session transcript on one developer's machine: 66 transcripts
 spanning 2026-08-03 to 2026-08-29, across several projects. From these we
 extract \emph{closing pairs}: the agent's final text message of a turn together
-with the user's next message. The first build of this yielded 854 pairs. The
-corrected readers of Section~\ref{sec:contamination} yield 764, of which 747
-are neither harness noise nor the gate talking to itself.
+with the user's next message. The current build yields 766 pairs, of which 749
+are neither harness noise nor the gate talking to itself. That file,
+\texttt{corpus.json}, is the source of every table in Section~\ref{sec:results}.
+Earlier builds, and why they were thrown out, are in Appendix~\ref{app:builds}.
 
 The corpus is naturally split by a date. The gate was first installed on
 2026-08-28, so of the 43 sessions that carry a closing, 32 are \emph{ungated}
-- produced with no gate in the stop path - and 11 are \emph{gated}.
-Ungated transcripts are the ones the gate never influenced. The lane
-ablations run over the whole clean corpus, because a gated closing is still a
-closing the developer answered; what the split is for is the era comparison,
-and for reading the gate's misses, which is only honest where the gate was
-not shaping the text.
+-- produced with no gate in the stop path -- and 11 are \emph{gated}.
+Ungated transcripts are the ones the gate never influenced. Lane ablations
+run over the whole clean corpus, because a gated closing is still a closing
+the developer answered. The split is for reading the gate's misses, which is
+only honest where the gate was not shaping the text.
 
 \subsection{A label nobody had to write}
 
@@ -248,34 +410,117 @@ Evaluating a stop gate requires knowing which stops were premature. Annotating
 that by hand is expensive and, worse, is annotated by the same person whose
 intuitions built the patterns.
 
-The corpus already contains the judgement. When an agent stops early, the user's
-next message is a bare push: \emph{dale}, \emph{seguí}, \emph{continue},
-\emph{keep going}. It carries no new instruction, because none was needed. We
-detect it with a closed lexicon anchored to the whole message, so that
-``continue with the refactor'' is not counted and ``ok dale'' is.
+The corpus already contains the judgement. A second local judge reads the
+developer's reply, not the agent's closing, and answers one question: did the
+developer have to ask for work the agent could have done on its own? A reply
+that pushes, picks from a menu the agent offered, or tells the agent to run
+what it just described is a push. A reply that supplies information the agent
+could not have had -- a preference, a priority, a fact from outside the
+repository, a correction -- is not.
 
-This label is noisy in one direction and clean in the other. A push is strong
-evidence the turn ended too early. Its absence is weak evidence of the opposite,
-because a user often absorbs the loss and just answers the question. We
-therefore report recall against pushes and firing rate, and do not report
-precision, which this label cannot support.
+Two live shapes. Closing: ``The paragraph is in. Commit and PR when you
+want.'' Next: \emph{bueno hace push y crea el PR}. That is a push: the
+agent named git and stopped. Closing: ``Which of the two APIs should
+I wire?'' Next: \emph{the public one, the internal one is frozen}. That
+is not a push: the developer gave a fact the agent did not have.
 
-\subsection{Metrics}
+This judgement is deliberately not the gate's own. Grading a gate with the
+prompt it decides by measures its consistency and nothing else.
 
-For each lane configuration we report how many closings it fires on, and what
-fraction of pushed closings it catches. We deliberately avoid a single combined
-score: the two costs are not commensurable. A missed premature stop costs the
-user one round trip. A false block costs the agent a full turn and, if the
-wording is wrong, poisons the next one.
+Two checks before using it. It recovers 10 of the 11 bare pushes a closed
+lexicon finds, without being given the lexicon. On a held-out set of nine
+hand-written boundary cases -- including short, blunt replies that carry real
+information -- it scores 9 of 9. A blinded second-model reading of 60 live pairs is in
+Section~\ref{sec:blind}.
+
+The label is noisy in one direction and clean in the other. A push is strong
+evidence the turn ended too early. Its absence is weak evidence of the
+opposite, because a user often absorbs the loss and just answers the question.
+Every precision in this paper is therefore a floor on the true value. What the
+label supports is the comparison of rates, and the association test that uses
+the rows the gate stayed quiet on.
+
+\subsection{What the numbers mean}
+\label{sec:metrics}
+
+Every table in this paper is four counts on the same 749 closings.
+
+A \emph{closing} is the agent's last text before it tries to stop.
+A \emph{fire} is the gate blocking that stop and waking the agent.
+A \emph{push} is the developer's next line asking for work the agent
+could have done on its own (\emph{push}, \emph{segu\'i}, \emph{hace el
+PR}). A \emph{caught} row is a fire that was also a push. A
+\emph{false alarm} is a fire with no push. A \emph{miss} is a push
+with no fire.
+
+On this file there are 82 pushes in 749 closings. That share, 10.9\%,
+is the \emph{base rate}. A gate that blocked at random would be right
+on about one fire in nine. Every precision in the paper is read
+against that number.
+
+A toy round of the same arithmetic, scaled to 100 closings so the
+fractions are visible. Eleven of those 100 are pushes. The gate
+speaks on 56. Eight of those 56 were pushes, so precision is
+$8/56 \approx 0.14$: when it speaks, it is a real early-stop about
+one time in seven. It caught eight of the eleven pushes, so recall
+is $8/11 \approx 0.73$: of the times the developer had to push, it
+had already spoken on most of them. Forty-eight fires were false
+alarms. Three early-stops went through.
+
+The stored 9B shipped row in Table~\ref{tab:lanes} is that arithmetic
+at full size: 499 fires, precision 0.136, recall 0.829. The live
+regex file at T4 (Table~\ref{tab:t0t1}) is 423 fires, 80 caught,
+precision $80/423 = 0.189$, recall $80/82 = 0.976$. Same 82 pushes.
+The false-alarm count did not rise.
+
+Precision answers a practical question: given that the gate just
+spoke, was this stop premature? Recall answers the other one: of the
+times the developer still had to push, had the gate already caught
+it? A miss costs the developer one round trip. A false alarm costs
+the agent a full extra turn and, if the wording is wrong, poisons
+the next one. Those costs do not trade one-for-one, so this paper
+does not tune on a combined score.
+
+The \emph{person} rows drop next-turns that are harness mail: a
+task-notification, a continue-from-where-you-left-off injection, a
+slash command. What remains is a line a person typed. Headline
+recall on that slice is the number that answers ``when I had to
+push, did the gate already have it.'' At T4 that recall is 70/70.
+
+The interval next to precision is a Wilson 95\% range. It is an
+honesty bar on a small count, not a second verdict. On 80 caught in
+423 fires the range is [0.155, 0.229]. On the stored 9B shipped row
+it is [0.109, 0.169], which still includes the base rate, so a
+single fire there is still compatible with guessing. On the T4 live
+row the range sits above 0.109. Even then four of five fires are
+false alarms, so the fire is a wake, not a verdict.
+
+The Fisher test asks whether fires and pushes land on the same rows
+more often than chance. They do ($p = 0.0007$ on the stored file).
+Silence is the safer signal: a closing the gate lets through is a
+push about 6\% of the time, not 11\%.
+
+A second label sits on the blocks themselves. After a fire, count
+the agent's tool calls before the developer speaks again. Above a
+threshold the fire \emph{bought work}. At or below it, the fire
+bought another paragraph. Section~\ref{sec:loop} gives the rule.
+55 of 63 graded blocks bought work.
+
+Live T0--T4 rows use this same arithmetic. The 27B verdicts stay
+frozen. Only the regex file moves. False alarms stay 343. Caught
+moves 66 to 80. Read those rows as: more of the 82 pushes found,
+and no extra false alarms.
 
 \section{The self-labeling loop}
 \label{sec:loop}
 
-Every decision the gate makes is appended to a private log: the lane that
-decided, the patterns that fired, the judge's verdict and confidence, the
-latency, and the first line of the message. The log records what was decided. It
-does not record whether the decision was right, and for the first weeks tuning
-meant reading transcripts by hand.
+A fire is only useful if the woken agent then does work. This section is
+that conversion number. Every decision the gate makes is appended to a
+private log: the lane that decided, the patterns that fired, the judge's
+verdict and confidence, the latency, and the first line of the message.
+The log records what was decided. It does not record whether the decision
+was right, and for the first weeks tuning meant reading transcripts by
+hand.
 
 The missing label was already in the transcript, a few lines below the block.
 A block wakes the agent, and from there exactly one of two things happens: the
@@ -305,7 +550,9 @@ same pattern class that had been demoted by hand that morning after measuring
 \section{Negative results}
 \label{sec:negative}
 
-These cost more than the positive ones and generalize better.
+These are the things we tried that failed. They cost more than the wins
+because they tell a practitioner what not to put in the prompt, and what
+not to spend a larger model on.
 
 \paragraph{The judge cannot report its own confidence.} Asked to append a
 confidence rating to its verdict, the 9B model answered with the maximum every
@@ -320,8 +567,10 @@ confidently wrong in a stable way, so disagreement-based confidence
 
 \paragraph{Token log-probabilities did move.} Taking the probability the model
 assigned to the single verdict token it emitted produced a number that varies
-with the message, and that separates at the extremes. It is the only one of the
-three that worked.
+with the message. It is the only one of the three that worked, and it does not
+work the way its name suggests. Higher confidence is not more precise.
+Scored against the label the curve is non-monotonic, and the stops the
+judge is least sure of are its most precise slice.
 
 \paragraph{A 9B judge cannot hold an exception.} Nineteen percent of the judge's
 blocks were turns in which the agent had correctly launched background work and
@@ -333,7 +582,7 @@ Waiting is now established deterministically from the transcript, before the
 judge is called at all. \emph{An instruction a small model cannot hold is a
 decision that belongs outside the model.}
 
-\paragraph{Nor a disposition.} The judge's instruction ended with
+\paragraph{The model ignores ``when unsure, STOP.''} The judge's instruction ended with
 \emph{when unsure, answer STOP}. Replacing it with its exact opposite,
 \emph{when unsure, answer OK}, changed 31 verdicts out of 841 and moved
 precision by 0.001. Replacing it instead with a test the model can apply --
@@ -354,19 +603,58 @@ before/after comparison reported three regressions. Both arms had been given
 different working directories, so one checker saw files on one side only. The
 regressions vanished once the directory was pinned.
 
+\paragraph{A claim-verification lane found almost nothing.} We extracted
+first-person delivery claims from every closing and matched them against the
+commands the session ran. Contradicted claims occur on 0.5\% of closings.
+The agent in these transcripts overstates what it did far less often than it
+stops with work available, and those are separate failures needing separate
+mechanisms. A first extractor that counted the word \emph{commit} anywhere
+read 41\% of claims as contradicted; that number was a bad regular expression,
+not a finding.
+
 \section{Threats to validity}
+\label{sec:threats}
+
+Every number here has a limit. For a practitioner the three that matter
+first are: one developer, one label with no human second reader, and only
+82 real pushes. The label is one-sided (Section~\ref{sec:setup}) and a
+blinded second model agrees at kappa 0.43 (Section~\ref{sec:blind}). The
+rest of this section is the full list.
+
+\paragraph{The failure rate moves.} The push rate rises from 0.067 to 0.160
+across the four weeks of the corpus, and the first and last weeks do not
+overlap at 95\%. Every pooled number in this paper averages over that, and the
+before-and-after comparison of the gate is confounded by it, because the gated
+era is the late one. We cannot separate a developer who changed from an agent
+that changed from work that got harder.
+
+\paragraph{The label has no human second reader.} Every number here rests on one
+judgment: whether the developer's next message was a push. That judgment is
+made by a model whose prompt the same developer wrote, checked against nine
+hand-written boundary cases written by that developer, in the same idiom as
+the prompt's own examples. A second model, blinded to the stored verdicts,
+scores Cohen's kappa $0.426$ on 60 pairs (Section~\ref{sec:blind}): fair
+agreement, and still not a person. An error rate of one in nine on the
+label would still be large enough to produce the precision differences
+this paper treats as real.
+The one-sidedness cuts both ways too: a developer who absorbs a premature stop
+and answers it makes the measured precision a floor, and makes the base rate a
+floor by the same mechanism, so correcting the label could move both numbers
+and either close the gap or widen it.
 
 \paragraph{One user, one idiom.} The corpus comes from a single developer. The
 patterns carry that developer's phrasing, and the judge required an explicit
-reading list for River Plate Spanish because \emph{quedó cableado} (``it is
+reading list for River Plate Spanish because \emph{qued\'o cableado} (``it is
 wired end to end'') was being read as work in progress. Nothing here has been
 tested on a second user's transcripts.
 
 \paragraph{The gate contaminates its own corpus.} Gated transcripts were
 produced with the gate running, so their closings are partly the gate's own
-output distribution. This is why all label-based evaluation is restricted to
-ungated transcripts, and why the era comparison in Section~\ref{sec:results} is
-observational rather than controlled.
+output distribution. This is why misses are only honest to read on ungated
+transcripts, and why an era comparison is observational rather than controlled.
+The first build of the corpus was worse than that: the gate's own wake was
+read as a developer reply, so the system scored itself. Appendix~\ref{app:builds}
+says what changed when the readers were corrected.
 
 \paragraph{The push label is one-sided.} Absence of a push is not evidence the
 turn was complete: a developer often absorbs a premature stop and simply
@@ -375,50 +663,64 @@ and not an estimate of it. What the label supports is the comparison of rates,
 and the comparison holds under any one-sided correction: the gate fires several
 times more often than a push occurs.
 
+\paragraph{No self-critique baseline was run.} The obvious comparison is to
+ask the agent itself whether it finished, in the same turn, before spending a
+second model. We argue in Section~\ref{sec:related} that this asks the party
+that made the error to detect it, and we did not test that argument. Doing it
+properly means running the agent model over all 749 closings, which is the one
+experiment in this paper that costs real money, and the local judge cannot
+stand in for it because it is not the model that stopped. The claim that an
+external gate beats self-critique here is reasoning and not a measurement.
+
 \paragraph{The grading rule rewards motion.} Counting tool calls after a block
 cannot see whether the work was any good. An agent that learned to emit cheap
 tool calls after every block would defeat it. We have not observed this, and it
 is the most obvious way the loop could be gamed.
 
 \paragraph{Rules are searched on the rows they are scored on.} Every class
-demotion, and the three rules added from the missed pushes, were chosen by
-reading this corpus and reported on it. Section~\ref{sec:results} splits the
-corpus by session and scores the search on held-out sessions to bound the
-damage: the direction transfers, the size is about two closings, and the set of
-classes chosen is not stable across halves.
+demotion, and the rules added from missed pushes, were chosen by reading this
+corpus and reported on it. A session-wise split of the search transfers in
+direction and barely in size: held-out precision rises in 16 of 20 splits, and
+the mean gain is about two closings. The set of classes chosen is not stable
+across halves.
 
-\paragraph{The corpus is small where it counts.} 747 closings carry 78 pushes,
+\paragraph{The corpus is small where it counts.} 749 closings carry 82 pushes,
 so every precision here has a Wilson interval two to four points wide and every
-per-class number rests on tens of rows. No configuration we measured separates
-from the base rate at 95\%. Conclusions in this paper are stated at the level
-the intervals support, which is rates and directions rather than values.
+per-class number rests on tens of rows. No pooled configuration we measured
+separates from the base rate at 95\%. Conclusions in this paper are stated at
+the level the intervals support, which is rates and directions rather than
+values.
 
 \paragraph{Thresholds are tuned, not derived.} The demotion threshold and the
 work threshold were chosen for the volume this log receives.
 
 \section{Discussion}
 
-Three things generalize beyond this system.
+If you run agents under standing permission, these three are the parts
+we expect to travel. They are untested on a second user, and they were
+measured on one corpus.
 
 \paragraph{Put the decision where the capability is.} The clearest single result
 is the background-work case: an exception that a 9B model could not hold in its
 prompt became trivial once it was decided by ten lines of transcript inspection.
 The temptation with a model in the loop is to route every judgement through
-it. The cheaper lanes should take everything they can prove, and the marginal
-cut says how much that is worth here: on the closings only the patterns catch,
-precision is 0.145; on the closings only the judge catches, it is 0.106 on a
-base rate of 0.104. The model earns its place by covering three times the
-volume, and it earns none of it by being more discriminating than a regular
-expression.
+it. The cheaper lanes should take everything they can prove. On the closings
+only the patterns catch, precision is 0.109, the base rate. On the closings
+only the judge catches, it is 0.129. Among closings a person answered, those
+unique judge rows reach 0.243 against 0.151. The model earns its place on the
+rows a person saw, and none of it by being more discriminating than a regular
+expression on the pooled table.
 
 \paragraph{Confidence is a router before it is a decision.} Per-pattern
 confidence is what makes the local model affordable, because it decides which
-messages are worth a model at all. The judge's own confidence was informative
-and unsafe to threshold, because dropping a low-confidence STOP loses real
-pushes. It became usable when the action space grew a third option: a STOP
-under the floor is put as the question instead of as an accusation, and the
-turn is neither blocked nor released. A weak signal that cannot pick between
-two actions can still pick a third.
+messages are worth a model at all. The judge's own confidence became usable
+when the action space grew a third option: a STOP under the floor is put as
+the question instead of as an accusation, and the turn is neither blocked nor
+released. A weak signal that cannot pick between two actions can still pick a
+third. Measured afterwards against the label, the low-confidence stops turn
+out to be the most precise slice the judge produces, so the floor is keeping
+its best rows and asking about them rather than discarding them. A confidence
+read as a quality score would have inverted that.
 
 \paragraph{Interventions leave labels.} Any system that interrupts an agent gets
 a natural experiment for free: the agent's behaviour after the interruption. We
@@ -427,39 +729,57 @@ interventions is often not a missing label but an unread one.
 
 \section{Limitations and future work}
 
+This system is one developer's gate, scored on one machine. The next
+three paragraphs are what that means for someone who wants to ship it.
+
 The loop corrects unevenly. It finds patterns that block too much cheaply,
 because every block leaves a graded trace and the report reads itself. The
 other side needs the push label: a turn the gate allowed and the developer then
-pushed back on is a miss, and reading the twelve of them took an afternoon and
-produced three rules. That path is manual, and it is only trustworthy on
-ungated transcripts, where the label is not partly the gate's own output. On
-this corpus the label does not thin out under the gate - 10.3\% of gated
-closings carry a push against 10.5\% of ungated ones - so the constraint is
-contamination rather than sparsity, and it is the same constraint either way:
-the misses can only be read where the gate was not running.
+pushed back on is a miss, and reading those misses is still manual.
+\texttt{STOP\_HOLDOUT} can suppress a fraction of fires at random to produce
+clean miss-rate rows. The default is zero. A random miss on a sure
+permission-ask is a failed re-wake, which is how the first Grok happy path
+died one time in ten.
+
+The scored tree cannot be graded on the frozen 749, because those
+sessions never wrote \texttt{decisions.json}. The word leftover can,
+and it fired on zero of them. A practitioner who wants this lane
+to earn its keep has to write the tree while branching. The unit
+fixtures grade the pick rule. They do not grade a year of live
+trees.
 
 Three extensions follow directly. Demotion is currently proposed and applied by
 an agent reading the report; promotion in the other direction is not
 implemented. The judge is a general instruction-tuned model, and the graded log
 is exactly the dataset needed to fine-tune a specialist. And no part of this has
-been run against a second user, which is the first thing that should happen.
+been run against a second user, which is the first thing that should happen. \texttt{SubagentStop} is a deliberate non-goal, not a missing port.
 
 \section{Conclusion}
 
 A gate that stops an agent from stopping early is easy to build and hard to
 evaluate, because evaluation needs labels and labels need a reader. Both
-labels this system needs were already lying in the transcript: the developer's
-own reply before the gate exists, and the agent's own behaviour after the gate
+labels this system needs were already lying in the transcript: the
+developer's own reply, and the agent's own behaviour after the gate
 intervenes. Neither costs an annotation.
 
-Reading them was uncomfortable and useful in the same measure. The gate fires
-on three closings in four and is right about one in eight, which is the rate at
-which the failure occurs at all: no configuration we measured separates from it
-at 95\%. The first thing the labels
-overturned was the design's most confident exemption, which turned out to be
-releasing turns worse than average. The second was a prompt written as a
-disposition, replaced by one written as a test, which improved every number at
-once.
+On the stored file the gate fires on two closings in three and is right
+about one in seven. On the closings a developer actually answered it is
+right about one in five, while the failure runs at one in seven. The
+association holds either way, $p = 0.0007$ pooled and $p = 0.0009$
+stratified by week. 55 of 63 graded blocks bought work.
 
-Neither correction came from a new idea. Both came from finally measuring
-something that had been sitting in the transcript the whole time.
+Against frozen 27B verdicts the live pattern file then takes person
+recall from 0.829 to 1.000 on Claude and from 0.791 to 1.000 on Grok,
+with zero extra false alarms. The two leftover extra-misses on Claude
+are harness next-turns, not a person. A single fire is still a poor
+bet: even at T4, four of five fires are false alarms.
+
+A practitioner who ships this should leave it on, and should not trust a
+single fire. Conversion is the number to run it on: after a wake, did
+the agent work. Put the decision where the capability is. Do not scale
+the model; scale around it. The next closing is still the one the gate
+cannot name.
+
+Neither the retired waiting exemption nor the prompt written as a test
+came from a new idea. Both came from finally measuring something that
+had been sitting in the transcript the whole time.

@@ -117,6 +117,20 @@ def main():
     if code != 0:
         failures.append("test-only work must stay silent")
 
+    code, err = run(repo(), REAL, files=["README.md"],
+                    ran=["./gradlew assembleDebug", "adb install app.apk"])
+    if code != 2:
+        failures.append("uncommitted readme must fire")
+    elif "uncommitted" not in err:
+        failures.append("uncommitted readme must be named")
+
+    code, err = run(repo(), REAL, files=["paper-body.tex"],
+                    ran=["./gradlew assembleDebug", "adb install app.apk"])
+    if code != 2:
+        failures.append("uncommitted tex must fire")
+    elif "uncommitted" not in err:
+        failures.append("uncommitted tex must be named")
+
     root = repo()
     outside = os.path.join(tempfile.mkdtemp(), "tool.py")
     open(outside, "w").write("x = 1\n")

@@ -6,6 +6,16 @@ lo deja ir.
 
 Corre en tu máquina, en todas las sesiones, sin que nadie lo prenda.
 
+El mismo script atiende Claude Code y Grok Build. El caller se lee del
+payload y del entorno; los carriles, los patrones y el juez local son uno.
+
+Una parada no habla el dialecto del otro harness. Claude cierra un Task
+con `<tool-use-id>` en el XML. Grok lo cierra con `tool_use_id` en el
+`tool_result`. Si el registro solo busca el tag, un spawn denegado queda
+vivo y el guardia pide KEEP GOING con nada corriendo. Cada closer tiene
+un fixture en la forma que el harness realmente escribe. Un tag citado
+en el cuerpo de un archivo no es una notificacion.
+
 ## Por qué existe
 
 Un agente corta antes de tiempo de muchas maneras y todas suenan bien:
@@ -15,6 +25,7 @@ Un agente corta antes de tiempo de muchas maneras y todas suenan bien:
 - "Listo, 2090 tests en verde" — un número que nunca midió.
 - "Agregué `Foo.kt`" — el archivo no está.
 - "BLOCKED: no puedo seguir" — casi siempre es mentira.
+- "That path failed, I stop here" — a higher-score sibling is still on the tree.
 
 El guardia mira cada una de esas contra los hechos de la sesión.
 
@@ -58,6 +69,11 @@ es 0,846, y todo bloqueo real del log está sobre 0,5. Debajo de `0.5` el
 veredicto pasa a ser la pregunta proactiva. Adivinar cuesta una mirada;
 acusar cuesta confianza.
 
+Un cierre de menos de 4 horas sigue por los tres carriles. Recién a las 4
+horas el juez se reserva: si ningún patrón firmó, no se llama al 27B.
+Announce firme sigue frenando. El skip de 400 caracteres soltó leftover;
+ese umbral ya no está.
+
 Tope: después de 6 bloqueos seguidos el guardia se corre. Siempre hay salida.
 
 ## Los controles
@@ -70,11 +86,38 @@ Tope: después de 6 bloqueos seguidos el guardia se corre. Siempre hay salida.
 | `check-hollow.py` | canta éxito y en la misma frase admite que está vacío |
 | `check-dead-code.py` | agregó código que nada afuera de sus tests usa |
 | `check-blocked.py` | audita el bloqueo: ¿lo intentó, o lo declaró? |
+| `check-tree.py` | a scored path remains after the last one failed |
 | `check-stop.py` | el que orquesta a todos y llama al modelo |
+
+## The decision tree
+
+Work is a tree of options. The agent scores them and takes one path.
+When that path fails, the next highest score is still work.
+
+The tree lives next to the session as `decisions.json`, or at
+`.grok/decisions.json` in the working directory. Each node has an id, a
+label, a score from 0 to 1, a status (`open` / `taken` / `failed` /
+`skipped`), and neighbours.
+
+The pick rule, seven fixtures, zero wrong:
+
+- Failed path: take the open node with the highest score. If several sit
+  in a 0.7 band of that best score, prefer a neighbour of last.
+- A low-score node waits while a higher-score node is open, unless it
+  sits next to last.
+- Successful path: take only a high neighbour. Distant alternatives stay.
+
+A closing that names leftover options, with no tree file, also blocks.
+
+Frozen v4: 749 closings, 0 leftover-word fires, 0 extra false positives,
+0 extra true positives. Those sessions never wrote the tree.
+`bench-tree.py corpus-v4-27b.json` reprints both tables. The paper treats
+this as an experiment: hypothesis, what the corpus can measure, what it
+cannot, and what would falsify the claim.
 
 ## Lo que se sacó
 
-Hubo un octavo control: leía "creé `Foo.kt`" y le preguntaba al árbol si el
+Hubo un control que leía "creé `Foo.kt`" y le preguntaba al árbol si el
 archivo estaba.
 
 Se midió contra los mensajes de cierre reales de esta máquina: 4478 mensajes,
@@ -99,22 +142,23 @@ seis fugas en el primer barrido, cero en el tercero.
 
 ## El modelo local
 
-Ollama en tu máquina, `qwen3.5:9b`. El transcript nunca sale de acá y un
-veredicto cuesta como una décima de segundo con el modelo caliente.
+Ollama en tu máquina, `stop-judge` (Qwen 3.8 27B, Q3_K_L, 13 GB, contexto 8k).
+Cabe en la RX 9070 XT de 16 GB. El transcript nunca sale de acá y un
+veredicto caliente cuesta cerca de medio segundo.
 
 El modelo está fijo en el código a propósito. Una sesión bajo control puede
 editar `settings.json`, y una lo hizo: se puso el modelo chico y toda la
 máquina quedó con el juez malo por un día. Sobre los casos reales, el 9b
 agarra 18 de 20; el 0.8b, 11.
 
-Si Ollama está apagado, el guardia lo prende solo y espera hasta 20 segundos.
+Si Ollama está apagado, el guardia no prende nada: se queda con los patrones y una pregunta proactiva.
 
 Cuando el juez es el que traba, el agente recibe la frase que lo delató, en sus
 propias palabras. Un veredicto sin prueba se lee como una máquina caprichosa, y
 lo primero que hace un agente con eso es discutir. Su propia línea citada cierra
 la discusión. El modelo la copia del mensaje; si lo que devuelve no está ahí
 escrito, no se muestra nada. Se pregunta aparte, después del veredicto: dejar
-que un 9b escriba prosa y etiqueta en la misma respuesta corrompe la etiqueta,
+que el modelo escriba prosa y etiqueta en la misma respuesta corrompe la etiqueta,
 que es la parte medida en 17 de 17.
 
 Todo lo que sale del guardia entra en un título y dos párrafos. Un recordatorio
@@ -230,19 +274,22 @@ segundo describe el trabajo, el primero a la persona. La verdad no ofende, pero
 cambia cómo te tratan después, y el guardia necesita que lo escuchen seis veces
 seguidas.
 
-Ocupa 6.6 GB. Si a la máquina le quedan menos de 8 GB libres, el guardia no lo
-carga y deja pasar el turno: trabar todas las sesiones detrás de memoria que no
-va a aparecer es peor que perder un control.
+Ocupa 13 GB. Si a la máquina le quedan menos de 14 GB libres de RAM, el guardia
+no lo carga y deja pasar el turno: trabar todas las sesiones detrás de memoria
+que no va a aparecer es peor que perder un control. No uses el IQ4 de 15 GB ni un Q4 de 17 GB: llenan la placa. Este alias fija
+contexto 8k sobre `qwen3.8-ud` (Q3_K_L, 13 GB).
 
 ## Operarlo
 
 ```sh
 python test_check_permission.py     # un control solo
-for t in test_*.py; do python "$t"; done   # todos
+python test_check_tree.py           # decision tree
+python bench-tree.py corpus-v4-27b.json
+bash run-tests.sh                   # todos, con el ledger de procesos
 python bench-llm.py                 # medir el modelo contra transcripts reales
 ```
 
-Está enganchado en `~/.claude/settings.json`, en `hooks.Stop`.
+Una sola definición: `stop.json` al lado del script. Claude y Grok cargan ese mismo `hooks.Stop`. Grok sigue cuando el script escribe `{"decision":"block"}` en stdout. `SubagentStop` no va: un hijo corto que el guardia mantiene vivo empila rondas y el 27B.
 
 Perillas, todas por variable de entorno:
 
@@ -251,9 +298,11 @@ Perillas, todas por variable de entorno:
 | `STOP_JUDGE_HOST` | `http://127.0.0.1:11434` | dónde vive Ollama |
 | `STOP_JUDGE_WAKE` | `0` | segundos esperando a un daemon que el hook prenda; `0` no prende nada |
 | `STOP_SURE_FLOOR` | `0.5` | confianza mínima para que un STOP frene en vez de preguntar |
-| `STOP_JUDGE_FLOOR` | `8` GB | memoria libre mínima para cargar el modelo |
+| `STOP_JUDGE_FLOOR` | `14` GB | memoria libre mínima para cargar el modelo |
 | `STOP_JUDGE_KEEP` | `5m` | cuánto queda caliente entre paradas |
 | `STOP_JUDGE_DEADLINE` | `70` | tope de segundos del juez; el harness corta a 90 |
+| `STOP_WORK_SECS` | `14400` | segundos de turno (4 h) para soltar el juez si ningún patrón firmó |
+| `STOP_HOLDOUT` | `0` | fracción de frenos (no Lane 0) que se sueltan al azar para medir misses |
 
 Para apagarlo del todo, sacá la línea de `settings.json`.
 
