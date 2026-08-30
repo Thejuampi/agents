@@ -282,22 +282,7 @@ def last_user(transcript):
     developer had asked for the reminder, and it scored the closing against
     that instead of the request - on every wake, which is the case the judge
     exists for."""
-    said = ""
-    for entry in entries(transcript):
-        if not reader.spoke(entry):
-            continue
-        content = entry.get("message", {}).get("content")
-        if isinstance(content, str):
-            words = reader.reply_of(content)
-        elif isinstance(content, list):
-            words = reader.reply_of(" ".join(
-                b.get("text", "") for b in content
-                if isinstance(b, dict) and b.get("type") == "text"))
-        else:
-            words = None
-        if words:
-            said = words
-    return said
+    return reader.last_user(entries(transcript))
 
 
 def openings(transcript):

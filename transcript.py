@@ -61,6 +61,17 @@ def reply_of(text):
 
 
 
+def last_user(rows):
+    said = ""
+    for entry in rows:
+        if not spoke(entry):
+            continue
+        words = reply_of(said_by(entry))
+        if words:
+            said = words
+    return said
+
+
 def said_by(entry):
     """The text of one entry, developer or agent, with nothing else in it."""
     content = entry.get("message", {}).get("content")

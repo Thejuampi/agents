@@ -29,6 +29,7 @@ _mod = importlib.util.spec_from_file_location(
 mod = importlib.util.module_from_spec(_mod)
 _mod.loader.exec_module(mod)
 host = mod.load("host.py")
+reader = mod.load("transcript.py")
 
 BASE_PATTERNS = os.path.join(HERE, "stop-patterns.txt")
 
@@ -252,9 +253,37 @@ def acted_this_turn(path):
     return used
 
 
-def ends_on_nothing(message, acted):
-    """Short, no tools, turn over. The work was available and went untouched."""
-    return not acted and len(message.strip()) < 400
+WORK = re.compile(
+    r"\b(fix|wire|build|implement|commit|segui|seguí|cablea|arregla|"
+    r"implementa|hace el trabajo)\b",
+    re.IGNORECASE)
+
+QUICK = re.compile(
+    r"(in one sentence|one sentence|una oraci[oó]n|una frase|"
+    r"how long|cu[aá]nto (tard|dura|toma)|"
+    r"\bwhy\b|\bpor qu[eé]\b|\bwhat is\b|\bqu[eé] es\b)",
+    re.IGNORECASE)
+
+
+def last_ask(path):
+    return reader.last_user(host.entries(path))
+
+
+def quick_ask(asked):
+    text = " ".join((asked or "").split())
+    if not text:
+        return False
+    if QUICK.search(text):
+        return True
+    if WORK.search(text):
+        return False
+    return "?" in text and len(text.split()) <= 40
+
+
+def ends_on_nothing(message, acted, asked=""):
+    return (not acted
+            and len(message.strip()) < 400
+            and not quick_ask(asked))
 
 
 MAYBE = 3
@@ -317,7 +346,7 @@ carried an ack pattern, and the two above this line were reports of finished
 work. The one below it was the real thing."""
 
 
-def offenders(message, cwd=None, acted=True):
+def offenders(message, cwd=None, acted=True, asked=""):
     # Naming a trigger phrase is not using it. Talking about the hook, or
     # quoting someone, must not fire it.
     stripped = unquoted(message)
@@ -333,7 +362,7 @@ def offenders(message, cwd=None, acted=True):
         hits.append("shape: closing question")
     if ends_on_a_colon(message):
         hits.append("shape: a closing that ends on a colon")
-    if ends_on_nothing(message, acted):
+    if ends_on_nothing(message, acted, asked):
         hits.append("shape: a short turn that ran nothing")
     return hits
 
@@ -353,11 +382,13 @@ def main():
 
     transcript = payload.get("transcript_path") or ""
     acted = False
+    asked = ""
     if transcript and os.path.exists(transcript):
         acted = acted_this_turn(transcript)
+        asked = last_ask(transcript)
 
     cwd = payload.get("cwd") or os.getcwd()
-    hits = offenders(message, cwd, acted)
+    hits = offenders(message, cwd, acted, asked)
     if not hits:
         return 0
 

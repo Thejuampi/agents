@@ -65,7 +65,12 @@ check("a screenshot and an interrupt are not the developer speaking",
 check("a turn with no answer yet still counts as asked",
       reader.exchanges([user("dale")]), [("dale", "")])
 
-print(f"6 cases, {len(failures)} failures")
+check("the last developer line is the newest real ask",
+      reader.last_user(talk), "y ahora el reporte")
+check("a wake is not the last ask",
+      reader.last_user([user("arregla el join"), WAKE]), "arregla el join")
+
+print(f"8 cases, {len(failures)} failures")
 for line in failures:
     print("  " + line)
 sys.exit(1 if failures else 0)

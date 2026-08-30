@@ -52,6 +52,11 @@ pendiente". Los que se midieron ruidosos llevan `?` en la clase dentro de
 `stop-patterns.txt` y son certeza baja: no condenan solos, pasan al modelo, y
 solo un OK claro los suelta. El resto frena por su cuenta.
 
+A short close that ran no tool fires after a work ask (`fix`, `wire`,
+`build`). After a short question (`why`, `how long`, `in one sentence`)
+the same close stays quiet. The checker reads the last developer line
+to tell them apart.
+
 Sobre 5284 mensajes reales: 2383 disparan, 657 son sentencia directa y 1726
 van al modelo. De una muestra de 60 candidatos de certeza baja, el modelo
 confirmó el freno en el 90% y soltó el 10%: esos son los falsos positivos que

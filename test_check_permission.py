@@ -216,10 +216,10 @@ MUST_FIRE.append("Next pass is those ten captions and openers.")
 
 
 
-def run(message, acted=True):
+def run(message, acted=True, asked="hace el trabajo"):
     transcript = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")
     transcript.write(json.dumps({"type": "user", "message": {"content": [
-        {"type": "text", "text": "hace el trabajo"}]}}) + "\n")
+        {"type": "text", "text": asked}]}}) + "\n")
     if acted:
         transcript.write(json.dumps({"type": "assistant", "message": {"content": [
             {"type": "tool_use", "name": "Bash", "input": {"command": "ls"}}]}}) + "\n")
@@ -259,6 +259,50 @@ def main():
     if code != 0:
         failures.append("a long explanation with no tools must stay silent")
 
+    if hook.quick_ask("in one sentence please") is not True:
+        failures.append("one sentence is a quick ask")
+    if hook.quick_ask("why last Stop took 16s") is not True:
+        failures.append("why is a quick ask")
+    if hook.quick_ask("what is FP?") is not True:
+        failures.append("a short question is a quick ask")
+    if hook.quick_ask("how long did it take") is not True:
+        failures.append("how long is a quick ask")
+    if hook.quick_ask("hace el trabajo") is not False:
+        failures.append("a work ask is not a quick ask")
+    if hook.quick_ask("can you fix this?") is not False:
+        failures.append("fix inside a question is still work")
+    if hook.ends_on_nothing("ok.", False, "in one sentence please"):
+        failures.append("ends_on_nothing still arms a one-sentence ask")
+    if not hook.ends_on_nothing("ok.", False, "hace el trabajo"):
+        failures.append("ends_on_nothing dropped a work ask")
+
+    code, _ = run("Cold load 16s, warm 2s.", acted=False,
+                  asked="in one sentence please")
+    if code != 0:
+        failures.append("a one-sentence ask must stay silent")
+
+    code, _ = run("The 27B was unloaded.", acted=False, asked="why")
+    if code != 0:
+        failures.append("a why ask must stay silent")
+
+    code, _ = run("A wrong alarm on a short answer.", acted=False,
+                  asked="what is FP?")
+    if code != 0:
+        failures.append("a short question must stay silent")
+
+    code, _ = run("About two seconds when warm.", acted=False,
+                  asked="how long did it take")
+    if code != 0:
+        failures.append("a how-long ask must stay silent")
+
+    code, _ = run("Listo.", acted=False, asked="fix the hook")
+    if code != 2:
+        failures.append("a work ask that ran nothing must fire")
+
+    code, _ = run("Listo.", acted=False, asked="can you wire this?")
+    if code != 2:
+        failures.append("a work question that ran nothing must fire")
+
     code, _ = run("Lo que sigue: cablear todo.")
     if code != 2:
         failures.append("baseline offender did not fire")
@@ -282,6 +326,23 @@ def main():
     if done.returncode not in (2, hook.MAYBE):
         failures.append(
             "grok-shaped history must fire, exit " + str(done.returncode))
+
+    grok_q = tempfile.NamedTemporaryFile(
+        "w", suffix=".jsonl", delete=False, encoding="utf-8")
+    grok_q.write(json.dumps({"type": "user", "content": [
+        {"type": "text", "text": "in one sentence please"}]}) + "\n")
+    grok_q.write(json.dumps({
+        "type": "assistant",
+        "content": "Cold load 16s, warm 2s.",
+    }) + "\n")
+    grok_q.close()
+    payload = json.dumps({"transcript_path": grok_q.name, "stop_hook_active": False})
+    done = settle.run([sys.executable, HOOK], input=payload,
+                      capture_output=True, text=True)
+    os.unlink(grok_q.name)
+    if done.returncode != 0:
+        failures.append("grok-shaped one-sentence ask must stay silent, exit "
+                        + str(done.returncode))
 
     payload = json.dumps({"transcript_path": HOOK, "stop_hook_active": True})
     done = settle.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)

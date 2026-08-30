@@ -156,6 +156,10 @@ def main():
     lines, suites = sources()
 
     cases += 1
+    if "in one sentence" not in body or "work ask" not in body:
+        failures.append("the paper dropped the quick-chat skip")
+
+    cases += 1
     near = f"{round(lines / 100) * 100:,} lines of Python"
     if near not in body:
         failures.append(f"the paper miscounts the code, which is {near}")
@@ -256,6 +260,8 @@ def main():
         failures.append("README still describes the tree in Spanish")
     elif "seven fixtures" not in readme:
         failures.append("README dropped the seven-fixture pick rule")
+    elif "in one sentence" not in readme:
+        failures.append("README dropped the quick-chat skip")
 
     cases += 1
     blind = subprocess.run(
