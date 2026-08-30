@@ -24,6 +24,31 @@ background = mod.load("background.py")
 NL = chr(10)
 failures = []
 
+GROK_USER = {"type": "user", "content": [
+    {"type": "text", "text": "<user_query>go</user_query>"}]}
+GROK_TASK = {"type": "assistant", "content": "launching",
+             "tool_calls": [{"id": "task1", "name": "spawn_subagent",
+                             "arguments": json.dumps({"description": "x"})}]}
+GROK_RESULT = {"type": "tool_result", "tool_call_id": "task1",
+               "content": "Denied by permission policy"}
+GROK_QUOTE = {"type": "tool_result", "tool_call_id": "read1",
+              "content": "<task-notification><tool-use-id>task1</tool-use-id></task-notification>"}
+GROK_SAID = {"type": "assistant", "content": "Sigo con lo proximo."}
+
+
+def grok_flight(*entries):
+    handle = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False,
+                                         encoding="utf-8")
+    with handle:
+        for entry in entries:
+            handle.write(json.dumps(entry) + NL)
+    try:
+        return background.waiting_on(handle.name)
+    finally:
+        os.unlink(handle.name)
+
+
+
 LAUNCH = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "task1", "name": "Bash",
      "input": {"command": "python corpus.py", "run_in_background": True}}]}}
@@ -33,6 +58,11 @@ SPOKE = {"type": "user", "message": {"content": "ok algo mas?"}}
 DONE = {"type": "user", "message": {"content":
         "<task-notification><tool-use-id>task1</tool-use-id>"
         "<status>completed</status></task-notification>"}}
+
+
+QUEUED = {"type": "queue-operation", "prompt":
+          "<task-notification><tool-use-id>task1</tool-use-id>"
+          "<status>completed</status></task-notification>"}
 
 
 def flight(*entries):
@@ -61,8 +91,16 @@ check("a long job outlives the turns the agent closes while it runs",
 check("and a task killed from outside is forgotten, not waited on forever",
       flight(LAUNCH, *([SAID] * (background.STALE + 2))), False)
 check("a promise with nothing behind it is not waiting", flight(SAID), False)
+check("the notification counts wherever the harness files it",
+      flight(LAUNCH, SAID, QUEUED, SAID), False)
+check("a grok tool_result closes the task it named",
+      grok_flight(GROK_USER, GROK_TASK, GROK_RESULT, GROK_SAID), False)
+check("a grok task with no result is still waiting",
+      grok_flight(GROK_USER, GROK_TASK, GROK_SAID), True)
+check("a quoted tag in a grok file body does not close a live task",
+      grok_flight(GROK_USER, GROK_TASK, GROK_QUOTE, GROK_SAID), True)
 
-print(f"6 cases, {len(failures)} failures")
+print(f"10 cases, {len(failures)} failures")
 for line in failures:
     print("  " + line)
 sys.exit(1 if failures else 0)

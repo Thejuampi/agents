@@ -108,6 +108,7 @@ The pick rule, seven fixtures, zero wrong:
 - Successful path: take only a high neighbour. Distant alternatives stay.
 
 A closing that names leftover options, with no tree file, also blocks.
+A tree that says finished, with source this session wrote still uncommitted, also blocks.
 
 Frozen v4: 749 closings, 0 leftover-word fires, 0 extra false positives,
 0 extra true positives. Those sessions never wrote the tree.

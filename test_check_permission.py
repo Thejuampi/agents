@@ -54,6 +54,46 @@ MUST_FIRE = [
     "Sigo aca, en el branch. Voy a main ahora para el bug, o el bug es de este branch?",
     "QA corriendo en background. Te aviso cuando termine.",
     "The suite is running in the background. I'll let you know when it lands.",
+    "Full suite running in the background; I'll check the results when it completes.",
+    "I'll check back once it's had time to complete.",
+    "I'll check again shortly and merge once everything's green.",
+    "I'll merge as soon as it finishes.",
+    "I'll be notified when it's done.",
+    "Checking CI status in ~7 minutes.",
+    "Queda, por impacto: Codificar el TTL y poner verde el probe.",
+    "Siguiente experimento cuando quieras.",
+    "Sin cambios.",
+    "The permanent setting includeCoAuthoredBy is yours to add.",
+    "E2E pipeline complete, all seven stages closed.",
+    "Final run is in flight over both modules.",
+    "Control run started on the clean tree.",
+    "Starting with the three measurable fixes. Baseline first.",
+    "Si las queres largas tambien ahi, decime.",
+    "El crash esta arreglado.",
+    "I did not merge them.",
+    "Ahora mido las carpetas grandes.",
+    "Confirm and I start the adversarial pass.",
+    "Reply with the number only.",
+    "The review-fix loop stops here.",
+    "I did not wipe app data.",
+    "<proposed_plan> Build the thing now.</proposed_plan>",
+    "**Pushed.** PR **#39** is updated.",
+    "El bloque pre-reporte ya se arma solo.",
+    "Listo. Agregue la seccion Communication preferences.",
+    "Waiting on the app suite.",
+    "P25 hit something live and large. LD-18 es 99 de 261 filas, y llega al FCFF publicado.",
+    "Listo. Saque el selector de abajo. Tests: 819, las mismas 2 fallas viejas.",
+    "El Quant Engine ya no mueve el score de ranking.",
+    "Commit, push y PR del playbook en agents.",
+    "Quedo en el playbook como expansion del bar.",
+    "The experiment is in place. Tests stay required.",
+    "QA-002 is fixed. Two P1 still open.",
+    "make android-release now writes the apk.",
+    "20.4 GB libres, 36%.",
+    "OpenCode esta haciendo prefill.",
+    "The keep lives in llama-panel profiles.",
+    "Listo. Commite todo el workspace, pushee la rama y abri el PR.",
+    "The second run is still in progress -- checking again shortly.",
     "Listo. El branch esta limpio.\n\nCual de los dos arranco primero?",
     "Estas en main, limpio y al dia con origin/main. Contame el bug.",
     "En main, limpio, al dia. Contame el bug.",
@@ -171,6 +211,7 @@ them were the same shape: the last sentence names what the agent is about to
 do and the turn ends there. On a 60-message sample of everything thesenew 
 patterns catch, the local model agreed it was a stop 90% of the time."""
 MUST_FIRE.extend(LIVE)
+MUST_FIRE.append("Next pass is those ten captions and openers.")
 
 
 
@@ -222,10 +263,50 @@ def main():
     if code != 2:
         failures.append("baseline offender did not fire")
 
+    grok = tempfile.NamedTemporaryFile(
+        "w", suffix=".jsonl", delete=False, encoding="utf-8")
+    grok.write(json.dumps({"type": "user", "content": [
+        {"type": "text", "text": "go"}]}) + "\n")
+    grok.write(json.dumps({
+        "type": "assistant",
+        "content": "Should I wire it up now?",
+        "tool_calls": [{"id": "t", "name": "write",
+                        "arguments": json.dumps(
+                            {"file_path": "src/Foo.kt", "content": "x"})}],
+    }) + "\n")
+    grok.close()
+    payload = json.dumps({"transcript_path": grok.name, "stop_hook_active": False})
+    done = settle.run([sys.executable, HOOK], input=payload,
+                      capture_output=True, text=True)
+    os.unlink(grok.name)
+    if done.returncode not in (2, hook.MAYBE):
+        failures.append(
+            "grok-shaped history must fire, exit " + str(done.returncode))
+
     payload = json.dumps({"transcript_path": HOOK, "stop_hook_active": True})
     done = settle.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
     if done.returncode != 0:
         failures.append("stop_hook_active must never re-fire")
+
+    stale = tempfile.NamedTemporaryFile(
+        "w", suffix=".jsonl", delete=False, encoding="utf-8")
+    stale.write(json.dumps({"type": "user", "message": {"content": [
+        {"type": "text", "text": "go"}]}}) + "\n")
+    stale.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Bash", "input": {"command": "ls"}}]}}) + "\n")
+    stale.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "text", "text": "Done. The suite is green."}]}}) + "\n")
+    stale.close()
+    payload = json.dumps({
+        "transcript_path": stale.name, "stop_hook_active": False,
+        "last_assistant_message": "Let me know if you want me to continue.",
+    })
+    done = settle.run([sys.executable, HOOK], input=payload,
+                      capture_output=True, text=True)
+    os.unlink(stale.name)
+    if done.returncode not in (2, hook.MAYBE):
+        failures.append("payload closing must beat a stale transcript, exit "
+                        + str(done.returncode))
 
     print(f"{len(MUST_FIRE)} offenders ({maybes} for the model), "
           f"{len(MUST_NOT_FIRE)} clean, {len(failures)} failures")

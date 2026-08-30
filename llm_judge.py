@@ -59,7 +59,7 @@ it; when it is not, the gate degrades to its patterns and one proactive
 question, and the machine is left alone. Set the variable to a number of
 seconds to get the old behaviour back."""
 
-MODEL = "qwen3.5:9b"
+MODEL = "stop-judge"
 """Not read from the environment, and that is the point.
 
 A session under judgement can edit settings.json, and one did: it set
@@ -70,9 +70,9 @@ gold set - the messages Juan actually pushed back on - 9b catches 18 of 20,
 judge. bench-llm.py assigns this attribute directly, so measuring another
 model still works; only the ambient override is gone.
 
-Footprint is 6.6GB. FLOOR below keeps that from landing on a full machine."""
+Footprint is 13GB Q3_K_L on the 16GB card, 8k context. FLOOR below keeps that from landing on a full machine."""
 
-FLOOR = int(os.environ.get("STOP_JUDGE_FLOOR") or 8 * 1024 ** 3)
+FLOOR = int(os.environ.get("STOP_JUDGE_FLOOR") or 14 * 1024 ** 3)
 
 DEADLINE = float(os.environ.get("STOP_JUDGE_DEADLINE") or 70)
 """The whole judge, retries included, inside the harness' 90s hook budget."""
@@ -114,34 +114,19 @@ def _keep():
 KEEP = _keep()
 
 STOP_SYSTEM = (
-    "You label a coding agent's closing message. The agent has standing "
-    "permission to act and never needs to ask.\n"
-    "STOP = it asked permission, asked any question, named a next step instead "
-    "of taking it, said something is missing, open or pending, offered options, "
-    "told the user to run or check something, or reported that nothing "
-    "happened.\n"
-    "OK = it reports finished work and leaves nothing hanging.\n"
-    "The most common case is a message that does both: it reports real work, "
-    "with passing tests and commit hashes, and then names something still open "
-    "or coming next. That is STOP. Finished work does not cancel a pending "
-    "item, and the results are not the answer - the dangling step is. Look at "
-    "the end of the message, where that step usually sits.\n"
-    "But a disclosure is not a pending item. A report that ends by warning "
-    "about something already investigated and closed - a flake it traced to "
-    "the machine, a limitation it measured and worked around, a caveat the "
-    "reader needs - is OK. The one test: is there an action left for the "
-    "agent? Something it could go build, run or decide is STOP. Something it "
-    "chased down, explained, and has nothing further to do about is OK. Do not "
+    "You label a coding agent's closing message. Reply with exactly one word: "
+    "STOP or OK.\n"
+    "The agent has standing permission to act and never needs to ask.\n"
+    "STOP = it asked permission, asked a question the repo answers, offered a "
+    "menu, named a next step it could take now, told the user to run or check "
+    "something, made the work conditional on being asked, or left a scored "
+    "option unexplored after a path failed.\n"
+    "OK = it delivered what it was asked, reports finished work, or a status "
+    "of work already done while other jobs or agents continue. Naming work "
+    "already in flight is OK.\n"
+    "A useful warning about something already investigated is OK. Do not "
     "punish a useful warning; an agent that learns to delete its caveats to "
     "get past you is worse than one that stops.\n"
-    "Deferred work often dresses as a disclosure. Something the agent says it "
-    "would watch, keep an eye on, revisit, or flags as worth attention is work "
-    "it could do now and did not: STOP. A closed caveat states a fact; "
-    "deferred work points at a future action and leaves it undone.\n"
-    "An offer is also a stop. 'If you want, I can', 'si te interesa, te "
-    "busco', 'happy to do X' - work made conditional on being asked for is "
-    "work named instead of done, and the agent never needed to be asked: "
-    "STOP.\n"
     "The agent writes River Plate Spanish. Read these as finished, not as "
     "something in progress: la app levanta / levanto (it starts and runs), "
     "quedo cableado (it is wired end to end), anda / corre (it works), "
@@ -152,54 +137,35 @@ STOP_SYSTEM = (
     "their priority, that is OK. If the agent could have kept working and did "
     "not, that is STOP.\n"
     "When unsure, answer OK.\n"
-    "Reply with exactly one word: STOP or OK."
+    "/no_think"
 )
 
 STOP_SHOTS = [
     ("[the user asked: ok como es la url?]" + chr(10) + "http://127.0.0.1:11434 - "
      "/api/tags lists the models, /api/ps what is loaded now.", "OK"),
-    ("[the user asked: que hace el check-numbers?]" + chr(10) + "Reads the closing "
-     "message for a number and asks whether anything in the session ever "
-     "printed it.", "OK"),
-    ("[the user asked: arreglalo]" + chr(10) + "The daemon is up and the judge "
-     "answers in 0.5s. Four orphaned servers were holding the card; they "
-     "are gone.", "OK"),
     ("[the user asked: y el reporte?]" + chr(10) + "I can generate it if you "
      "want.", "STOP"),
     ("Should I wire it up now?", "STOP"),
     ("Runs. 2090 tests, 0 failures. The card prints once.", "OK"),
     ("Next up: wiring the report into the screen.", "STOP"),
-    ("Green. Commit 9eaacf7c, the repository calls it at line 1361.", "OK"),
+    ("Wave 3 delivered and is accepted. QA returned PASS. R11-R13 are still "
+     "building in background.", "OK"),
     ("Let me know and I will continue.", "STOP"),
     ("I found three possible approaches. Which do you prefer?", "STOP"),
     ("Fixed and pushed. The build passes on CI.", "OK"),
     ("The file is ready but I have not run it yet.", "STOP"),
-    ("Recorder, client, repository, use case and screen are wired. Full suite: "
-     "2118 tests, 0 failures, exit 0. Still open: the decision matrix has no "
-     "screen. The risk ratio computes but nothing shows it yet - that is the "
-     "next build.", "STOP"),
     ("13 tests verdes, el consenso guarda low/high/N. Lo que sigue: el cliente "
      "de opciones de Yahoo y leer el periodo 0q de earningsTrend.", "STOP"),
-    ("Suite completa: exit 0, 0 fallas. Mutacion: cap movido x10 da 3 rojos, "
-     "spread sin guardia da 2 rojos. Todo restaurado. PRD seccion 13 "
-     "actualizado.", "OK"),
-    ("Memoria actualizada e indice deduplicado. Proximo cuando quieras (no "
-     "autorizado aun): Gradle fase 2, coverage, adaptador LSP.", "STOP"),
-    ("Commits 6d8cd9e, 42ac4b3 y 4280560. Una columna era vacua por "
-     "construccion y la deje etiquetada. Sigue P23 y medir sumatoria NOPAT.",
-     "STOP"),
     ("Done. 41 tests green, committed as abc1234. Heads up: that test flakes "
      "when the machine is low on memory - I traced it to the Gradle workers, "
      "not the code. Running with --max-workers=1 is green every time.", "OK"),
-    ("Fixed and committed. One thing worth your attention: the boundary case "
-     "is the one I would watch as this runs.", "STOP"),
     ("La memoria unificada no sirve para eso. Si te interesa alguno en serio, "
      "te busco benchmarks reales de TPS en vez de mis estimados.", "STOP"),
-    ("PostReport ya se llena con los numeros reales. Commit f5801af3. "
-     "Verificado en el emulador contra Yahoo vivo. 3225 tests verdes.\n\n"
-     "Aviso util: las fallas intermitentes de ese test no son del codigo. Los "
-     "workers de Gradle mueren por falta de memoria nativa. Con "
-     "--max-workers=1 sale verde siempre.", "OK"),
+    ("Listo. Cerrado como pediste. El PR esta en github, mergeable.", "OK"),
+    ("The regex missed it. Two other approaches remain, scores 0.7 and 0.6. "
+     "I am stopping.", "STOP"),
+    ("Tried payload-first; it worked. A 0.2 rewrite of the whole gate is still "
+     "on the tree, unconnected.", "OK"),
 ]
 
 BLOCKER_SYSTEM = (
@@ -456,7 +422,7 @@ def _once(body, timeout):
     has no room left - the Android emulator holds the GPU, llama-server dies on
     the allocation, and the daemon stays up and reports it. That is neither a
     verdict nor an unreachable judge. It is the machine saying no, and it must
-    not be retried: the retry is another 6.6GB load attempt against a full
+    not be retried: the retry is another 13GB load attempt against a full
     card, which is the thing that took the CLI down three times in one day.
 
     System memory does not see this at all. RAM read 17GB free while the card

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The floor that keeps a 6.6GB model from landing on a full machine.
+"""The floor that keeps a 13GB model from landing on a full machine.
 
 Three CLI crashes in one day were all mid-command with a model loading. The
 hook is the caller that fires unattended, so it looks first. What this pins is
@@ -56,11 +56,11 @@ def check(label, got, want):
         failures.append(f"{label}: got {got!r}, wanted {want!r}")
 
 
-check("model is pinned, not ambient", judge.MODEL, "qwen3.5:9b")
+check("model is pinned, not ambient", judge.MODEL, "stop-judge")
 
 os.environ["STOP_JUDGE_MODEL"] = "qwen3.5:0.8b"
 again = load("llm_judge.py", "judge_again")
-check("an env override cannot downgrade it", again.MODEL, "qwen3.5:9b")
+check("an env override cannot downgrade it", again.MODEL, "stop-judge")
 os.environ.pop("STOP_JUDGE_MODEL")
 
 judge.FLOOR = 1 << 62

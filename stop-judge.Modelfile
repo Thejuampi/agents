@@ -1,0 +1,5 @@
+FROM qwen3.8-ud:latest
+PARAMETER num_ctx 8192
+PARAMETER temperature 0
+PARAMETER seed 7
+PARAMETER num_predict 4

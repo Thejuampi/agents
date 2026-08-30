@@ -39,6 +39,7 @@ perm = load("perm", "check-permission.py")
 gate = load("gate", "check-stop.py")
 judge = load("judge", "llm_judge.py")
 push = load("push", "judge_push.py")
+host = load("hostmod", "host.py")
 
 
 def entries(path):
@@ -81,32 +82,69 @@ def tools(entry):
                if isinstance(block, dict) and block.get("type") == "tool_use")
 
 
+QUERY = re.compile(r"<user_query>\s*(.*?)\s*</user_query>", re.S)
+DROP = re.compile(
+    r"<(?:system-reminder|user_info|attached_files|mcp_instructions)"
+    r"[\s\S]*?</(?:system-reminder|user_info|attached_files|"
+    r"mcp_instructions)>", re.I)
+
+
+def grok_body(text):
+    raw = str(text or "")
+    found = QUERY.search(raw)
+    if found:
+        return found.group(1).strip()
+    cleaned = DROP.sub(" ", raw)
+    cleaned = re.sub(r"</?[^>]+>", " ", cleaned)
+    return " ".join(cleaned.split())
+
+
+def walk_pairs(rows, path, ask_fn=None):
+    ask_fn = ask_fn or (lambda body: body)
+    out = []
+    closing, asked, used, blocks = "", "", 0, 0
+    for entry in rows:
+        if spoke(entry):
+            body = ask_fn(text_of(entry))
+            words = reply_of(body)
+            if closing and words:
+                out.append({"closing": closing, "next": words,
+                            "asked": asked, "tools": used,
+                            "blocks": blocks, "file": path})
+            asked, closing, used, blocks = body or "", "", 0, 0
+            continue
+        if entry.get("type") == "user":
+            if WAKE in str(text_of(entry))[:200]:
+                blocks += 1
+            continue
+        if entry.get("type") != "assistant":
+            continue
+        used += tools(entry)
+        body = text_of(entry)
+        if body:
+            closing = body
+    return out
+
+
 def pairs():
     out = []
     for path in sorted(glob.glob(os.path.join(PROJECTS, "*", "*.jsonl"))):
-        closing, asked, used, blocks = "", "", 0, 0
-        for entry in entries(path):
-            if spoke(entry):
-                body = text_of(entry)
-                words = reply_of(body)
-                if closing and words:
-                    out.append({"closing": closing, "next": words,
-                                "asked": asked, "tools": used,
-                                "blocks": blocks, "file": path})
-                asked, closing, used, blocks = body, "", 0, 0
-                continue
-            if entry.get("type") == "user":
-                if WAKE in str(text_of(entry))[:200]:
-                    blocks += 1
-                continue
-            if entry.get("type") != "assistant":
-                continue
-            used += tools(entry)
-            body = text_of(entry)
-            if body:
-                closing = body
+        out.extend(walk_pairs(entries(path), path))
     return out
 
+
+def grok_pairs():
+    home = os.environ.get("GROK_HOME") or os.path.join(
+        os.path.expanduser("~"), ".grok")
+    pattern = os.path.join(home, "sessions", "*", "*", "chat_history.jsonl")
+    out = []
+    for path in sorted(glob.glob(pattern)):
+        rows = list(host.entries(path))
+        chunk = walk_pairs(rows, path, grok_body)
+        for row in chunk:
+            row["source"] = "grok"
+        out.extend(chunk)
+    return out
 
 def label(rows, step=50):
     start = time.time()
@@ -147,6 +185,41 @@ def repatterned():
     return rows
 
 
+def rejudge(dest):
+    src = json.load(open(OUT, encoding="utf-8"))
+    rows = src
+    if os.path.exists(dest):
+        prev = json.load(open(dest, encoding="utf-8"))
+        if len(prev) == len(src):
+            rows = prev
+    start = time.time()
+    done = 0
+    batch_ch = 0
+    for row in rows:
+        if row.get("noise"):
+            continue
+        if row.get("model") == judge.MODEL:
+            done += 1
+            continue
+        verdict, _ = judge.stop_verdict(
+            row["closing"], asked=row.get("asked") or "")
+        row["verdict"] = verdict if verdict in ("STOP", "OK") else None
+        row["sure"] = judge.sureness()
+        row["fired"] = bool(row.get("firm")) or row["verdict"] == "STOP"
+        row["model"] = judge.MODEL
+        done += 1
+        batch_ch += len(row.get("closing") or "")
+        if done == 1 or done % 25 == 0:
+            json.dump(rows, open(dest, "w", encoding="utf-8"),
+                      ensure_ascii=False)
+            n = 1 if done == 1 else 25
+            print(done, int(time.time() - start), "s",
+                  batch_ch // n, "ch", flush=True)
+            batch_ch = 0
+    json.dump(rows, open(dest, "w", encoding="utf-8"), ensure_ascii=False)
+    return rows
+
+
 def report(rows):
     real = [r for r in rows if not r.get("noise")]
     hit = [r for r in real if r.get("push")]
@@ -160,9 +233,30 @@ def report(rows):
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if "--expand" in sys.argv:
+        named = [a for a in sys.argv[1:]
+                 if a != "--expand" and not a.startswith("-")]
+        dest = named[0] if named else os.path.join(HERE, "corpus-expand.jsonl")
+        if not os.path.isabs(dest):
+            dest = os.path.join(HERE, dest)
+        extra = grok_pairs()
+        with open(dest, "w", encoding="utf-8") as handle:
+            for row in extra:
+                handle.write(json.dumps(row, ensure_ascii=False) + chr(10))
+        print(len(extra), "grok closings", dest, flush=True)
+        return
     if "--patterns" in sys.argv:
         rows = repatterned()
         json.dump(rows, open(OUT, "w", encoding="utf-8"), ensure_ascii=False)
+        report(rows)
+        return
+    if "--judge" in sys.argv:
+        named = [a for a in sys.argv[1:] if a != "--judge" and not a.startswith("-")]
+        dest = named[0] if named else os.path.join(HERE, "corpus-v3-27b.json")
+        if not os.path.isabs(dest):
+            dest = os.path.join(HERE, dest)
+        rows = rejudge(dest)
+        print("wrote", dest, flush=True)
         report(rows)
         return
     rows = pairs()

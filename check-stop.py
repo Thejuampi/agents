@@ -18,10 +18,11 @@ Three lanes, and only two ways a turn ends here.
           whole list to the model would be slower and would put every sure
           catch at the mercy of one more opinion.
 
-  Lane 2  the local model. Nothing reaches a clean exit without passing here.
-          The checkers only know the phrasings somebody wrote down; this is
-          what reads the ones nobody did. Unreachable counts as an objection,
-          so taking the model away is not a way out.
+  Lane 2  the local model. Nothing reaches a clean exit without passing here
+          while the judge is up. The checkers only know the phrasings somebody
+          wrote down; this is what reads the ones nobody did. Unreachable
+          degrades to the pattern lanes plus one proactive question; the gate
+          starts no daemon.
 
           An OK from the model does not close the turn by itself. It only
           answers whether the agent stopped early, which a turn with
@@ -45,12 +46,14 @@ exit: after MAX_BLOCKS the hook stands down no matter what it sees.
 import glob
 import hashlib
 import io
+import random
 import importlib.util
 import json
 import re
 import os
 import sys
 import time
+from datetime import datetime
 
 _mod = importlib.util.spec_from_file_location(
     "_hook_mod", os.path.join(
@@ -70,6 +73,7 @@ def state_path():
             or os.path.join(HERE, ".stop-state.json"))
 BLOCKED_CHECKER = os.path.join(HERE, "check-blocked.py")
 MAX_BLOCKS = 6
+HOST = "claude"
 MAYBE = 3
 PHRASE_AFTER = 2
 
@@ -83,29 +87,31 @@ judge = _load("llm_judge", "llm_judge.py")
 background = _load("background", "background.py")
 reader = _load("transcript", "transcript.py")
 hints = _load("candidates", "candidates.py")
+host = _load("host", "host.py")
+tree = _load("check_tree", "check-tree.py")
 
-REPEAT = """Block {n} of {cap}. {left} The same message will not read differently, so change the work instead."""
+REPEAT = """Block {n} of {cap}. {left} The same message reads the same. Change the work."""
 
-SAME = """This closing came back word for word. Something has to move before it reads as new."""
+SAME = """This closing came back word for word. Move something before it reads as new."""
 
-PHRASE = """If you are truly blocked - continuing under any assumption would be unsafe or would waste the work - write BLOCKED:, one sentence naming the single thing you need, and then this line exactly:
+PHRASE = """If continuing under any assumption would be unsafe, write BLOCKED:, one sentence naming what you need, then this line exactly:
 
     {phrase}
 
-It is new, it belongs to this block, and it is in no file you can read. It buys a real hearing: the blocker is then audited against what ran this turn."""
+It buys a real hearing: the blocker is audited against what ran this turn."""
 
 NO_PHRASE = """ONE MORE STEP - BLOCKED: IS NOT A PASSWORD
 
-You wrote BLOCKED: without this block's release phrase, so the claim was not read yet. The phrase is issued after you have been sent back and done the work. Go do that; if the blocker is real it will still be there, and you will have something that actually failed to point at - which is a case nobody can argue with."""
+You wrote BLOCKED: without this block's release phrase, so the claim was not read. The phrase is issued after you go back and do the work. Do that first. A real blocker will still be there, with something that actually failed to point at."""
 
 FAKE = """KEEP GOING - THE BLOCKER DID NOT SURVIVE THE AUDIT
 
 {why}
 
-A blocker is something this machine cannot give you and you already walked into. A preference you want confirmed, or an ambiguity the repo could settle, is a call you are trusted to make. Choose the default, say which one, keep going."""
+A blocker is something this machine cannot give you. A preference you want confirmed, or an ambiguity the repo could settle, is your call. Choose the default, say which one, keep going."""
 
 QUOTE = """
-The local model read your message and points at this line of yours: "{line}"
+The judge read your message and points at this line: "{line}"
 """
 """What the judge saw, in the agent's own words.
 
@@ -116,16 +122,16 @@ the argument: there is nothing to dispute about a line it wrote."""
 
 SILENT = """ONE MORE STEP - NO VERDICT YET
 
-The local model at {host} did not answer, and a judge that cannot be reached is not a pass. Start it, or keep working - both end the turn honestly, and either is a minute's work."""
+The local model at {host} did not answer, and an unreachable judge is not a pass. Start it, or keep working."""
 
 LLM_STOP = """KEEP GOING - THERE LOOKS TO BE WORK LEFT
 {why}
-What you did stands. Permission was granted in advance and does not expire, so if anything is still open, take the step instead of announcing it, pick one instead of offering a menu, run it yourself instead of sending the user. You are more than able to finish this."""
+What you did stands. Permission does not expire. Take the step instead of announcing it, pick one instead of offering a menu, run it yourself instead of sending the user."""
 
 
 WAITING = """KEEP GOING - THE WORK YOU LAUNCHED REPORTS BACK ON ITS OWN
 
-You will be woken when it finishes, so the time until then is yours. What you did stands; spend the wait on the next piece instead of holding the turn open for it. If nothing else can move without that result, say what you are waiting on and why nothing else starts."""
+You will be woken when it finishes. Spend the wait on the next piece. If nothing else can move without that result, say what you are waiting on."""
 
 
 def floor_sure():
@@ -151,18 +157,17 @@ NEAR = """
 Two things this turn did and did not follow through on:
 {items}
 
-Neither is an accusation - they are read off your own tool calls, not off your
-work. If one of them is real, do it now. If both are already handled, say which
-and how, and the turn closes."""
+They are read off your own tool calls, not off your work. If one is real, do
+it now. If both are handled, say which and how."""
 
 
 PROACTIVE = """ONE MORE LOOK - IS THERE SOMETHING WE CAN DO PROACTIVELY?
 
-Nothing in what you wrote looks unfinished, so this is not a correction. It is the last question before the turn closes: with the repo in front of you and permission already granted, is there a next action you can take right now?
+Nothing looks unfinished, so this is not a correction. With permission granted, is there a next action you can take right now?
 
-Look for the thing you would do next if nobody asked: the test that covers the case you just fixed, the doc that still describes the old behaviour, the neighbouring caller with the same bug, the measurement that would tell you whether the change worked. If you find one, take it - do not come back to propose it.
+The test for the case you just fixed, the doc that still describes the old behaviour, the neighbouring caller with the same bug. Find one and take it, do not propose it.
 
-If there is genuinely nothing, say what you checked and why nothing remains. That answer ends the turn."""
+If there is nothing, say what you checked."""
 
 
 def log_path():
@@ -218,17 +223,7 @@ def prune(state, keep=40):
 
 
 def entries(transcript):
-    try:
-        with open(transcript, encoding="utf-8") as handle:
-            for line in handle:
-                try:
-                    entry = json.loads(line)
-                except ValueError:
-                    continue
-                if isinstance(entry, dict):
-                    yield entry
-    except OSError:
-        return
+    yield from host.entries(transcript)
 
 
 def last_message(transcript):
@@ -348,6 +343,87 @@ def tools_this_turn(transcript):
     return count
 
 
+def work_secs():
+    try:
+        value = float(os.environ.get("STOP_WORK_SECS") or 4 * 3600)
+    except ValueError:
+        return 4 * 3600
+    return value if value > 0 else 4 * 3600
+
+
+def as_epoch(raw):
+    if raw is None or raw == "":
+        return None
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, (int, float)):
+        value = float(raw)
+        if value > 1e12:
+            value /= 1000.0
+        return value if value > 1e9 else None
+    text = str(raw).strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        return datetime.fromisoformat(text).timestamp()
+    except ValueError:
+        return None
+
+
+def grok_turn_started(transcript):
+    path = os.path.join(os.path.dirname(transcript or ""), "events.jsonl")
+    if not os.path.isfile(path):
+        return None
+    last = None
+    try:
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    continue
+                if row.get("type") != "turn_started":
+                    continue
+                stamp = as_epoch(row.get("ts") or row.get("timestamp"))
+                if stamp is not None:
+                    last = stamp
+    except OSError:
+        return None
+    return last
+
+
+def turn_started(transcript):
+    last = None
+    for entry in entries(transcript):
+        if not reader.spoke(entry):
+            continue
+        stamp = as_epoch(entry.get("timestamp") or entry.get("ts"))
+        if stamp is not None:
+            last = stamp
+    if last is not None:
+        return last
+    return grok_turn_started(transcript)
+
+
+def busy(transcript):
+    started = turn_started(transcript)
+    if started is None:
+        return False
+    return (time.time() - started) >= work_secs()
+
+
+def holdout_rate():
+    try:
+        return max(0.0, min(1.0, float(os.environ.get("STOP_HOLDOUT") or 0)))
+    except ValueError:
+        return 0.0
+
+
+def held_out():
+    rate = holdout_rate()
+    return rate > 0.0 and random.random() < rate
+
+
 def digest_of(text):
     return hashlib.sha1((text or "").encode("utf-8", "replace")).hexdigest()
 
@@ -437,7 +513,12 @@ def block(state, transcript, chain, message, body, repeated, asked=False):
         left = ("One more block after this one." if count < MAX_BLOCKS
                 else "This is the last one; the next stop goes through.")
         out.append(REPEAT.format(n=count, cap=MAX_BLOCKS, left=left))
-    sys.stderr.write("\n\n".join(out) + "\n")
+    text = "\n\n".join(out) + "\n"
+    sys.stderr.write(text)
+    sys.stderr.flush()
+    if HOST == "grok":
+        sys.stdout.write(json.dumps({"decision": "block", "reason": text.strip()}) + "\n")
+        sys.stdout.flush()
     return 2
 
 
@@ -455,8 +536,15 @@ def main():
     if not isinstance(data, dict):
         return 0
 
-    transcript = data.get("transcript_path") or ""
-    if not transcript or not os.path.exists(transcript):
+    global HOST
+    seen = host.view(data)
+    HOST = seen.kind
+    if seen.ignore:
+        return 0
+    data = seen.payload
+
+    transcript = seen.path or data.get("sessionId") or ""
+    if not transcript and not seen.last_message():
         return 0
 
     state = read_state()
@@ -468,7 +556,7 @@ def main():
         write_state(prune(state))
         return 0
 
-    message = last_message(transcript)
+    message = seen.last_message() or last_message(transcript)
     if not message or harness_noise(message):
         return allow(state, transcript)
 
@@ -481,11 +569,8 @@ def main():
         _, audit = run_checker(BLOCKED_CHECKER, data)
         calls = tools_this_turn(transcript)
         verdict, _ = judge.blocker_verdict(message, calls)
-        if verdict is judge.SKIP:
+        if verdict is judge.SKIP or verdict is None:
             verdict = "REAL" if not audit else "FAKE"
-        if verdict is None:
-            return block(state, transcript, chain, message,
-                         SILENT.format(host=judge.HOST), repeated)
         if verdict == "FAKE" or audit:
             why = audit or (
                 "  - the local model read it against the {n} tool call(s) this "
@@ -495,24 +580,51 @@ def main():
         return allow(state, transcript)
 
     sure, unsure = deterministic(data)
-    waiting = background.waiting_on(transcript)
+    waiting = bool(seen.waiting) or background.waiting_on(transcript)
+    calls = tools_this_turn(transcript)
+    extra = dict(tools=calls, chars=len(message), cheap="", holdout=False)
+    picked = tree.next_path(tree.load_tree(data) or {})
+    if picked:
+        extra.update(branch=picked.get("id"),
+                     branch_score=tree.score_of(picked),
+                     branch_file=tree.tree_path(data))
+
     if sure:
-        note(transcript, lane="pattern", firm=sure, weak=unsure,
-             head=message[:120], waiting=waiting)
+        drop = held_out()
+        extra.update(holdout=drop, lane="pattern", firm=sure, weak=unsure,
+                     head=message[:120], waiting=waiting)
+        note(transcript, **extra)
+        if drop:
+            return allow(state, transcript)
         return block(state, transcript, chain, message,
                      WAITING if waiting else "\n\n".join(sure), repeated)
+
+    if waiting:
+        extra.update(lane="waiting", weak=unsure, head=message[:120],
+                     waiting=True)
+        note(transcript, **extra)
+        return block(state, transcript, chain, message, WAITING, repeated)
+
+    if busy(transcript):
+        extra.update(lane="cheap", cheap="busy", weak=unsure,
+                     head=message[:120], waiting=waiting)
+        note(transcript, **extra)
+        return allow(state, transcript)
 
     asked = last_user(transcript)
     before = earlier(transcript)
     verdict, seconds = judge.stop_verdict(message, asked=asked, before=before)
+    extra.update(lane="judge", weak=unsure, head=message[:120])
     if verdict is judge.SKIP:
-        note(transcript, lane="judge", verdict="skip", weak=unsure,
-             head=message[:120])
+        extra.update(verdict="skip")
+        note(transcript, **extra)
         return allow(state, transcript)
     if verdict is None:
-        note(transcript, lane="judge", verdict="silent", weak=unsure,
-             head=message[:120], asked=bool(chain.get("asked")))
-        if chain.get("asked"):
+        drop = held_out()
+        extra.update(verdict="silent", holdout=drop,
+                     asked=bool(chain.get("asked")))
+        note(transcript, **extra)
+        if chain.get("asked") or drop:
             return allow(state, transcript)
         near = openings(transcript)
         body = PROACTIVE if not near else PROACTIVE + NEAR.format(
@@ -520,35 +632,36 @@ def main():
         return block(state, transcript, chain, message, body,
                      repeated, asked=True)
 
-    seen = bool(chain.get("asked"))
+    already = bool(chain.get("asked"))
     shaky = verdict == "STOP" and not unsure and judge.sureness() < floor_sure()
     if shaky:
         verdict = "OK"
-    asking = verdict == "OK" and not waiting and not seen
+    asking = verdict == "OK" and not already
     line = ""
     if verdict == "STOP" and not unsure:
         line = judge.why(message, asked=asked)
     near = openings(transcript) if asking else []
-    note(transcript, lane="judge", verdict=verdict, sure=judge.sureness(),
-         weak=unsure, seconds=round(seconds, 2), quote=line,
-         head=message[:120], waiting=waiting, near=near,
-         asked=seen, ask=asking and bool(near), shaky=shaky)
+    drop = held_out() if (verdict == "STOP" or (asking and near)) else False
+    extra.update(verdict=verdict, sure=judge.sureness(),
+                 seconds=round(seconds, 2), quote=line, waiting=waiting,
+                 near=near, asked=already, ask=asking and bool(near),
+                 shaky=shaky, holdout=drop)
+    note(transcript, **extra)
 
-    if waiting:
-        body = WAITING
-    elif verdict == "STOP":
+    if verdict == "STOP":
+        if drop:
+            return allow(state, transcript)
         body = "\n\n".join(unsure) if unsure else LLM_STOP.format(
             why=QUOTE.format(line=line) if line else "")
-    elif seen:
+        return block(state, transcript, chain, message, body, repeated)
+    if already or not near:
         return allow(state, transcript)
-    else:
-        if not near:
-            return allow(state, transcript)
-        return block(state, transcript, chain, message,
-                     PROACTIVE + NEAR.format(
-                         items="".join(chr(10) + "  - " + line for line in near)),
-                     repeated, asked=True)
-    return block(state, transcript, chain, message, body, repeated)
+    if drop:
+        return allow(state, transcript)
+    return block(state, transcript, chain, message,
+                 PROACTIVE + NEAR.format(
+                     items="".join(chr(10) + "  - " + line for line in near)),
+                 repeated, asked=True)
 
 
 if __name__ == "__main__":

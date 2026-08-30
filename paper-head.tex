@@ -4,6 +4,8 @@
 \usepackage{lmodern}
 \usepackage[margin=1.1in]{geometry}
 \usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
 \usepackage{microtype}
 \usepackage{enumitem}
 \usepackage[hidelinks]{hyperref}
@@ -11,36 +13,28 @@
 \title{Stopping the stop: a self-labeling gate for premature termination\\
        in autonomous coding agents}
 \author{Juan Lescano}
-\date{29 August 2026}
+\date{30 August 2026}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-A coding agent granted standing permission still ends its turn early: it names
-the next step instead of taking it, offers a menu instead of choosing, or hands
-the user a command it could have run. We describe a gate on the agent's stop
-path that detects this in three lanes of increasing cost -- an audit of the
-agent's own escape hatch, 299 pattern labeling functions, and a 9B local judge
--- and re-wakes the agent when the closing message shows the pattern. Building
-the gate was straightforward; evaluating it was not, because evaluation needs
-labels and labels need a reader. We show that two usable labels are already
-present in the transcript and cost no annotation. Before the gate exists, the
-developer's own next message says whether they had to ask for work the agent
-could have done. After the gate intervenes, the agent's tool calls before the
-developer speaks again say whether the intervention bought anything. Measured
-over 747 closings from 43 real sessions, the first label puts the base rate of
-premature stopping at 10.4\% and the shipped gate's precision at 0.119 while
-it fires on 74\% of closings: barely above chance, and we report that without
-softening it. The second label grades 41 interventions and finds 35 of them
-bought work, which locates the cost precisely -- the gate is imprecise about
-when to speak and largely useful when it does. The labels then pay for
-themselves again. They retire an exemption the design was confident in,
-releasing turns that wait on launched work, and they demote the two pattern
-classes that fire at a third of the base rate. We also report the corpus this
-was first measured on being contaminated by the system's own output, and what
-changed when it was rebuilt. Negative results are reported in full, including
-three separate instructions a 9B judge would not hold, two failed attempts to
-obtain a usable confidence signal from it, and a claim-verification lane that
-found almost nothing to catch.
+A coding agent granted standing permission still ends its turn early. This
+paper puts a three-lane gate on that stop: cheap patterns first, a small
+local model second, the developer last. Two labels already sit in the
+transcript. A \emph{push} is the developer's next line asking for leftover
+work. A \emph{fire} is the gate waking the agent. Precision is the share
+of fires that were pushes. Recall is the share of pushes the gate caught.
+
+The stored 9B campaign and the live 27B regex pass are separate
+measurements. Do not add them. Over 749 closings the stored 9B gate
+fires on two in three and is right on one in seven (precision 0.136,
+against a 10.9\% base rate of pushes). Firing and pushing still travel
+together ($p = 0.0007$). On the 463 closings a person answered, that
+9B judge reaches precision 0.213 [0.167, 0.268], and 55 of 63 graded
+blocks bought more tool work.
+
+A later pass keeps those 27B verdicts frozen and moves only the regex
+file. Person recall then goes from 0.829 to 1.000 on Claude and from
+0.791 to 1.000 on Grok, with zero extra false alarms on either store.
 \end{abstract}

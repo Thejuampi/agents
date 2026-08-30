@@ -9,8 +9,8 @@ body = open("paper-body.tex", encoding="utf-8").read()
 results = open("paper-results.tex", encoding="utf-8").read()
 refs = open("paper-refs.tex", encoding="utf-8").read()
 app = open("paper-appendix.tex", encoding="utf-8").read()
-mark = chr(92) + "section{The self-labeling loop}"
-assert mark in body, "the loop section anchors where results go"
+mark = chr(92) + "section{Negative results}"
+assert mark in body, "negative results anchors where the results section goes"
 before, after = body.split(mark, 1)
 whole = head + before + results + mark + after + app + refs + chr(10) + chr(92) + "end{document}" + chr(10)
 open("paper.tex", "w", encoding="utf-8").write(whole)

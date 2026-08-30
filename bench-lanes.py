@@ -9,12 +9,32 @@ import math
 import os
 import sys
 
+from math import comb
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-def rows(path):
+MACHINE = ("<task-notification>", "<local-command-caveat>", "<command-name>",
+           "<system-reminder>", "[Request interrupted",
+           "Continue from where you left off")
+
+
+def spoke(row):
+    """Did the developer write the next message at all?
+
+    The label reads the reply that follows a closing. On 38% of them nobody
+    replied: the turn was resumed by a task notification, a hook, a slash
+    command or a resume prompt. Those rows can carry a push only by accident,
+    and leaving them in divides every precision by a denominator the developer
+    never touched."""
+    text = row.get("next") or ""
+    return not any(mark in text for mark in MACHINE)
+
+
+def rows(path, human=False):
     data = json.load(open(path, encoding="utf-8"))
-    return [r for r in data if not r.get("noise")]
+    live = [r for r in data if not r.get("noise")]
+    return [r for r in live if spoke(r)] if human else live
 
 
 def wilson(hit, total, z=1.96):
@@ -27,6 +47,33 @@ def wilson(hit, total, z=1.96):
     centre = share + z * z / (2 * total)
     return ((centre - span) / (1 + z * z / total),
             (centre + span) / (1 + z * z / total))
+
+
+def fisher(a, b, c, d):
+    """Two-sided exact test on the 2x2 of fires against pushes.
+
+    Comparing a precision interval with the base rate by eye is not a test:
+    the caught pushes sit inside the pushes, so the two proportions are not
+    independent samples. The table below asks the question the eyeball was
+    reaching for, using the rows the gate did not fire on as well."""
+    total = a + b + c + d
+
+    def odds(x):
+        return comb(a + b, x) * comb(c + d, a + c - x) / comb(total, a + c)
+
+    seen = odds(a)
+    low = max(0, a + c - (c + d))
+    high = min(a + b, a + c)
+    return sum(odds(x) for x in range(low, high + 1)
+               if odds(x) <= seen * (1 + 1e-9))
+
+
+def association(real, fires):
+    caught = sum(1 for r in real if fires(r) and r.get("push"))
+    loud = sum(1 for r in real if fires(r) and not r.get("push"))
+    missed = sum(1 for r in real if not fires(r) and r.get("push"))
+    quiet = sum(1 for r in real if not fires(r) and not r.get("push"))
+    return caught, loud, missed, quiet, fisher(caught, loud, missed, quiet)
 
 
 def score(real, fires):
@@ -59,13 +106,15 @@ def line(name, got):
 
 
 def main():
-    path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "corpus.json")
-    real = rows(path)
+    named = [a for a in sys.argv[1:] if not a.startswith("--")]
+    path = named[0] if named else os.path.join(HERE, "corpus.json")
+    real = rows(path, human="--human" in sys.argv)
     hits = sum(1 for r in real if r.get("push"))
     band = wilson(hits, len(real))
     print(f"{len(real)} closings, {hits} pushes, base "
           f"{100.0 * hits / len(real):.1f}% [{100.0 * band[0]:.1f}, {100.0 * band[1]:.1f}]")
     print(f"{'config':22} {'fires':>4}  {'prec':>5}  {'rec':>5}  {'f1':>5}")
+    line("always fires", score(real, lambda r: True))
     line("patterns", score(real, lambda r: bool(r.get("firm"))))
     line("patterns+doubt", score(real, lambda r: bool(r.get("hits"))))
     line("judge", score(real, lambda r: r.get("verdict") == "STOP"))
@@ -102,6 +151,10 @@ def main():
             edge = wilson(caught, len(part))
             print(f"{f'{low:.2f}-{high:.2f}':22} {len(part):4}"
                   f"  {caught / len(part):.3f}  [{edge[0]:.3f}, {edge[1]:.3f}]")
+    print()
+    cell = association(real, lambda r: bool(r.get("firm")) or r.get("verdict") == "STOP")
+    print(f"fires and pushes: {cell[:4]} Fisher p={cell[4]:.4f}")
+
     print()
     off, best = set(), score(real, lambda r: bool(r.get("firm")) or r.get("verdict") == "STOP")
     while True:

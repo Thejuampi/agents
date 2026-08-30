@@ -52,9 +52,22 @@ def greedy(part):
         off.add(moved)
 
 
+def corpus_path():
+    """The corpus a table was computed on, not whichever one is newest.
+
+    Every rebuild moves corpus.json, so a benchmark that only reads that name
+    silently answers a different question than the paper it feeds. The
+    snapshot from each build stays on disk; naming it is how a table stays
+    reproducible after the next build."""
+    for arg in sys.argv[1:]:
+        if arg.endswith(".json"):
+            return arg if os.path.isabs(arg) else os.path.join(HERE, arg)
+    return os.path.join(HERE, "corpus.json")
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    real = rows(os.path.join(HERE, "corpus.json"))
+    real = rows(corpus_path())
     files = sorted({r["file"] for r in real})
     print(len(files), "sessions,", len(real), "closings")
     random.seed(7)

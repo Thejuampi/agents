@@ -6,6 +6,13 @@ import os
 import sys
 import tempfile
 
+_seed = importlib.util.spec_from_file_location(
+    "_hook_seed", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "seedrepo.py"))
+seedrepo = importlib.util.module_from_spec(_seed)
+_seed.loader.exec_module(seedrepo)
+
+
 _settle = importlib.util.spec_from_file_location(
     "_hook_settle", os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "settle.py"))
@@ -216,6 +223,65 @@ def main():
         failures.append("the session tree wins over cwd")
     elif "from cwd" in done.stderr:
         failures.append("cwd must not win when a session tree exists")
+
+    counted()
+    root = seedrepo.seeded()
+    with open(os.path.join(root, "host.py"), "w", encoding="utf-8") as handle:
+        handle.write("KIND = \"grok\"\n")
+    store = os.path.join(root, ".grok")
+    os.makedirs(store, exist_ok=True)
+    with open(os.path.join(store, "decisions.json"), "w", encoding="utf-8") as handle:
+        json.dump({"last": "a", "nodes": [
+            {"id": "a", "score": 0.8, "status": "taken", "next": []},
+        ]}, handle)
+    handle = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")
+    handle.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Write",
+         "input": {"file_path": os.path.join(root, "host.py")}}]}}) + chr(10))
+    handle.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "text", "text": "Stopping."}]}}) + chr(10))
+    handle.close()
+    env = dict(os.environ)
+    env.pop("STOP_TREE", None)
+    payload = json.dumps({"transcript_path": handle.name, "cwd": root,
+                          "stop_hook_active": False,
+                          "last_assistant_message": "Stopping."})
+    done = settle.run([sys.executable, HOOK], input=payload,
+                      capture_output=True, text=True, env=env)
+    os.unlink(handle.name)
+    if done.returncode != 2 or "GIT DOES NOT" not in done.stderr:
+        failures.append("a finished tree with dirty source must fire")
+
+    counted()
+    root = seedrepo.seeded()
+    with open(os.path.join(root, "host.py"), "w", encoding="utf-8") as handle:
+        handle.write("KIND = \"grok\"\n")
+    spawn = mod.load("spawn.py")
+    spawn.run(["git", "add", "-A"], cwd=root, capture_output=True)
+    spawn.run(["git", "commit", "-qm", "w"], cwd=root, capture_output=True)
+    store = os.path.join(root, ".grok")
+    os.makedirs(store, exist_ok=True)
+    with open(os.path.join(store, "decisions.json"), "w", encoding="utf-8") as handle:
+        json.dump({"last": "a", "nodes": [
+            {"id": "a", "score": 0.8, "status": "taken", "next": []},
+        ]}, handle)
+    handle = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")
+    handle.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Write",
+         "input": {"file_path": os.path.join(root, "host.py")}}]}}) + chr(10))
+    handle.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "text", "text": "Stopping."}]}}) + chr(10))
+    handle.close()
+    env = dict(os.environ)
+    env.pop("STOP_TREE", None)
+    payload = json.dumps({"transcript_path": handle.name, "cwd": root,
+                          "stop_hook_active": False,
+                          "last_assistant_message": "Stopping."})
+    done = settle.run([sys.executable, HOOK], input=payload,
+                      capture_output=True, text=True, env=env)
+    os.unlink(handle.name)
+    if done.returncode != 0:
+        failures.append("a finished tree with committed source must stay silent")
 
     print(f"{len(RUNS)} cases, {len(failures)} failures")
     for line in failures:

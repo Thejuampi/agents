@@ -77,6 +77,30 @@ class Gate(unittest.TestCase):
                                    ("say", "Should I wire it up now?")])
         self.assertEqual(2, code, out)
 
+    def test_a_grok_question_is_blocked(self):
+        from urllib.parse import quote
+        home = os.path.join(self.room, "ghome")
+        sid = "sess-g"
+        target = os.path.join(home, "sessions", quote(self.repo, safe=""),
+                              sid, "chat_history.jsonl")
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps({"type": "user", "content": [
+                {"type": "text", "text": "<user_query>go</user_query>"}]}) + "\n")
+            handle.write(json.dumps({
+                "type": "assistant",
+                "content": "Should I wire it up now?",
+                "tool_calls": [{"id": "t", "name": "read_file",
+                                "arguments": json.dumps({"target_file": "a.kt"})}],
+            }) + "\n")
+        payload = {"stopHookActive": False, "sessionId": sid, "cwd": self.repo,
+                   "reason": "end_turn",
+                   "lastAssistantMessage": "Should I wire it up now?"}
+        env = dict(os.environ, STOP_STATE=self.state, STOP_LOG=self.state + ".log",
+                   GROK_HOME=home, GROK_SESSION_ID=sid)
+        code, out = settle.settled(payload, env, timeout=180)
+        self.assertEqual(2, code, out)
+
     def test_finished_work_ends_the_turn(self):
         code, out = self.run_hook([("user", "go"), ("tool", "Edit"), ("tool", "Bash"),
                                    ("say", "Done. The suite is green and the "

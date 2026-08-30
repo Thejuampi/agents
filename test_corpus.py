@@ -85,6 +85,13 @@ def main():
     if corpus.reply_of("seguí con el resto") != "seguí con el resto":
         failures.append("a plain reply survives untouched")
 
+
+    cases += 1
+    body = corpus.grok_body(
+        "<user_info>noise</user_info><user_query>segui</user_query>")
+    if body != "segui":
+        failures.append("grok_body keeps the user_query and drops user_info")
+
     print(f"{cases} cases, {len(failures)} failures")
     for line in failures:
         print("  FAIL", line)

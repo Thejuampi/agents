@@ -25,6 +25,8 @@ mod = importlib.util.module_from_spec(_mod)
 _mod.loader.exec_module(mod)
 
 perm = mod.load("check-permission.py")
+dead = mod.load("check-dead-code.py")
+claim = mod.load("check-done-claim.py")
 
 FAILED = {"failed", "fail", "miss", "dead"}
 TAKEN = {"taken", "done", "ok", "passed", "success"}
@@ -54,6 +56,12 @@ REMINDER = """KEEP GOING - THE TREE STILL HAS A PATH
 
 Next: {label} (score {score}).
 The last path is done or failed. Take this node now. Update the tree file when you finish it."""
+
+GIT = """KEEP GOING - THE TREE SAYS FINISHED, GIT DOES NOT
+
+{items}
+
+The tree file has no next path. Source this session wrote is still uncommitted. Land it."""
 
 NAMED = """KEEP GOING - YOU NAMED A PATH YOU DID NOT TAKE
 
@@ -193,6 +201,15 @@ def main():
         sys.stderr.write(REMINDER.format(
             label=label, score=round(score_of(node), 2)) + "\n")
         return 2
+
+    if loaded and node is None:
+        touched = dead.touched_files(payload.get("transcript_path") or "")
+        pending = claim.uncommitted(
+            payload.get("cwd") or os.getcwd(), touched)
+        if pending:
+            sys.stderr.write(GIT.format(
+                items="\n".join("  - " + p for p in pending[:8])) + "\n")
+            return 2
 
     hits = _leftover(message)
     if not hits:

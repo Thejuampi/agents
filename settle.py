@@ -80,18 +80,20 @@ def run(command, input=None, env=None, **kw):
 def once(payload, env=None, timeout=200):
     """One pass of the gate, with the environment the caller asked for."""
     said = io.StringIO()
-    heard, spoke = sys.stdin, sys.stderr
+    out = io.StringIO()
+    heard, wrote, spoke = sys.stdin, sys.stdout, sys.stderr
     before = dict(os.environ)
     if env is not None:
         os.environ.clear()
         os.environ.update(env)
-    sys.stdin, sys.stderr = io.StringIO(json.dumps(payload)), said
+    sys.stdin = io.StringIO(json.dumps(payload))
+    sys.stdout, sys.stderr = out, said
     try:
         code = gate.main()
     except SystemExit as done:
         code = done.code
     finally:
-        sys.stdin, sys.stderr = heard, spoke
+        sys.stdin, sys.stdout, sys.stderr = heard, wrote, spoke
         os.environ.clear()
         os.environ.update(before)
     return code or 0, said.getvalue()

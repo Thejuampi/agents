@@ -24,6 +24,11 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(HERE, "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+host = mod.load("host.py")
 
 BASE_PATTERNS = os.path.join(HERE, "stop-patterns.txt")
 
@@ -59,7 +64,7 @@ def unquoted(message, code=True):
 
 REMINDER = """KEEP GOING - YOU ALREADY HAVE PERMISSION
 
-Matched: {hits}. What you did is fine; permission was granted in advance and does not expire. If work is left, take the step instead of naming it, pick one instead of offering a menu, run it yourself instead of sending the user, and answer from the repo instead of asking what it already says: {sources}"""
+Matched: {hits}. Permission does not expire. Take the step instead of naming it, pick one instead of offering a menu, run it yourself instead of sending the user, and answer from the repo instead of asking what it already says: {sources}"""
 
 
 def read_patterns(path):
@@ -153,26 +158,27 @@ def sources_in(cwd):
 
 def last_assistant_text(path):
     text = ""
-    try:
-        with open(path, encoding="utf-8") as handle:
-            for line in handle:
-                try:
-                    entry = json.loads(line)
-                except ValueError:
-                    continue
-                if not isinstance(entry, dict) or entry.get("type") != "assistant":
-                    continue
-                content = entry.get("message", {}).get("content")
-                if not isinstance(content, list):
-                    continue
-                parts = [b.get("text", "") for b in content
-                         if isinstance(b, dict) and b.get("type") == "text"]
-                joined = " ".join(p for p in parts if p).strip()
-                if joined:
-                    text = joined
-    except OSError:
-        return ""
+    for entry in host.entries(path):
+        if entry.get("type") != "assistant":
+            continue
+        content = entry.get("message", {}).get("content")
+        if not isinstance(content, list):
+            continue
+        parts = [b.get("text", "") for b in content
+                 if isinstance(b, dict) and b.get("type") == "text"]
+        joined = " ".join(p for p in parts if p).strip()
+        if joined:
+            text = joined
     return text
+
+
+def closing_of(payload):
+    text = (payload.get("last_assistant_message")
+            or payload.get("lastAssistantMessage")
+            or "")
+    if str(text).strip():
+        return str(text).strip()
+    return last_assistant_text(payload.get("transcript_path") or "")
 
 
 def prose(message):
@@ -229,30 +235,20 @@ def acted_this_turn(path):
     """Did any tool run since the user last spoke? A turn of pure prose that
     closes short is an acknowledgement, and an acknowledgement is not work."""
     used = False
-    try:
-        with open(path, encoding="utf-8") as handle:
-            for line in handle:
-                try:
-                    entry = json.loads(line)
-                except ValueError:
-                    continue
-                if not isinstance(entry, dict):
-                    continue
-                if entry.get("type") == "user":
-                    content = entry.get("message", {}).get("content")
-                    if not isinstance(content, list) or any(
-                            isinstance(b, dict) and b.get("type") != "tool_result"
-                            for b in content):
-                        used = False
-                    continue
-                if entry.get("type") != "assistant":
-                    continue
-                content = entry.get("message", {}).get("content")
-                if isinstance(content, list) and any(
-                        isinstance(b, dict) and b.get("type") == "tool_use" for b in content):
-                    used = True
-    except OSError:
-        return True
+    for entry in host.entries(path):
+        if entry.get("type") == "user":
+            content = entry.get("message", {}).get("content")
+            if not isinstance(content, list) or any(
+                    isinstance(b, dict) and b.get("type") != "tool_result"
+                    for b in content):
+                used = False
+            continue
+        if entry.get("type") != "assistant":
+            continue
+        content = entry.get("message", {}).get("content")
+        if isinstance(content, list) and any(
+                isinstance(b, dict) and b.get("type") == "tool_use" for b in content):
+            used = True
     return used
 
 
@@ -351,16 +347,17 @@ def main():
     if payload.get("stop_hook_active"):
         return 0
 
-    transcript = payload.get("transcript_path") or ""
-    if not transcript or not os.path.exists(transcript):
-        return 0
-
-    message = last_assistant_text(transcript)
+    message = closing_of(payload)
     if not message:
         return 0
 
+    transcript = payload.get("transcript_path") or ""
+    acted = False
+    if transcript and os.path.exists(transcript):
+        acted = acted_this_turn(transcript)
+
     cwd = payload.get("cwd") or os.getcwd()
-    hits = offenders(message, cwd, acted_this_turn(transcript))
+    hits = offenders(message, cwd, acted)
     if not hits:
         return 0
 

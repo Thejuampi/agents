@@ -25,6 +25,7 @@ _mod.loader.exec_module(mod)
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 perm = mod.load("check-permission.py")
+host = mod.load("host.py")
 
 RESULT = re.compile(
     r"([\d][\d.,]*)\s*(?:"
@@ -61,39 +62,29 @@ def blocks(path):
     command: quoting a count someone else measured is honest reporting, and
     the checker used to call it fabrication."""
     said, printed = [], []
-    try:
-        with open(path, encoding="utf-8") as handle:
-            for line in handle:
-                try:
-                    entry = json.loads(line)
-                except ValueError:
-                    continue
-                if not isinstance(entry, dict):
-                    continue
-                kind = entry.get("type")
-                content = entry.get("message", {}).get("content")
-                if isinstance(content, str):
-                    if kind == "user":
-                        printed.append(content)
-                    continue
-                if not isinstance(content, list):
-                    continue
-                for block in content:
-                    if not isinstance(block, dict):
-                        continue
-                    btype = block.get("type")
-                    if btype == "text" and kind == "assistant":
-                        said.append(block.get("text", ""))
-                    elif btype == "text" and kind == "user":
-                        printed.append(block.get("text", ""))
-                    elif btype == "tool_result":
-                        body = block.get("content")
-                        if isinstance(body, list):
-                            body = " ".join(b.get("text", "") for b in body
-                                            if isinstance(b, dict))
-                        printed.append(str(body or ""))
-    except OSError:
-        return [], []
+    for entry in host.entries(path):
+        kind = entry.get("type")
+        content = entry.get("message", {}).get("content")
+        if isinstance(content, str):
+            if kind == "user":
+                printed.append(content)
+            continue
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            btype = block.get("type")
+            if btype == "text" and kind == "assistant":
+                said.append(block.get("text", ""))
+            elif btype == "text" and kind == "user":
+                printed.append(block.get("text", ""))
+            elif btype == "tool_result":
+                body = block.get("content")
+                if isinstance(body, list):
+                    body = " ".join(b.get("text", "") for b in body
+                                    if isinstance(b, dict))
+                printed.append(str(body or ""))
     return said, printed
 
 
@@ -120,7 +111,8 @@ def main():
         return 0
 
     said, printed = blocks(transcript)
-    raw = next((t for t in reversed(said) if t.strip()), "")
+    raw = perm.closing_of(payload) or next(
+        (t for t in reversed(said) if t.strip()), "")
     if not raw:
         return 0
 

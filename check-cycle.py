@@ -33,6 +33,7 @@ def _load(name, filename):
 perm = _load("perm", "check-permission.py")
 dead = _load("dead", "check-dead-code.py")
 claim = _load("claim", "check-done-claim.py")
+host = _load("host", "host.py")
 
 RULES = ("AGENTS.md", "CLAUDE.md", ".grok/rules/bmad.md")
 
@@ -72,29 +73,19 @@ def cycle_repo(cwd):
 
 def reviewed(transcript):
     """A review is a thing that ran, so it is looked for in the tool calls."""
-    try:
-        with open(transcript, encoding="utf-8") as handle:
-            for line in handle:
-                try:
-                    entry = json.loads(line)
-                except ValueError:
-                    continue
-                if not isinstance(entry, dict):
-                    continue
-                content = entry.get("message", {}).get("content")
-                if not isinstance(content, list):
-                    continue
-                for block in content:
-                    if not isinstance(block, dict):
-                        continue
-                    if block.get("type") == "tool_use" and REVIEWED.search(
-                            json.dumps(block.get("input") or {})):
-                        return True
-                    if block.get("type") == "tool_use" and REVIEWED.search(
-                            str(block.get("name") or "")):
-                        return True
-    except OSError:
-        return False
+    for entry in host.entries(transcript):
+        content = entry.get("message", {}).get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "tool_use" and REVIEWED.search(
+                    json.dumps(block.get("input") or {})):
+                return True
+            if block.get("type") == "tool_use" and REVIEWED.search(
+                    str(block.get("name") or "")):
+                return True
     return False
 
 
@@ -107,7 +98,7 @@ def main():
         return 0
 
     transcript = payload.get("transcript_path") or ""
-    message = perm.last_assistant_text(transcript)
+    message = perm.closing_of(payload)
     if not message or not claim.CLAIM.search(perm.unquoted(message)):
         return 0
 

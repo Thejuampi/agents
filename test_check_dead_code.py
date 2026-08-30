@@ -73,6 +73,10 @@ CASES = [
      {"src/main/a/Thing.kt": CALLER, "src/test/a/ThingTest.kt": TEST_ONLY}, 2, "orphanedHelper"),
     ("locals are not symbols", {"src/main/a/Main.kt": LOCALS}, 0, ""),
     ("clean tree says nothing", {}, 0, ""),
+    ("python private stays unnamed",
+     {"src/hidden.py": "def _hidden():\n    return 1\n"}, 0, ""),
+    ("python public helper is dead until called",
+     {"src/visible.py": "def visibleHelper():\n    return 2\n"}, 2, "visibleHelper"),
 ]
 
 

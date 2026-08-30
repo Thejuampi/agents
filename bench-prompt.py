@@ -67,12 +67,21 @@ def run(kind, rows, step=50):
     return kind, fires, prec, rec, f1
 
 
+def corpus_path():
+    """The corpus a table was computed on, not whichever one is newest."""
+    for arg in sys.argv[1:]:
+        if arg.endswith(".json"):
+            return arg if os.path.isabs(arg) else os.path.join(HERE, arg)
+    return os.path.join(HERE, "corpus.json")
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    data = json.load(open(os.path.join(HERE, "corpus.json"), encoding="utf-8"))
+    data = json.load(open(corpus_path(), encoding="utf-8"))
     rows = [r for r in data if not r.get("noise")]
-    if len(sys.argv) > 1:
-        rows = rows[:int(sys.argv[1])]
+    limit = [a for a in sys.argv[1:] if not a.endswith(".json")]
+    if limit:
+        rows = rows[:int(limit[0])]
     print(len(rows), "rows", sum(1 for r in rows if r.get("push")), "pushes")
     got = [run(kind, rows) for kind in ("base", "loose", "strict")]
     print()

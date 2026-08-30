@@ -82,6 +82,7 @@ ask: qu[eé] prefer[ií]s
 ask: cu[aá]l prefer[ií]s
 ask: pido permiso
 ask: con tu ok
+ask: cuando quieras
 ask: cuando me digas
 ask: cuando digas
 ask: let me know
@@ -174,6 +175,7 @@ handoff: \bde tu lado\b
 handoff: you (have|need) to\b
 handoff: that'?s (yours|your call|on you)
 handoff: only you can
+handoff: next pass is
 
 # ---- defer: postponing a decision to a shared moment that never comes
 defer: ah[ií] vemos
@@ -195,7 +197,6 @@ defer: we could
 defer: we should
 defer: one option is
 defer: the fix (is|would be) to
-defer: se (van|va a|sacan|saca|eliminan|elimina|borran|borra|apagan|apaga)
 defer: por eso,? para
 
 
@@ -374,7 +375,7 @@ announce?: (?:^|[.!?]\s)Now\b[^.!?\n]{0,150}[.!?]?\s*$
 announce: \b(te l[oa]s? debo|queda(n)? a deber|lo dejo a deber|i owe you)\b
 
 # The whole message is a shrug. Twelve hits, none caught by anything else.
-idle: ^\s*(No response requested\.?|Sin novedad\.?|Nada que reportar\.?)\s*$
+idle: ^\s*(No response requested\.?|Sin novedad\.?|Nada que reportar\.?|Sin cambios\.?)\s*$
 
 # 'the move stays unpriced', 'sigue vacio' - a thing left broken in the
 # report. Low: it is also how you honestly describe state you cannot change.
@@ -392,3 +393,46 @@ announce?: \b(still depends on|sigue dependiendo de|todavía depende de)\b
 # 'will recheck PR39 in ~8 minutes' - a check postponed to a clock instead
 # of made, with the wait handed to the reader.
 announce: \bwill (?:recheck|re-check|check back|revisit|follow up)\b
+announce: I(?:'ll| will) check (?:back|again|the results)
+announce: I(?:'ll| will) merge as soon as
+announce: I(?:'ll| will) be notified when
+announce: Checking CI status
+announce: checking again shortly
+announce: Queda,\s*por impacto
+
+handoff: yours to add
+handoff: I can'?t touch it
+announce: stages closed
+wait: Final run is
+wait: Control run started
+announce: ^Starting with the
+ask: [Ss]i las quer[eé]s
+announce: crash (est[aá] arreglado|is fixed)
+wait: in flight over
+handoff: I did not merge
+announce: \bahora mido\b
+
+ask: Confirm and I start
+ask: reply with the number
+announce: loop stops here
+announce: I did not wipe
+announce: <proposed_plan>
+announce: ^(\*\*)?Pushed\.
+announce: PR \*\*#\d+
+announce: ya se arma solo
+announce: Listo\.\s+Agreg
+wait: Waiting on the app
+announce: ^P25 hit
+announce: llega al FCFF
+announce: selector de abajo
+announce: fallas viejas
+announce: Quant Engine ya no mueve
+announce: Commit, push y PR del playbook
+announce: expansi[oó]n del bar
+announce: Tests stay required
+announce: QA-002 is fixed
+announce: now writes
+announce: 20.4 GB libres
+announce: OpenCode est[aá] haciendo prefill
+announce: llama-panel profiles
+announce: Commit[eé] todo el workspace

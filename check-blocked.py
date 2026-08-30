@@ -28,6 +28,7 @@ _mod.loader.exec_module(mod)
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 perm = mod.load("check-permission.py")
+host = mod.load("host.py")
 
 MARK = re.compile(r"BLOCKED:", re.IGNORECASE)
 STREAK = 3
@@ -43,24 +44,16 @@ def claims(path):
     """Every closing message this session made, in order, and whether each one
     declared a blocker. A single one is a fact; a run of them is a posture."""
     out = []
-    try:
-        with open(path, encoding="utf-8") as handle:
-            for line in handle:
-                try:
-                    entry = json.loads(line)
-                except ValueError:
-                    continue
-                if not isinstance(entry, dict) or entry.get("type") != "assistant":
-                    continue
-                content = entry.get("message", {}).get("content")
-                if not isinstance(content, list):
-                    continue
-                text = " ".join(b.get("text", "") for b in content
-                                if isinstance(b, dict) and b.get("type") == "text").strip()
-                if text:
-                    out.append(bool(MARK.search(perm.unquoted(text))))
-    except OSError:
-        return []
+    for entry in host.entries(path):
+        if entry.get("type") != "assistant":
+            continue
+        content = entry.get("message", {}).get("content")
+        if not isinstance(content, list):
+            continue
+        text = " ".join(b.get("text", "") for b in content
+                        if isinstance(b, dict) and b.get("type") == "text").strip()
+        if text:
+            out.append(bool(MARK.search(perm.unquoted(text))))
     return out
 
 
@@ -82,7 +75,7 @@ def main():
         return 0
 
     transcript = payload.get("transcript_path") or ""
-    raw = perm.last_assistant_text(transcript)
+    raw = perm.closing_of(payload)
     message = perm.unquoted(raw or "")
     if not raw or not MARK.search(message):
         return 0

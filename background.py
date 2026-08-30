@@ -6,7 +6,6 @@ check-stop.py loads check-permission.py, so the detection cannot live in
 either one.
 """
 import importlib.util
-import json
 import os
 import re
 
@@ -17,20 +16,11 @@ mod = importlib.util.module_from_spec(_mod)
 _mod.loader.exec_module(mod)
 
 reader = mod.load("transcript.py")
+host = mod.load("host.py")
 
 
 def entries(transcript):
-    try:
-        with open(transcript, encoding="utf-8") as handle:
-            for line in handle:
-                try:
-                    entry = json.loads(line)
-                except ValueError:
-                    continue
-                if isinstance(entry, dict):
-                    yield entry
-    except OSError:
-        return
+    yield from host.entries(transcript)
 
 
 BACKGROUND = ("agent", "task", "monitor", "croncreate", "schedulewakeup")
@@ -50,6 +40,30 @@ tracks reports back well before that."""
 NOTIFIED = re.compile(r"<tool-use-id>\s*([^<\s]+)", re.IGNORECASE)
 
 
+def closed(entry):
+    found = []
+    content = entry.get("message", {}).get("content")
+    if isinstance(content, str):
+        found.extend(NOTIFIED.findall(content))
+    elif isinstance(content, list):
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            done = block.get("tool_use_id") or block.get("tool_call_id")
+            if done:
+                found.append(done)
+            if block.get("type") == "tool_result":
+                continue
+            piece = block.get("text") or ""
+            if piece:
+                found.extend(NOTIFIED.findall(piece))
+    prompt = entry.get("prompt")
+    if isinstance(prompt, str):
+        found.extend(NOTIFIED.findall(prompt))
+    return found
+
+
+
 def waiting_on(transcript):
     """True when this turn started work that has not reported back yet.
 
@@ -64,6 +78,14 @@ def waiting_on(transcript):
     notification arrives, or after STALE closings if that notification never
     does, which covers a task killed from outside the session.
 
+    The notification is not always a user message. The harness files it as a
+    queue-operation or an attachment depending on how the session was woken,
+    and reading only user turns left three finished agents in the register for
+    the rest of a session. Any entry that is not the agent speaking is searched
+    for the id. Grok files that same end as a tool_result whose
+    tool_use_id field is the launch id, with no XML tag. A file body
+    that quotes the tag is not a notification.
+
     A launch is not enough and a missing tool_result is the wrong signal: a
     backgrounded call answers immediately with its task id, so that absence
     never happens and the first version of this measured zero. The end of the
@@ -77,12 +99,8 @@ def waiting_on(transcript):
             live.pop(key, None)
         kind = entry.get("type")
         content = entry.get("message", {}).get("content")
-        if kind == "user":
-            text = content if isinstance(content, str) else " ".join(
-                b.get("text", "") for b in content
-                if isinstance(b, dict) and b.get("type") == "text"
-            ) if isinstance(content, list) else ""
-            for done in NOTIFIED.findall(text or ""):
+        if kind != "assistant":
+            for done in closed(entry):
                 live.pop(done, None)
             continue
         if kind != "assistant" or not isinstance(content, list):

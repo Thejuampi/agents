@@ -85,7 +85,7 @@ def main():
     if not transcript or not os.path.exists(transcript):
         return 0
 
-    raw = perm.last_assistant_text(transcript)
+    raw = perm.closing_of(payload)
     if not raw:
         return 0
     message = perm.unquoted(raw)

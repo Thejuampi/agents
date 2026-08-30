@@ -21,6 +21,7 @@ _mod.loader.exec_module(mod)
 spawn = mod.load("spawn.py")
 claim = mod.load("claim.py")
 perm = mod.load("check-permission.py")
+host = mod.load("host.py")
 
 
 KOTLIN = re.compile(
@@ -99,35 +100,23 @@ its own terms and made every such stop run git for nothing."""
 def touched_files(path):
     """Files this session actually wrote. Another agent on the same tree is not mine."""
     touched = set()
-    try:
-        with open(path, encoding="utf-8") as handle:
-            for line in handle:
-                try:
-                    entry = json.loads(line)
-                except ValueError:
-                    continue
-                if not isinstance(entry, dict):
-                    continue
-                content = entry.get("message", {}).get("content")
-                if not isinstance(content, list):
-                    continue
-                for block in content:
-                    if not isinstance(block, dict) or block.get("type") != "tool_use":
-                        continue
-                    if str(block.get("name") or "").lower() not in WRITERS:
-                        continue
-                    payload = block.get("input") or {}
-                    target = payload.get("file_path")
-                    if isinstance(target, str):
-                        touched.add(os.path.normpath(target).replace("\\", "/").lower())
-                    # Edits made through the shell carry no file_path, so the
-                    # command text is the only record of what they touched.
-                    command = payload.get("command")
-                    if isinstance(command, str):
-                        for token in PATH_LIKE.findall(command):
-                            touched.add(os.path.normpath(token).replace("\\", "/").lower())
-    except OSError:
-        return set()
+    for entry in host.entries(path):
+        content = entry.get("message", {}).get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            if str(block.get("name") or "").lower() not in WRITERS:
+                continue
+            payload = block.get("input") or {}
+            target = payload.get("file_path")
+            if isinstance(target, str):
+                touched.add(os.path.normpath(target).replace("\\", "/").lower())
+            command = payload.get("command")
+            if isinstance(command, str):
+                for token in PATH_LIKE.findall(command):
+                    touched.add(os.path.normpath(token).replace("\\", "/").lower())
     return touched
 
 
@@ -161,7 +150,10 @@ def added_symbols(cwd, touched):
         for pattern in (KOTLIN, PYTHON, TS):
             match = pattern.match(line)
             if match:
-                found.setdefault(match.group(1), current)
+                name = match.group(1)
+                if name.startswith("_"):
+                    break
+                found.setdefault(name, current)
                 break
     for path in untracked:
         if TEST_HINT.search(path) or not path.endswith((".kt", ".java", ".py", ".ts", ".tsx")):
@@ -174,7 +166,10 @@ def added_symbols(cwd, touched):
                     for pattern in (KOTLIN, PYTHON, TS):
                         match = pattern.match("+" + raw.rstrip("\n"))
                         if match:
-                            found.setdefault(match.group(1), path)
+                            name = match.group(1)
+                            if name.startswith("_"):
+                                break
+                            found.setdefault(name, path)
                             break
         except OSError:
             continue
@@ -230,7 +225,7 @@ def main():
         return 0
 
     cwd = payload.get("cwd") or os.getcwd()
-    message = perm.last_assistant_text(payload.get("transcript_path") or "")
+    message = perm.closing_of(payload)
     if not message or not claim.CLAIM.search(perm.unquoted(message)):
         return 0
 
