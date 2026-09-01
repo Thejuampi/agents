@@ -245,9 +245,23 @@ agents/           # canonical agent prompts
 commands/         # slash / skill entrypoints
 adapters/         # harness notes (claude, grok, codex, opencode, vscode)
 install/          # PowerShell projectors
+claude/           # the stop guard: a Stop hook that sends an early finish back
 Makefile          # install / sync targets
 AGENTS.md         # rules for editing this repo
 ```
+
+---
+
+## The stop guard
+
+`claude/` holds a `Stop` hook that reads the closing message of a turn. When the
+agent named the next step instead of doing it, claimed a number it never
+measured, or said BLOCKED with a path still open, the hook sends the turn back.
+Patterns decide first; a local model settles what they leave open.
+
+It runs on Claude Code and Grok Build from the same block. Install it with
+[`claude/install.ps1`](claude/install.ps1); the why and the knobs are in
+[`claude/README.md`](claude/README.md) and [`claude/INSTALL.md`](claude/INSTALL.md).
 
 ---
 
