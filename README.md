@@ -337,3 +337,9 @@ See [`AGENTS.md`](AGENTS.md).
 ```
 
 Craft first. Nested brains last (never). Correctness over convenience — always. Suites green ≠ Stage 6 black-box QA.
+
+---
+
+## License
+
+MIT. See [LICENSE](LICENSE).
