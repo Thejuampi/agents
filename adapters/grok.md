@@ -89,6 +89,8 @@ the old entry exists.
 ```text
 /e2e
 /plan-this
+/sensei-this
+/advisor-this
 $e2e
 ```
 

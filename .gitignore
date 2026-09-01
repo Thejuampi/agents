@@ -5,3 +5,4 @@
 
 # E2E session artifacts
 .agents/
+.grok/

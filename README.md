@@ -229,6 +229,8 @@ Canonical definitions: [`agents/`](agents/).
 | `/plan-this` | Planner only |
 | `/build-this` | Builder only |
 | `/review-this` | Reviewer only |
+| `/sensei-this` | Sensei only |
+| `/advisor-this` | Advisor only |
 | `/qa-this` | QA only |
 | `/curate-this` | Curator only |
 

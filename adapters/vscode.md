@@ -86,7 +86,7 @@ qa       --[Final Sensei Pass]-----> sensei
 | --- | --- | --- |
 | `name` | all 9 | command file base name |
 | `description` | all 9 | `Get-CommandSkillDescription` (existing wave-1 helper, reused — same fallback rules, same 1024-char ceiling, same no-`$`-sigil rule as every other harness) |
-| `agent` | all 9 (all 9 commands reference a role) | `Get-CommandAgent` |
+| `agent` | all 11 (all 11 commands reference a role) | `Get-CommandAgent` |
 | `argument-hint` | `e2e`, `e2e-resume` only | `Get-CommandArgumentHint` — `$null` for the other 7, so **no key is emitted at all** for them (I4: an absent hint is never rendered as an empty `argument-hint:` line) |
 
 Before this wave, `install/vscode.ps1` wrote only a generated-comment + raw command body — no frontmatter, so nothing beyond a filename appeared in the `/` picker and no prompt routed to a role (F-14). Fixed.

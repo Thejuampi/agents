@@ -90,7 +90,7 @@ $resumeHint = Get-CommandArgumentHint -Path (Join-Path $Repo 'commands\e2e-resum
 Assert-Equal -Expected '[session-slug]' -Actual $e2eHint -Message 'commands/e2e.md Argument-Hint parses to [session-slug]'
 Assert-Equal -Expected '[session-slug]' -Actual $resumeHint -Message 'commands/e2e-resume.md Argument-Hint parses to [session-slug]'
 $othersWithoutHint = Get-CommandFiles -Repo $Repo | Where-Object { $_.Name -notin @('e2e', 'e2e-resume') }
-Assert-Equal -Expected 7 -Actual $othersWithoutHint.Count -Message 'exactly 7 other command files exist'
+Assert-Equal -Expected 9 -Actual $othersWithoutHint.Count -Message 'exactly 9 other command files exist'
 foreach ($c in $othersWithoutHint) {
   $hint = Get-CommandArgumentHint -Path $c.Path
   Assert-True -Condition ($null -eq $hint) -Message "'$($c.Name).md' has no Argument-Hint -> parser returns `$null (not empty string)"

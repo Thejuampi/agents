@@ -55,13 +55,13 @@ try {
   $SkillsRoot = Join-Path $TmpTarget '.claude\skills'
   $CmdsDir = Join-Path $TmpTarget '.claude\commands'
 
-  # --- W2-P01: 9 agents, 9 skills, 9 commands generated -----------------------
+  # --- W2-P01: 9 agents, 11 skills, 11 commands generated -----------------------
   $agentFiles = @(Get-ChildItem -LiteralPath $AgentsDir -Filter *.md)
   $skillDirs = @(Get-ChildItem -LiteralPath $SkillsRoot -Directory)
   $cmdFiles = @(Get-ChildItem -LiteralPath $CmdsDir -Filter *.md)
   Assert-Equal -Expected 9 -Actual $agentFiles.Count -Message 'W2-P01: 9 agent files generated'
-  Assert-Equal -Expected 9 -Actual $skillDirs.Count -Message 'W2-P01: 9 skill dirs generated'
-  Assert-Equal -Expected 9 -Actual $cmdFiles.Count -Message 'W2-P01: 9 command alias files generated'
+  Assert-Equal -Expected 11 -Actual $skillDirs.Count -Message 'W2-P01: 11 skill dirs generated'
+  Assert-Equal -Expected 11 -Actual $cmdFiles.Count -Message 'W2-P01: 11 command alias files generated'
 
   # --- W2-P02 (generator half; sandboxed-launch confirmation deferred to wave-7) --
   $senseiFm = Get-FrontmatterBlock -Path (Join-Path $AgentsDir 'sensei.md')
@@ -84,7 +84,7 @@ try {
     Assert-True -Condition ($fm -match '(?m)^disable-model-invocation:\s*true\s*$') -Message "W2-P03: '$skillName' SKILL.md has disable-model-invocation: true"
   }
   $otherSkills = @($skillDirs | Where-Object { $_.Name -notin @('e2e', 'e2e-resume') })
-  Assert-Equal -Expected 7 -Actual $otherSkills.Count -Message 'W2-N02: exactly 7 other skills exist'
+  Assert-Equal -Expected 9 -Actual $otherSkills.Count -Message 'W2-N02: exactly 9 other skills exist'
   foreach ($s in $otherSkills) {
     $fm = Get-FrontmatterBlock -Path (Join-Path $s.FullName 'SKILL.md')
     Assert-True -Condition ($fm -notmatch 'disable-model-invocation') -Message "W2-N02: '$($s.Name)' SKILL.md has no disable-model-invocation (stays model-invocable)"
