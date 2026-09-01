@@ -1,0 +1,42 @@
+747 rows 78 pushes
+base 0 0 s
+base 50 46 s
+base 100 98 s
+base 150 148 s
+base 200 276 s
+base 250 354 s
+base 300 400 s
+base 350 464 s
+base 400 543 s
+base 450 637 s
+base 500 702 s
+base 550 743 sbabase 600 815 s
+base 650 870 sbabase 700 929 sloloose 0 0 sloloose 50 65 sloloose 100 117 sloose 150 205 s
+loloose 200 214 sloloose 250 283 sloloose 300 316 sloose 350 419 s
+loose 400 542 s
+loose 450 606 s
+loose 500 650 s
+loose 550 684 s
+loose 600 723 s
+loose 650 765 s
+loose 700 820 s
+strict 0 0 s
+strict 50 41 s
+strict 100 77 s
+strict 150 104 s
+strict 200 144 s
+strict 250 190 s
+strict 300 238 s
+strict 350 319 s
+strict 400 395 s
+strict 450 452 s
+strict 500 498 s
+strict 550 535 s
+strict 600 600 s
+strict 650 620 s
+strict 700 644 s
+
+base      470  0.117  0.705  0.201
+loose     414  0.123  0.654  0.207
+strict    408  0.130  0.679  0.218
+

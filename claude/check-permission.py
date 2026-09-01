@@ -1,0 +1,400 @@
+#!/usr/bin/env python3
+"""Stop hook. One question: did the final message announce the next step
+instead of doing it, or ask for permission that was already granted?
+
+Exit 2 + stderr -> the harness re-wakes the model with the reminder in context.
+Exit 0 silent   -> nothing to say.
+
+Nothing about the rules lives in this file. The patterns come from
+stop-patterns.txt beside it, and a repo can add or remove its own at
+<repo>/.claude/stop-patterns.txt. The sources the reminder points at are
+whatever the repo actually holds, discovered per run, so a project with no PRD
+gets told to read its README and its tests instead.
+
+There is no escape hatch here. Blockers are handled once, centrally, in
+check-stop.py, behind a release phrase and the local model. A checker that let
+the string BLOCKED: through was a checker that could be switched off by typing
+it.
+"""
+import glob
+import importlib.util
+import json
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(HERE, "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+host = mod.load("host.py")
+reader = mod.load("transcript.py")
+
+BASE_PATTERNS = os.path.join(HERE, "stop-patterns.txt")
+
+FENCED = re.compile(r"```.*?```", re.DOTALL)
+CODE = re.compile(r"`[^`\n]*`")
+TABLE = re.compile(r"^[ 	]*\|.*\|[ 	]*$", re.M)
+
+QUOTED = re.compile("\"[^\"\n]*\"|«[^»\n]*»|“[^”\n]*”")
+
+
+REPORTED = re.compile(
+    r"\b(dice|dicen|avisa|avisan|indica|indican|advierte|advierten|aclara|explica|"
+    r"muestra|reza|says|warns|reads|states|tells)\s+(que|that)\b[^.\n]*",
+    re.IGNORECASE,
+)
+
+
+def unquoted(message, code=True):
+    """The agent's own words. Reporting a phrase is not saying it, so anything
+    fenced, tabled, backticked, quoted or attributed to something else comes
+    out. A markdown table row is a listing of phrases, and a gate that reads
+    the before column of "before / after" blocks the report of its own fix.
+    One pass cannot do this: a backtick inside a quoted span eats the closing
+    quote and leaks the rest of the line back in.
+
+    Pass code=False when backticks do not mean attribution. An agent writes
+    its own measurements as `2118 tests` all day; dropping those would hand it
+    a way to launder every number it never ran."""
+    plain = TABLE.sub(" ", FENCED.sub(" ", message))
+    if code:
+        plain = CODE.sub(" ", plain)
+    return REPORTED.sub(" ", QUOTED.sub(" ", plain))
+
+REMINDER = """KEEP GOING - YOU ALREADY HAVE PERMISSION
+
+Matched: {hits}. Permission does not expire. Take the step instead of naming it, pick one instead of offering a menu, run it yourself instead of sending the user, and answer from the repo instead of asking what it already says: {sources}"""
+
+
+def read_patterns(path):
+    """Returns (added, removed). A line starting with - removes an inherited one."""
+    added, removed = [], set()
+    try:
+        with open(path, encoding="utf-8") as handle:
+            for raw in handle:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                drop = line.startswith("-")
+                if drop:
+                    line = line[1:].strip()
+                if ":" not in line:
+                    continue
+                label, _, pattern = line.partition(":")
+                pattern = pattern.strip()
+                if not pattern:
+                    continue
+                if drop:
+                    removed.add(pattern)
+                else:
+                    added.append((label.strip(), pattern))
+    except OSError:
+        return [], set()
+    return added, removed
+
+
+def patterns_for(cwd):
+    added, removed = read_patterns(BASE_PATTERNS)
+    extra, extra_removed = read_patterns(os.path.join(cwd, ".claude", "stop-patterns.txt"))
+    added += extra
+    removed |= extra_removed
+    out = []
+    for label, pattern in added:
+        if pattern in removed:
+            continue
+        try:
+            out.append((label, re.compile(pattern, re.IGNORECASE)))
+        except re.error:
+            continue
+    return out
+
+
+NOISE = ("/build/", "/dist/", "/target/", "/out/", "/bin/", "/obj/",
+         "/node_modules/", "/.git/", "/.gradle/", "/.idea/", "/venv/",
+         "/__pycache__/", "/coverage/", "/.next/", "/vendor/")
+
+CHECKS = [
+    ("the spec", ["*[Pp][Rr][Dd]*.md", "docs/**/*[Pp][Rr][Dd]*.md",
+                  "spec/**/*.md", "specs/**/*.md", "requirements*.md",
+                  "_bmad-output/**/*.md"]),
+    ("the README", ["README*", "readme*"]),
+    ("the project instructions", ["CLAUDE.md", "AGENTS.md", ".cursorrules",
+                                  ".github/copilot-instructions.md"]),
+    ("the docs", ["docs/**/*.md", "doc/**/*.md"]),
+    ("the tests", ["**/src/test/**", "**/tests/**", "**/test/**",
+                   "**/*_test.*", "**/*.spec.*", "**/[Tt]est*.*"]),
+]
+
+
+def _pick(cwd, pattern):
+    """The shortest match, which is the canonical one. A repo has one README
+    at the root and forty in its dependencies."""
+    try:
+        hits = [p for p in glob.iglob(os.path.join(cwd, pattern), recursive=True)
+                if not any(n in p.replace("\\", "/") + "/" for n in NOISE)]
+    except OSError:
+        return None
+    if not hits:
+        return None
+    return min(hits, key=lambda p: (len(p.split(os.sep)), len(p)))
+
+
+def sources_in(cwd):
+    """What this repo actually offers to read, discovered per run. A project
+    with no spec is told to read its README and its tests instead. Nothing
+    about any one project is written down here."""
+    found = []
+    for label, globs in CHECKS:
+        for pattern in globs:
+            hit = _pick(cwd, pattern)
+            if hit:
+                found.append((label, os.path.relpath(hit, cwd).replace("\\", "/")))
+                break
+    found.append(("the git history", "git log"))
+    found.append(("the running app", "build it and use it"))
+    return ", ".join(where for _, where in found)
+
+
+def last_assistant_text(path):
+    text = ""
+    for entry in host.entries(path):
+        if entry.get("type") != "assistant":
+            continue
+        content = entry.get("message", {}).get("content")
+        if not isinstance(content, list):
+            continue
+        parts = [b.get("text", "") for b in content
+                 if isinstance(b, dict) and b.get("type") == "text"]
+        joined = " ".join(p for p in parts if p).strip()
+        if joined:
+            text = joined
+    return text
+
+
+def closing_of(payload):
+    text = (payload.get("last_assistant_message")
+            or payload.get("lastAssistantMessage")
+            or "")
+    if str(text).strip():
+        return str(text).strip()
+    return last_assistant_text(payload.get("transcript_path") or "")
+
+
+def prose(message):
+    """The message with code removed. A question followed by the code it
+    proposes is still a question waiting for an answer, and a regex quoted
+    inside backticks is not a question however it ends."""
+    out = []
+    fenced = False
+    for line in message.strip().splitlines():
+        if line.strip().startswith("```"):
+            fenced = not fenced
+            continue
+        if not fenced:
+            out.append(CODE.sub(" ", line))
+    return "\n".join(out)
+
+
+def ends_on_a_question(message):
+    """The shape, not the vocabulary. A closing question hands the turn back
+    whatever words it uses, so this catches phrasings no list foresees.
+
+    The whole last paragraph counts, not only its last line. Asking the
+    question and then adding a sentence of colour does not unask it."""
+    body = prose(message).strip()
+    if not body:
+        return False
+    closing = []
+    for line in reversed(body.splitlines()):
+        stripped = line.strip().strip("*_`> ")
+        if not stripped:
+            if closing:
+                break
+            continue
+        closing.insert(0, stripped)
+        if len(closing) >= 3:
+            break
+    return any(sentence.strip().endswith("?")
+               for line in closing
+               for sentence in re.split(r"(?<=[.!?])\s+", line))
+
+
+def ends_on_a_colon(message):
+    """A closing whose last line ends in a colon promised the thing that comes
+    after it and never wrote it. The shape says the turn stopped mid-sentence."""
+    body = prose(message).strip()
+    for line in reversed(body.splitlines()):
+        stripped = line.strip().strip("*_`> ")
+        if stripped:
+            return stripped.endswith(":")
+    return False
+
+
+def acted_this_turn(path):
+    """Did any tool run since the user last spoke? A turn of pure prose that
+    closes short is an acknowledgement, and an acknowledgement is not work."""
+    used = False
+    for entry in host.entries(path):
+        if entry.get("type") == "user":
+            content = entry.get("message", {}).get("content")
+            if not isinstance(content, list) or any(
+                    isinstance(b, dict) and b.get("type") != "tool_result"
+                    for b in content):
+                used = False
+            continue
+        if entry.get("type") != "assistant":
+            continue
+        content = entry.get("message", {}).get("content")
+        if isinstance(content, list) and any(
+                isinstance(b, dict) and b.get("type") == "tool_use" for b in content):
+            used = True
+    return used
+
+
+WORK = re.compile(
+    r"\b(fix|wire|build|implement|commit|segui|seguí|cablea|arregla|"
+    r"implementa|hace el trabajo)\b",
+    re.IGNORECASE)
+
+QUICK = re.compile(
+    r"(in one sentence|one sentence|una oraci[oó]n|una frase|"
+    r"how long|cu[aá]nto (tard|dura|toma)|"
+    r"\bwhy\b|\bpor qu[eé]\b|\bwhat is\b|\bqu[eé] es\b)",
+    re.IGNORECASE)
+
+
+def last_ask(path):
+    return reader.last_user(host.entries(path))
+
+
+def quick_ask(asked):
+    text = " ".join((asked or "").split())
+    if not text:
+        return False
+    if QUICK.search(text):
+        return True
+    if WORK.search(text):
+        return False
+    return "?" in text and len(text.split()) <= 40
+
+
+def ends_on_nothing(message, acted, asked=""):
+    return (not acted
+            and len(message.strip()) < 400
+            and not quick_ask(asked))
+
+
+MAYBE = 3
+"""Exit code for a hit nobody should be sentenced on.
+
+A pattern matches a word and cannot see around it: "nothing pending" trips the
+pending rule, "no deja nada pendiente" reads as an announcement. Those wordings
+are worth catching and are not worth blocking on their own, so they leave here
+as a candidate and the local model decides. A class written with a trailing ?
+in stop-patterns.txt is one of these. Everything else still blocks on its own,
+which is most of the list: a direct request for permission needs no second
+opinion."""
+
+
+def weak(label):
+    return label.rstrip().endswith("?")
+
+
+def quoted_hit(found):
+    """The agent's own words, not the regex that found them.
+
+    A reminder that prints the raw pattern tells the reader what the machine
+    is, when what it needs to know is which of its own sentences tripped
+    it."""
+    text = found.group(0).strip().lstrip(".!?").strip()
+    if not text:
+        return found.re.pattern[:40]
+    if len(text) > 60:
+        return text[:60].rsplit(" ", 1)[0].rstrip(" .,;:") + "..."
+    return text.rstrip(" .,;:")
+
+
+NO = re.compile(
+    r"(\b(no|not|nothing|none|never|without|nor|nada|ning[u\u00fa]n\w*|nunca|sin|tampoco)\b"
+    r"|n't)", re.IGNORECASE)
+"""Words that turn a stall phrase into a report that nothing is stalled."""
+
+LOOKBACK = 4
+"""How many words back a negation still governs the phrase.
+
+'Nothing is running now' is one word away and must not fire. 'I did not
+finish the audit; I will report back when it lands' carries a negation in the
+same message and is a real stall, so the window stays short and stops at the
+nearest clause break."""
+
+
+def negated(text, found):
+    head = text[:found.start()]
+    clause = re.split(r"[.;:,!?\n]", head)[-1]
+    return bool(NO.search(" ".join(clause.split()[-LOOKBACK:])))
+
+
+ACK_WORDS = 60
+"""How short a turn has to be for an acknowledgement to be the whole of it.
+
+An ack is a turn that ends on one - "perfecto", "ahora tengo", "that worked" -
+with nothing built behind it. The same words inside a long report are the
+agent saying what it found. Measured over 885 real closings: three messages
+carried an ack pattern, and the two above this line were reports of finished
+work. The one below it was the real thing."""
+
+
+def offenders(message, cwd=None, acted=True, asked=""):
+    # Naming a trigger phrase is not using it. Talking about the hook, or
+    # quoting someone, must not fire it.
+    stripped = unquoted(message)
+    brief = len(message.split()) <= ACK_WORDS
+    hits = []
+    for label, rx in patterns_for(cwd or os.getcwd()):
+        if label.startswith("ack") and not brief:
+            continue
+        found = rx.search(stripped)
+        if found and not negated(stripped, found):
+            hits.append(f"{label}: {quoted_hit(found)}")
+    if ends_on_a_question(message):
+        hits.append("shape: closing question")
+    if ends_on_a_colon(message):
+        hits.append("shape: a closing that ends on a colon")
+    if ends_on_nothing(message, acted, asked):
+        hits.append("shape: a short turn that ran nothing")
+    return hits
+
+
+def main():
+    try:
+        payload = json.loads(sys.stdin.read() or "{}")
+    except ValueError:
+        payload = {}
+
+    if payload.get("stop_hook_active"):
+        return 0
+
+    message = closing_of(payload)
+    if not message:
+        return 0
+
+    transcript = payload.get("transcript_path") or ""
+    acted = False
+    asked = ""
+    if transcript and os.path.exists(transcript):
+        acted = acted_this_turn(transcript)
+        asked = last_ask(transcript)
+
+    cwd = payload.get("cwd") or os.getcwd()
+    hits = offenders(message, cwd, acted, asked)
+    if not hits:
+        return 0
+
+    sys.stderr.write(REMINDER.format(hits=", ".join(hits[:5]), sources=sources_in(cwd)) + "\n")
+    return MAYBE if all(weak(h.split(chr(58))[0]) for h in hits) else 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
