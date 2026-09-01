@@ -53,8 +53,41 @@ $skillFiles = Install-PlaybookSkillsTo `
   -SkillsRoot $SkillsRoot `
   -Repo $Repo `
   -SyncCommand $syncCommand `
-  -HarnessLabel 'claude'
+  -HarnessLabel 'claude' `
+  -Global:$Global
 $genFiles += $skillFiles
+
+# Task 2.5: e2e / e2e-resume alone get Claude-only skill frontmatter
+# (argument-hint + disable-model-invocation: true — I7, they must never be
+# auto-invoked by the model). Install-PlaybookSkillsTo's -ExtraFrontmatter is
+# a single map applied uniformly to every command in its batch (wave-1-owned,
+# not editable here per plan.v3.md 1.4a's ownership matrix), so the two
+# Claude-only skills are regenerated individually via the same wave-1
+# `New-PlaybookSkillMarkdown` primitive with their own extra-frontmatter map,
+# overwriting the just-written uniform-frontmatter copy at the same path.
+# The other 7 skills stay untouched and remain model-invocable (W2-N02).
+foreach ($cmdName in @('e2e', 'e2e-resume')) {
+  $cmdPath = Join-Path $Repo "commands\$cmdName.md"
+  if (-not (Test-Path -LiteralPath $cmdPath)) { continue }
+  $agent = Get-CommandAgent -Path $cmdPath
+  $task = Get-CommandTask -Path $cmdPath
+  $skillDesc = Get-CommandSkillDescription -Path $cmdPath -CommandName $cmdName -AgentName $agent
+  $argHint = Get-CommandArgumentHint -Path $cmdPath
+  $extraFrontmatter = [ordered]@{}
+  if ($argHint) { $extraFrontmatter['argument-hint'] = $argHint }
+  $extraFrontmatter['disable-model-invocation'] = 'true'
+  $skill = New-PlaybookSkillMarkdown `
+    -CommandName $cmdName `
+    -AgentName $agent `
+    -Task $task `
+    -SkillDescription $skillDesc `
+    -SyncCommand $syncCommand `
+    -Repo $Repo `
+    -Global:$Global `
+    -ExtraFrontmatter $extraFrontmatter
+  $skillOut = Join-Path $SkillsRoot "$cmdName\SKILL.md"
+  Set-Content -LiteralPath $skillOut -Value $skill -Encoding utf8 -NoNewline
+}
 
 # Legacy/compat command markdown (same slash names)
 foreach ($c in (Get-CommandFiles -Repo $Repo)) {
@@ -64,7 +97,16 @@ foreach ($c in (Get-CommandFiles -Repo $Repo)) {
   $task = Get-CommandTask -Path $c.Path
   $agentForDesc = if ($agent) { $agent } else { 'agent' }
   $skillDesc = Get-CommandSkillDescription -Path $c.Path -CommandName $c.Name -AgentName $agentForDesc
-  $agentsSourceDir = Join-Path $Repo 'agents'
+  # F-2/D3 fix (wave-1 disclosed finding, fixed here for this second call
+  # site): name the role, never bake this machine's absolute repo path into a
+  # generated artifact. `-Global` installs aren't tied to one repo checkout;
+  # in-repo installs may point at a repo-relative fallback path instead.
+  $roleHint = if ($Global) {
+    "ask which project's canonical ``agents/$agentForDesc.md`` to load (a personal/global install is not tied to one specific repo checkout)"
+  }
+  else {
+    "load the canonical role definition at ``agents/$agentForDesc.md`` (repo-relative) in this project"
+  }
   $cmdBody = @"
 ---
 description: $skillDesc
@@ -74,7 +116,7 @@ $header
 
 $task
 
-Load specialist prompts from ``$agentsSourceDir`` as needed. Prefer the installed skill ``/$($c.Name)`` and subagents under the Claude agents directory when available.
+Load the ``$agentForDesc`` specialist by name (Claude subagent or skill) when available; otherwise $roleHint. Prefer the installed skill ``/$($c.Name)`` and subagents under the Claude agents directory when available.
 "@
   $out = Join-Path $CmdsDir "$($c.Name).md"
   Set-Content -LiteralPath $out -Value $cmdBody -Encoding utf8 -NoNewline

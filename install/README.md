@@ -93,7 +93,7 @@ Black-box QA (`agents/qa.md`) is armed as E2E **Stage 6** after Wave-2. Installe
 | Harness | Docs read | Product write | Bash / app | Notes |
 | --- | --- | --- | --- | --- |
 | **OpenCode** (`Get-OpenCodeAgentMeta` → `qa`) | **allow** (no `read = 'deny'`) | `edit = 'deny'` | `bash = 'allow'` | Docs must be readable. Product-source path deny is policy in `agents/qa.md` when the harness cannot express path-class deny (degraded + source-citation detect). |
-| **Claude** (`Get-ClaudeAgentFrontmatter` → `qa`) | `tools: Bash, Read, Grep, Glob` | `disallowedTools: Write, Edit, NotebookEdit` | Bash allowed | Orchestrator copy-only persists `qa/*`. |
+| **Claude** (`Get-ClaudeAgentFrontmatter` → `qa`) | `tools: Bash, Read, Grep, Glob, PowerShell` | `disallowedTools: Write, Edit, NotebookEdit` | Bash/PowerShell allowed | Orchestrator copy-only persists `qa/*`. |
 | **Codex** | sandbox | intentional product write deny | yes | Stage 6 requires **enforce write allowlist** for the product tree **or** mark the runner `stage6_unsupported` / `BLOCKED_ENV`. Do not document “unsandboxable residual = OK.” |
 | **Grok / VS Code** | policy in `agents/qa.md` | policy forbid | policy | No native path deny → degraded mode + citation detect. |
 

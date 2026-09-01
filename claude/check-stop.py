@@ -1,0 +1,653 @@
+#!/usr/bin/env python3
+"""The single Stop hook entry, for every session on this machine.
+
+Three lanes, and only two ways a turn ends here.
+
+  Lane 0  the message claims a blocker. It needs the release phrase from the
+          last block, in order, or it does not get read. With the phrase it
+          gets audited - by check-blocked.py on the transcript facts, and then
+          by the local model, which has the last word. A blocker that sounds
+          reasonable is still a blocker that has to be true.
+
+  Lane 1  the deterministic checkers. Every check-*.py beside this file, run on
+          the same payload. Cheap, and it catches the wordings already seen.
+          A checker that is sure ends the matter here, which is most of them.
+          A checker that is only suspicious exits MAYBE and its hit is carried
+          into lane 2 instead: those patterns match a word without seeing
+          around it, so "nothing pending" trips the pending rule. Sending the
+          whole list to the model would be slower and would put every sure
+          catch at the mercy of one more opinion.
+
+  Lane 2  the local model. Nothing reaches a clean exit without passing here
+          while the judge is up. The checkers only know the phrasings somebody
+          wrote down; this is what reads the ones nobody did. Unreachable
+          degrades to the pattern lanes plus one proactive question; the gate
+          starts no daemon.
+
+          An OK from the model does not close the turn by itself. It only
+          answers whether the agent stopped early, which a turn with
+          nothing wrong in it passes while still leaving work on the
+          table. So an OK asks once for the next action, and the release
+          comes on the pass after that: the turn ends when the agent
+          looked and could not name one.
+
+Why one entry: a session loads settings.json when it starts and keeps that
+snapshot. A checker added to settings later never reaches a session already
+running - which is how a real stop went unchecked. Files in this directory are
+read on every run, so a checker dropped here works immediately, in every live
+session, with no settings change and no restart.
+
+Why it does not simply obey stop_hook_active: that flag is true whenever the
+model was woken by this hook and stopped again, so honouring it blindly hands
+out one free stop after every block. Stopping twice was the whole escape. The
+counter below keeps the checks running across a chain and still guarantees an
+exit: after MAX_BLOCKS the hook stands down no matter what it sees.
+"""
+import glob
+import hashlib
+import io
+import random
+import importlib.util
+import json
+import re
+import os
+import sys
+import time
+from datetime import datetime
+
+_mod = importlib.util.spec_from_file_location(
+    "_hook_mod", os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "mod.py"))
+mod = importlib.util.module_from_spec(_mod)
+_mod.loader.exec_module(mod)
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SELF = os.path.basename(os.path.abspath(__file__))
+def state_path():
+    """Read at call time, not at import.
+
+    The tests run this gate in this same process now, and each of them
+    points it at its own scratch file. A constant fixed at import would
+    hand every test the first test's state."""
+    return (os.environ.get("STOP_STATE")
+            or os.path.join(HERE, ".stop-state.json"))
+BLOCKED_CHECKER = os.path.join(HERE, "check-blocked.py")
+MAX_BLOCKS = 6
+HOST = "claude"
+MAYBE = 3
+PHRASE_AFTER = 2
+
+
+def _load(name, filename):
+    return mod.load(filename)
+
+
+release = _load("release", "release.py")
+judge = _load("llm_judge", "llm_judge.py")
+background = _load("background", "background.py")
+reader = _load("transcript", "transcript.py")
+hints = _load("candidates", "candidates.py")
+host = _load("host", "host.py")
+tree = _load("check_tree", "check-tree.py")
+
+REPEAT = """Block {n} of {cap}. {left} The same message reads the same. Change the work."""
+
+SAME = """This closing came back word for word. Move something before it reads as new."""
+
+PHRASE = """If continuing under any assumption would be unsafe, write BLOCKED:, one sentence naming what you need, then this line exactly:
+
+    {phrase}
+
+It buys a real hearing: the blocker is audited against what ran this turn."""
+
+NO_PHRASE = """ONE MORE STEP - BLOCKED: IS NOT A PASSWORD
+
+You wrote BLOCKED: without this block's release phrase, so the claim was not read. The phrase is issued after you go back and do the work. Do that first. A real blocker will still be there, with something that actually failed to point at."""
+
+FAKE = """KEEP GOING - THE BLOCKER DID NOT SURVIVE THE AUDIT
+
+{why}
+
+A blocker is something this machine cannot give you. A preference you want confirmed, or an ambiguity the repo could settle, is your call. Choose the default, say which one, keep going."""
+
+QUOTE = """
+The judge read your message and points at this line: "{line}"
+"""
+"""What the judge saw, in the agent's own words.
+
+A verdict with no evidence reads as a machine being difficult, and the next
+thing an agent does with that is argue. Its own sentence quoted back ends
+the argument: there is nothing to dispute about a line it wrote."""
+
+
+SILENT = """ONE MORE STEP - NO VERDICT YET
+
+The local model at {host} did not answer, and an unreachable judge is not a pass. Start it, or keep working."""
+
+LLM_STOP = """KEEP GOING - THERE LOOKS TO BE WORK LEFT
+{why}
+What you did stands. Permission does not expire. Take the step instead of announcing it, pick one instead of offering a menu, run it yourself instead of sending the user."""
+
+
+WAITING = """KEEP GOING - THE WORK YOU LAUNCHED REPORTS BACK ON ITS OWN
+
+You will be woken when it finishes. Spend the wait on the next piece. If nothing else can move without that result, say what you are waiting on."""
+
+
+def floor_sure():
+    """How much of its own mass the judge must put on a block.
+
+    The number came off the logprobs from the first day and decided nothing. It
+    turns out to separate cleanly: on the 17 gold messages the judge gets right,
+    its lowest score is 0.846, and every block in the log scores above 0.5. The
+    one verdict below that was a false accusation - "Sin faltantes: la suite corre
+    entera, commit abc1234" scored 0.228 and got called unfinished work.
+
+    A shaky STOP is not released either. It becomes the proactive question, which
+    asks for the same second look without telling the agent it left work behind.
+    Guessing costs a look; accusing costs trust.
+
+    Read at every call. A constant is read once per interpreter, and the checkers
+    share one now, so a constant would answer for whoever imported first."""
+    return float(os.environ.get("STOP_SURE_FLOOR") or 0.5)
+
+
+NEAR = """
+
+Two things this turn did and did not follow through on:
+{items}
+
+They are read off your own tool calls, not off your work. If one is real, do
+it now. If both are handled, say which and how."""
+
+
+PROACTIVE = """ONE MORE LOOK - IS THERE SOMETHING WE CAN DO PROACTIVELY?
+
+Nothing looks unfinished, so this is not a correction. With permission granted, is there a next action you can take right now?
+
+The test for the case you just fixed, the doc that still describes the old behaviour, the neighbouring caller with the same bug. Find one and take it, do not propose it.
+
+If there is nothing, say what you checked."""
+
+
+def log_path():
+    return os.environ.get("STOP_LOG") or os.path.join(HERE, "judge-log.jsonl")
+
+
+def note(transcript, **fields):
+    """One line per decision, for Rick, never for the agent.
+
+    The reminder the agent reads has to stay short and has to stay kind, so
+    everything useful for tuning the gate has no room in it: how sure the
+    model was, which patterns fired, whether the deterministic lane and the
+    model agreed. That detail also reads as an accusation, and an agent that
+    feels accused argues instead of working.
+
+    So it goes here instead. A block the model scored 0.3 on is a pattern
+    worth measuring; a firm pattern the model disagrees with is one worth
+    demoting. Read it with judge-log.py."""
+    fields["at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    fields["session"] = os.path.basename(transcript or "")[:12]
+    fields["file"] = transcript or ""
+    try:
+        with open(log_path(), "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(fields, ensure_ascii=False) + chr(10))
+    except OSError:
+        pass
+
+
+def read_state():
+    try:
+        with open(state_path(), encoding="utf-8") as handle:
+            data = json.load(handle)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def write_state(state):
+    try:
+        with open(state_path(), "w", encoding="utf-8") as handle:
+            json.dump(state, handle)
+    except OSError:
+        pass
+
+
+def prune(state, keep=40):
+    """A released chain has to outlive its own release, so entries stay until
+    the user speaks. Old transcripts would pile up; the newest ones are the
+    only ones any live session can ask about."""
+    if len(state) <= keep:
+        return state
+    return dict(list(state.items())[-keep:])
+
+
+def entries(transcript):
+    yield from host.entries(transcript)
+
+
+def last_message(transcript):
+    text = ""
+    for entry in entries(transcript):
+        if entry.get("type") != "assistant":
+            continue
+        content = entry.get("message", {}).get("content")
+        if not isinstance(content, list):
+            continue
+        joined = " ".join(b.get("text", "") for b in content
+                          if isinstance(b, dict) and b.get("type") == "text").strip()
+        if joined:
+            text = joined
+    return text
+
+
+def harness_noise(message):
+    """An error page the harness wrote is not a stop the agent chose.
+
+    A turn killed by an API error or a usage limit leaves that notice as the
+    last assistant message, and the hook runs on it. Blocking there sends a
+    reminder to a session that already ended, and it was 11% of what the model
+    was condemning."""
+    head = (message or "").strip()[:90].lower()
+    return head.startswith(("api error", "you've hit your session limit",
+                            "you have hit your session limit",
+                            "claude ai usage limit", "request was aborted",
+                            "request interrupted"))
+
+
+def turns():
+    """How many developer turns the judge sees, this one included.
+
+    One is what it had, and one is enough for a reply that answers a question.
+    It is not enough for a reply that continues something agreed two messages
+    ago. The number is a knob because the right value is an experiment, not an
+    opinion: bench-context.py scores it against the push label."""
+    return int(os.environ.get("STOP_JUDGE_TURNS") or 1)
+
+
+def earlier(transcript):
+    """The exchanges before this one, oldest first, empty when turns is 1."""
+    keep = turns()
+    if keep <= 1:
+        return ()
+    return tuple(reader.exchanges(entries(transcript), keep)[:-1])
+
+
+def last_user(transcript):
+    """What the developer said last, which is the only thing a reply
+    can be wrong about.
+
+    Tool results wear the user role, and so does this gate's own reminder.
+    Counting the reminder meant that after any block the judge was told the
+    developer had asked for the reminder, and it scored the closing against
+    that instead of the request - on every wake, which is the case the judge
+    exists for."""
+    return reader.last_user(entries(transcript))
+
+
+def openings(transcript):
+    """Concrete next actions in this turn's own tool calls, or an empty list.
+
+    A general question is easy to answer with a general no: over its first
+    blocks the proactive request bought no work one time in two, the worst
+    conversion in the gate. Naming what the turn changed, and what it did not
+    change with it, costs nothing and makes no an answer that needs evidence.
+
+    An empty list now releases the turn instead of asking anyway. Over 1291
+    turns of real transcripts a candidate exists on 30% of them, so the
+    question is asked when it can point at something and the other 70% of
+    clean closings end where they used to end."""
+    paths = []
+    for entry in entries(transcript):
+        if reader.spoke(entry):
+            paths = []
+            continue
+        if entry.get("type") == "assistant":
+            paths += hints.written(entry)
+    return hints.found(paths)
+
+
+def tools_this_turn(transcript):
+    """How many tool calls since the user last spoke. The message will not
+    volunteer this and it is the one fact a blocker cannot argue with."""
+    count = 0
+    for entry in entries(transcript):
+        if entry.get("type") == "user":
+            content = entry.get("message", {}).get("content")
+            if not isinstance(content, list) or any(
+                    isinstance(b, dict) and b.get("type") != "tool_result"
+                    for b in content):
+                count = 0
+            continue
+        if entry.get("type") != "assistant":
+            continue
+        content = entry.get("message", {}).get("content")
+        if isinstance(content, list):
+            count += sum(1 for b in content
+                         if isinstance(b, dict) and b.get("type") == "tool_use")
+    return count
+
+
+def work_secs():
+    try:
+        value = float(os.environ.get("STOP_WORK_SECS") or 4 * 3600)
+    except ValueError:
+        return 4 * 3600
+    return value if value > 0 else 4 * 3600
+
+
+def as_epoch(raw):
+    if raw is None or raw == "":
+        return None
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, (int, float)):
+        value = float(raw)
+        if value > 1e12:
+            value /= 1000.0
+        return value if value > 1e9 else None
+    text = str(raw).strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        return datetime.fromisoformat(text).timestamp()
+    except ValueError:
+        return None
+
+
+def grok_turn_started(transcript):
+    path = os.path.join(os.path.dirname(transcript or ""), "events.jsonl")
+    if not os.path.isfile(path):
+        return None
+    last = None
+    try:
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    continue
+                if row.get("type") != "turn_started":
+                    continue
+                stamp = as_epoch(row.get("ts") or row.get("timestamp"))
+                if stamp is not None:
+                    last = stamp
+    except OSError:
+        return None
+    return last
+
+
+def turn_started(transcript):
+    last = None
+    for entry in entries(transcript):
+        if not reader.spoke(entry):
+            continue
+        stamp = as_epoch(entry.get("timestamp") or entry.get("ts"))
+        if stamp is not None:
+            last = stamp
+    if last is not None:
+        return last
+    return grok_turn_started(transcript)
+
+
+def busy(transcript):
+    started = turn_started(transcript)
+    if started is None:
+        return False
+    return (time.time() - started) >= work_secs()
+
+
+def holdout_rate():
+    try:
+        return max(0.0, min(1.0, float(os.environ.get("STOP_HOLDOUT") or 0)))
+    except ValueError:
+        return 0.0
+
+
+def held_out():
+    rate = holdout_rate()
+    return rate > 0.0 and random.random() < rate
+
+
+def digest_of(text):
+    return hashlib.sha1((text or "").encode("utf-8", "replace")).hexdigest()
+
+
+LOADED = {}
+
+
+def run_checker(path, data):
+    """Ask one checker, in this process.
+
+    Each checker used to be its own interpreter: nine of them started and
+    torn down on every single stop, which cost about a second of startup and,
+    on Windows, opened nine console windows over whatever the developer was
+    looking at. They are pure functions over a payload, so none of that
+    bought anything.
+
+    The contract that made them separate files is kept. A checker still reads
+    a payload on stdin, still writes its objection to stderr and still
+    returns an exit code, so dropping a new check-*.py in this directory
+    still works with no registration. Only the process is gone.
+
+    The chain policy lives here, so the children are asked the plain
+    question. Each of them still guards itself when wired up directly, and
+    that guard would silence the whole chain if the flag were forwarded."""
+    module = LOADED.get(path)
+    if module is None:
+        name = os.path.basename(path)[:-3].replace("-", "_")
+        try:
+            module = _load(name, os.path.basename(path))
+        except Exception:
+            return 0, ""
+        LOADED[path] = module
+    if not hasattr(module, "main"):
+        return 0, ""
+
+    said = io.StringIO()
+    payload = json.dumps(dict(data, stop_hook_active=False))
+    heard, spoke = sys.stdin, sys.stderr
+    sys.stdin, sys.stderr = io.StringIO(payload), said
+    try:
+        code = module.main()
+    except SystemExit as done:
+        code = done.code
+    except Exception:
+        code = 0
+    finally:
+        sys.stdin, sys.stderr = heard, spoke
+
+    if code in (2, MAYBE) and said.getvalue().strip():
+        return code, said.getvalue().strip()
+    return 0, ""
+
+
+def deterministic(data):
+    """Objections split by how sure the checker is.
+
+    A checker exits 2 when the wording condemns itself and MAYBE when it only
+    raises a suspicion. Sure hits are the bulk of the list and still end the
+    matter here. The unsure ones are the patterns that match a word without
+    seeing around it, and they buy a reading rather than a sentence."""
+    sure, unsure = [], []
+    for path in sorted(glob.glob(os.path.join(HERE, "check-*.py"))):
+        name = os.path.basename(path)
+        if name == SELF or path == BLOCKED_CHECKER:
+            continue
+        code, objection = run_checker(path, data)
+        if not objection:
+            continue
+        (sure if code == 2 else unsure).append(objection)
+    return sure, unsure
+
+
+def block(state, transcript, chain, message, body, repeated, asked=False):
+    count = chain.get("blocks", 0) + 1
+    parts = release.mint() if count >= PHRASE_AFTER else []
+    state[transcript] = {"blocks": count, "digest": digest_of(message),
+                         "phrase": parts,
+                         "asked": asked or chain.get("asked")}
+    write_state(prune(state))
+
+    out = [body]
+    if repeated:
+        out.append(SAME)
+    if parts:
+        out.append(PHRASE.format(phrase=release.render(parts)))
+    if count > 1:
+        left = ("One more block after this one." if count < MAX_BLOCKS
+                else "This is the last one; the next stop goes through.")
+        out.append(REPEAT.format(n=count, cap=MAX_BLOCKS, left=left))
+    text = "\n\n".join(out) + "\n"
+    sys.stderr.write(text)
+    sys.stderr.flush()
+    if HOST == "grok":
+        sys.stdout.write(json.dumps({"decision": "block", "reason": text.strip()}) + "\n")
+        sys.stdout.flush()
+    return 2
+
+
+def allow(state, transcript):
+    state.pop(transcript, None)
+    write_state(prune(state))
+    return 0
+
+
+def main():
+    try:
+        data = json.loads(sys.stdin.read() or "{}")
+    except ValueError:
+        return 0
+    if not isinstance(data, dict):
+        return 0
+
+    global HOST
+    seen = host.view(data)
+    HOST = seen.kind
+    if seen.ignore:
+        return 0
+    data = seen.payload
+
+    transcript = seen.path or data.get("sessionId") or ""
+    if not transcript and not seen.last_message():
+        return 0
+
+    state = read_state()
+    chain = state.get(transcript) or {}
+    if not data.get("stop_hook_active"):
+        chain = {"blocks": 0, "digest": "", "phrase": []}
+    if chain.get("blocks", 0) >= MAX_BLOCKS:
+        state[transcript] = chain
+        write_state(prune(state))
+        return 0
+
+    message = seen.last_message() or last_message(transcript)
+    if not message or harness_noise(message):
+        return allow(state, transcript)
+
+    repeated = digest_of(message) == chain.get("digest")
+
+    if release.claims_block(message):
+        if not release.presented(message, chain.get("phrase") or []):
+            return block(state, transcript, chain, message, NO_PHRASE, repeated)
+
+        _, audit = run_checker(BLOCKED_CHECKER, data)
+        calls = tools_this_turn(transcript)
+        verdict, _ = judge.blocker_verdict(message, calls)
+        if verdict is judge.SKIP or verdict is None:
+            verdict = "REAL" if not audit else "FAKE"
+        if verdict == "FAKE" or audit:
+            why = audit or (
+                "  - the local model read it against the {n} tool call(s) this "
+                "turn and found no wall already walked into.".format(n=calls))
+            return block(state, transcript, chain, message,
+                         FAKE.format(why=why), repeated)
+        return allow(state, transcript)
+
+    sure, unsure = deterministic(data)
+    waiting = bool(seen.waiting) or background.waiting_on(transcript)
+    calls = tools_this_turn(transcript)
+    extra = dict(tools=calls, chars=len(message), cheap="", holdout=False)
+    picked = tree.next_path(tree.load_tree(data) or {})
+    if picked:
+        extra.update(branch=picked.get("id"),
+                     branch_score=tree.score_of(picked),
+                     branch_file=tree.tree_path(data))
+
+    if sure:
+        drop = held_out()
+        extra.update(holdout=drop, lane="pattern", firm=sure, weak=unsure,
+                     head=message[:120], waiting=waiting)
+        note(transcript, **extra)
+        if drop:
+            return allow(state, transcript)
+        return block(state, transcript, chain, message,
+                     WAITING if waiting else "\n\n".join(sure), repeated)
+
+    if waiting:
+        extra.update(lane="waiting", weak=unsure, head=message[:120],
+                     waiting=True)
+        note(transcript, **extra)
+        return block(state, transcript, chain, message, WAITING, repeated)
+
+    if busy(transcript):
+        extra.update(lane="cheap", cheap="busy", weak=unsure,
+                     head=message[:120], waiting=waiting)
+        note(transcript, **extra)
+        return allow(state, transcript)
+
+    asked = last_user(transcript)
+    before = earlier(transcript)
+    verdict, seconds = judge.stop_verdict(message, asked=asked, before=before)
+    extra.update(lane="judge", weak=unsure, head=message[:120])
+    if verdict is judge.SKIP:
+        extra.update(verdict="skip")
+        note(transcript, **extra)
+        return allow(state, transcript)
+    if verdict is None:
+        drop = held_out()
+        extra.update(verdict="silent", holdout=drop,
+                     asked=bool(chain.get("asked")))
+        note(transcript, **extra)
+        if chain.get("asked") or drop:
+            return allow(state, transcript)
+        near = openings(transcript)
+        body = PROACTIVE if not near else PROACTIVE + NEAR.format(
+            items="".join(chr(10) + "  - " + line for line in near))
+        return block(state, transcript, chain, message, body,
+                     repeated, asked=True)
+
+    already = bool(chain.get("asked"))
+    shaky = verdict == "STOP" and not unsure and judge.sureness() < floor_sure()
+    if shaky:
+        verdict = "OK"
+    asking = verdict == "OK" and not already
+    line = ""
+    if verdict == "STOP" and not unsure:
+        line = judge.why(message, asked=asked)
+    near = openings(transcript) if asking else []
+    drop = held_out() if (verdict == "STOP" or (asking and near)) else False
+    extra.update(verdict=verdict, sure=judge.sureness(),
+                 seconds=round(seconds, 2), quote=line, waiting=waiting,
+                 near=near, asked=already, ask=asking and bool(near),
+                 shaky=shaky, holdout=drop)
+    note(transcript, **extra)
+
+    if verdict == "STOP":
+        if drop:
+            return allow(state, transcript)
+        body = "\n\n".join(unsure) if unsure else LLM_STOP.format(
+            why=QUOTE.format(line=line) if line else "")
+        return block(state, transcript, chain, message, body, repeated)
+    if already or not near:
+        return allow(state, transcript)
+    if drop:
+        return allow(state, transcript)
+    return block(state, transcript, chain, message,
+                 PROACTIVE + NEAR.format(
+                     items="".join(chr(10) + "  - " + line for line in near)),
+                 repeated, asked=True)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

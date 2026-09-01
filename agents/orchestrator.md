@@ -30,15 +30,17 @@ If you were spawned *as* `orchestrator` by a parent that should have run e2e its
 
 ### Model tier map (when the harness allows selection)
 
-| Role | Tier | Examples (when available) |
+| Role | Tier | Rationale / examples (when available) |
 | --- | --- | --- |
 | Orchestrator | Highest | Claude Opus, GPT high / “Sol”-class, Grok max |
 | Planner | Highest | same |
 | Sensei | Highest | same |
+| Reviewer | High | Stage 5 correctness gate on Builder's output; Claude Sonnet (high effort), GPT high / “Sol”-class |
+| QA | High | **Genuine pre-existing doc gap, now closed.** Stage 6's hard gate on product acceptance — same weight class as Reviewer's Stage 5 gate |
+| Refiner | High | **This plan's own judgment call**, resolving the prior "Mid or high" range: Refiner's synchronous, one-shot Q&A shapes the entire session's scope, and nothing later structurally re-checks that scoping the way Reviewer/QA structurally re-check Builder's output |
 | Advisor | Mid | Claude Sonnet, GPT mid / “Terra”-class |
 | Builder | Mid | same mid tier |
-| Reviewer | Highest when reviewing correctness-critical work; otherwise mid+ | prefer high if only one review pass |
-| Refiner / Curator | Mid or high | mid is acceptable |
+| Curator | Mid | **This plan's own judgment call**, resolving the prior "Mid or high" range: human-gated acceptance (Stage 8 — output stays candidates until accepted) is a *stronger* correction mechanism than a peer gate, not the absence of one, so Mid is the conservative floor of the range, not an invented uplift |
 
 If the harness cannot select models, note the limitation once and continue with the default model for all roles.
 
@@ -309,21 +311,21 @@ Each iteration:
 5. **You apply all open P0 fixes** (and any predicted P0s you accept as real) into `plan.v{N+1}.md` (full revised plan). Fold high-confidence predicted P0s **now**—do not wait for them to reappear as r4 surprises.
 6. P1/P2 may be noted in the ledger but **do not block** exit once P0s are clear; do not boy-scout the whole plan for P1+ during Phase A unless fixing a P0 requires it.
 
-#### Phase B — Delta-only, no boy scout (iterations 6+)
+#### Phase B — Delta-only intake (iterations 6+)
 
 **Trigger:** after **5** full iterations, **any open P0 remains** (or a new P0 appeared when applying r5).
 
-From iteration **6** onward:
+From iteration **6** onward, Sensei and Advisor **report everything they see** (`agents/sensei.md` / `agents/advisor.md`)—they do not filter to P0-only. The orchestrator's **intake**, not the reviewers' recall, is what stays delta-scoped:
 
 | Rule | Detail |
 | --- | --- |
 | **Review surface** | **Delta only:** (a) diff / changelog since previous plan revision, (b) open P0 ledger items, (c) sections touched while fixing those P0s. Not the entire treatise. |
-| **No boy scout** | Reviewers and orchestrator **MUST NOT** raise new P1/P2, drive-by cleanups, doc polish, alternative designs, or re-litigation of settled non-P0 topics. |
-| **P0 only** | New findings allowed **only if severity is P0** (or a claimed fix failed / regressed a prior P0). |
-| **Verdict** | `revise` only for open/new P0s; otherwise treat as P0-clean for loop exit even without dual rhetorical `approve`. |
+| **Ledger intake** | Only a **delta-scope P0** (a new P0 in the diff/touched sections, or a claimed fix that failed/regressed a prior P0) enters `p0-ledger.md`. Every other reported finding—non-delta P0, any P1/P2, drive-by cleanup, doc polish, alternative design, re-litigation of settled non-P0 items—is **appended to `LESSONS-LEARNED.md` without escalation**: not discarded, not blocking. |
+| **P0 only blocks** | Only ledger-entered (delta-scope) P0s can force `revise` or keep the loop open. |
+| **Verdict** | `revise` only for open/new delta-scope P0s; otherwise treat as P0-clean for loop exit even without dual rhetorical `approve`. |
 | **Plan edits** | Patch the delta and ledger—avoid rewriting unrelated waves “while you’re there.” |
 
-Goal of Phase B: **close remaining P0s with minimal thrash**, not raise the bar sideways.
+Goal of Phase B: **close remaining P0s with minimal thrash**, not raise the bar sideways—while still capturing everything reviewers noticed, routed rather than dropped.
 
 #### Pre-build P1+ sweep (once, then build)
 
@@ -345,7 +347,9 @@ If a P1+ fix **discovers a new P0**, that P0 re-enters the ledger and must be fi
 - **Detection rule** (how a future planner/reviewer should catch it earlier—pattern, doc cite, required evidence shape)
 - **Plan change** (what was added so it does not recur mid-build)
 
-Sensei and Advisor **must** propose lesson entries in their packages when they find a new class of defect. You write them into the file.
+Sensei and Advisor **must** propose lesson entries in their packages when they find a new class of defect. You write them into the file—including the Phase B routed findings above.
+
+Match the length of each ledger entry and lesson to what the finding needs: cover the substance, do not pad with filler summaries or boilerplate.
 
 At Stage 8 (retro), promote durable lessons into project docs / playbook if they will recur across sessions.
 

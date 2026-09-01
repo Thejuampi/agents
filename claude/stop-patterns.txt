@@ -1,0 +1,438 @@
+# Patterns that mark a closing message as a stop the agent did not have to make.
+# One per line: <class>: <python regex>, matched case-insensitively against the
+# message with quoted spans removed. Lines starting with # are comments.
+#
+# A project can add its own without touching code: drop a file with this same
+# shape at <repo>/.claude/stop-patterns.txt and it is merged on top of this one.
+# A line starting with - removes an inherited pattern: "- announce: hay que\b".
+
+# ---- announce: naming the next step instead of taking it
+announce: lo que sigue
+announce?: lo que faltan?\b
+announce: lo que queda
+announce: pr[oó]ximos? pasos?
+announce?: \bfaltan?\b
+announce: sigue faltando
+announce?: \bpendientes?\b
+announce: por (ahora )?queda afuera
+announce: queda abierto
+announce: sigue abierto
+announce: queda afuera
+announce: eso es lo pr[oó]ximo
+announce: todav[ií]a no (est[aá]|hay|se|lo|tiene)
+announce: a[uú]n no (est[aá]|hay|se|lo|tiene)
+announce: no (est[aá]|se) (cableado|conectado|mostrado)
+announce: no tiene pantalla
+announce: nadie lo (llama|muestra|lee)
+announce: sin pantalla todav[ií]a
+announce: what'?s next
+announce: next steps?:
+announce: remaining work:
+announce: what'?s left
+announce: still open
+announce: still missing
+announce: still pending
+announce: still to (do|come|build|wire)
+announce: remains? open
+announce: left to (do|build|wire)
+announce: open items?
+announce: that'?s the next
+announce: the next build
+announce: is the next
+announce: next up
+announce: not (yet )?(wired|hooked|implemented|built|done|shown|surfaced)
+announce: (has|have) no (screen|ui|surface|caller)
+announce: nothing (shows|surfaces|reads|calls) it
+announce: future work
+announce: follow-?up work
+announce: out of scope for now
+announce: \btbd\b
+
+# ---- ask: requesting permission that was already granted
+ask: si quer[eé]s
+ask: si quieres
+ask: si te parece
+ask: si lo prefer[ií]s
+ask: quer[eé]s que
+ask: quieres que
+ask: necesit[aá]s que
+ask: te gustar[ií]a que
+ask: decime y
+ask: decime si
+ask: dec[ií]me qu[eé]
+ask: avisame y
+ask: avisame si
+ask: av[ií]same
+ask: confirmame
+ask: confirm[aá]s
+ask: me confirm
+ask: \bprocedo\b
+ask: sigo\?
+ask: puedo seguir
+ask: puedo continuar
+ask: \barranco\b
+ask: \bempiezo\b
+ask: \bavanzo\b
+ask: lo hago\?
+ask: vamos por (ah[ií]|el|la|eso)
+ask: qued[oó] a la espera
+ask: esperando tu
+ask: te parece\?
+ask: qu[eé] prefer[ií]s
+ask: cu[aá]l prefer[ií]s
+ask: pido permiso
+ask: con tu ok
+ask: cuando quieras
+ask: cuando me digas
+ask: cuando digas
+ask: let me know
+ask: just say the word
+ask: say the word
+ask: would you like me to
+ask: do you want me to
+ask: want me to
+ask: should i\b
+ask: shall i\b
+ask: may i\b
+ask: can i go ahead
+ask: if you want
+ask: if you'?d like
+ask: if you prefer
+ask: ready when you are
+ask: waiting for your
+wait?: i'?ll wait
+ask: please confirm
+ask: permission to
+ask: awaiting your
+ask: happy to .{0,24}if you
+
+# ---- wait: idling on work the agent itself started
+wait?: te aviso cuando
+wait?: te aviso apenas
+wait?: aviso cuando termine
+wait?: corriendo en (background|segundo plano)
+wait?: esper(o|ando) que termine
+wait?: cuando termine te
+wait?: mientras tanto espero
+wait?: i'?ll (let you know|tell you|ping you|report back) when
+wait?: will report back
+wait?: running in the background
+wait?: waiting for it to (finish|complete)
+wait?: once it finishes,? i'?ll
+wait?: in the meantime,? i'?ll wait
+
+# ---- read: asking for what the repo already answers
+read: \bcontame\b
+read: \bcont[aá]me\b
+read?: \bdecime\b
+read?: \bdec[ií]me\b
+read: \bpasame\b
+read: \bp[aá]same\b
+read: \bmandame\b
+read: \bm[aá]ndame\b
+read: \bmostrame\b
+read: \bmostr[aá]me\b
+read: \bexplicame\b
+read: \bexplic[aá]me\b
+read: \bdame\b
+read: \bcompartime\b
+read: \bnecesito (que me|saber|el|la|los|las)\b
+read: \btell me\b
+read: \bshow me\b
+read: \bgive me\b
+read: \bsend me\b
+read: \bshare the\b
+read: \bpaste the\b
+read: \bwhich one\b
+read: \bwhat is the\b
+
+# ---- errand: telling Juan to go run something
+errand?: \bcorré\s
+errand?: \bcorr[eé]\s+(/|`|\./|python |bash |npm |node |\.\\)
+errand?: \bsal[ií] de la sesi[oó]n
+errand?: \bentr[aá] de nuevo
+errand?: \brevert[ií]\b
+errand?: \bfijate\b
+errand?: \bf[ií]jate\b
+errand?: \band[aá]te\b
+errand?: \bhac[eé]lo vos
+errand?: \bprob[aá]lo\b
+errand?: \breinici[aá]\b
+errand?: \babr[ií] (el|la|una)
+errand?: \bpon[eé] (el|la|eso)
+errand?: restart the (session|app|process)
+errand?: run `?/
+errand?: open the (app|page|file) yourself
+
+# ---- handoff: giving the job back
+handoff: \bten[eé]s que\b
+handoff: \bdepende de vos\b
+handoff: \bes tuyo\b
+handoff: \blo confirm[aá]s vos\b
+handoff: \bes decisi[oó]n tuya\b
+handoff: \beso lo hac[eé]s vos\b
+handoff: \bde tu lado\b
+handoff: you (have|need) to\b
+handoff: that'?s (yours|your call|on you)
+handoff: only you can
+handoff: next pass is
+
+# ---- defer: postponing a decision to a shared moment that never comes
+defer: ah[ií] vemos
+defer: ah[ií] decidimos
+defer: vemos si
+defer: decidimos si
+defer: vamos a ver
+defer: lo vemos despu[eé]s
+defer: despu[eé]s vemos
+defer: we'?ll see
+defer: then we (can|decide|know)
+defer: let'?s see
+defer: el (siguiente|pr[oó]ximo) (corte|paso|tema|punto)
+defer: habr[ií]a que
+defer?: hay que\b
+defer: convendr[ií]a
+defer: lo mejor ser[ií]a
+defer: we could
+defer: we should
+defer: one option is
+defer: the fix (is|would be) to
+defer: por eso,? para
+
+
+# ---- idle: closing a turn on "nothing happened"
+idle: nada nuevo
+idle: sin novedad
+idle: nada que reportar
+idle: todo igual
+idle: sigue igual
+idle: nothing new
+idle: no change
+idle: nothing to report
+idle?: still running
+idle: sigue corriendo
+
+# ---- errand: imperative with a clitic attached is still an order to Juan
+errand?: \b(corr|prob|hac|and|mir|fij|abr|pon|dec|pas|mand|mostr|revis|borr|sac|cambi|guard|reinici|pegh?|ejecut|instal|copi)[aáeé](l[oa]s?|me|te|nos|selo)\b
+errand?: \bcorr[eé]l[oa]\b
+errand?: y (a partir de )?ah[ií] (yo )?(sigo|edito|hago|arranco)
+errand?: run (it|this|that) (and|then)
+errand?: once you (run|do) (it|that)
+
+# ---- ack: the turn ends on an acknowledgement, nothing was built
+ack: ^\s*perfecto\b
+ack: ^\s*(perfect|great|nice|excellent|awesome)[.,!]
+ack: ya no aparecen
+ack: ahora (tengo|puedo|s[ií] (tengo|puedo))
+ack: now i (have|can)
+ack: that worked
+ack: qued[oó] (protegido|habilitado|desbloqueado)
+
+# ---- announce: first person future is still an announcement, not an act
+announce?: \bvoy (a|por|con)\b
+announce: \bahora (hago|voy|sigo con|paso a|arranco con)\b
+announce?: \bsigo con\b
+announce: \bpaso a\b
+announce: \bme queda (hacer|cerrar|commitear|correr)
+announce: sigue sin ser
+announce: sigue sin (estar|quedar)
+announce: falta (el |la |los |las )?commit
+announce: next i'?(ll|m)\b
+announce: i'?m going to\b
+announce: i'?ll (start|do|go|now|take|run|commit|wire)\b
+announce: i am going to\b
+
+# ---- handoff: naming holes and leaving them for Juan
+handoff: necesitan? tu mano
+handoff: necesitan? de vos
+handoff: siguen? abiert[oa]s? y
+handoff: no cambiaron y
+handoff: needs? your hand
+handoff: on your side to
+
+# ---- announce: closing the turn on work that never left this machine
+announce?: \buncommitted\b
+announce?: sin commitear
+announce: sin committear
+announce: queda sin commit
+announce: nada commiteado
+announce: no commit yet
+announce: not committed
+announce: solo en el [aá]rbol
+
+# ---- defer: naming the verification instead of running it
+defer: (habr[ií]a|hay) que (chequear|verificar|mirar|revisar|confirmar)
+defer: i'?d (actually )?(check|verify|look|confirm)
+defer: before trusting
+defer: worth (checking|verifying|a look)
+defer: valdr[ií]a la pena (chequear|verificar|mirar)
+defer: convendr[ií]a (chequear|verificar|mirar)
+defer: (chequear|verificar|mirar|revisar|confirmar|medir)[ií]a\b
+defer: antes de confiar
+
+# ---- mined by the local judge from closings the list did not know
+wait?: te confirmo cuando
+wait?: y te aviso\b
+wait?: lo dej[eé] esperando
+wait?: sigo cuando (vuelv|termin|lleg)
+wait?: siguen? corriendo
+wait?: is now running
+wait?: still (running|pending)
+handoff: need(s|en)? your call
+handoff: necesitan? tu (firma|ok|visto)
+handoff: then you decide
+handoff: falta tu firma
+announce: still owed
+announce: weak spot:
+announce: sin corregir\b
+announce: nada est[aá] commiteado
+announce: sin commitear todav[ií]a
+defer: let me .{0,40}tomorrow
+defer: es una hip[oó]tesis, no
+defer: is a hypothesis, not
+
+# ---- second mining pass: approval-gated work and launched-then-reported runs
+ask: si lo bendec[ií]s
+ask: if you (bless|approve|greenlight|sign off)
+defer: i'?d (ladder|start|begin|proceed)
+announce: la corrida no\b
+announce: existe, (la corrida|el run|la ejecuci[oó]n) no
+announce: queda unresolved
+wait?: en \d+ procesos
+wait?: runs? (corriendo|en curso)
+
+# ---- wait: dispatched a sub-agent, then idled on its verdict
+wait?: (held|parked|waiting) pending
+wait?: pending r-?\d+
+wait?: until it rules
+wait?: is (running|reviewing|writing) now
+wait?: (reviewer|orchestrator|qa|builder|advisor|sensei|agent)\b[^.\n]{0,40}\b(running|reviewing|writing|dispatched|is next)
+wait?: results when it finishes
+wait?: i'?ll report what comes back
+wait?: runs? in the background
+wait?: ready to .{0,25}(the moment|once|when)
+wait?: the moment (that )?\w+ lands
+
+# ---- handoff: the last step handed over
+handoff: you can (merge|review|close|approve|ship|land)
+handoff: back for confirmation
+handoff: unless you want to
+handoff: unless you'?d (rather|prefer)
+
+# ---- announce: written but not landed
+announce: drafted[.,]
+announce: drafted,? (held|pending)
+announce: \bare next\b
+announce: carried items?
+
+# ---- idle / errand: closing on a clean bill or on a manual step
+idle: no action needed
+idle: everything checks out
+errand?: set it manually
+errand?: paste .{0,30} into the
+
+# ---- found by reading the last 15 turns of a live session, 2026-08-28
+# The closing sentence names an action the agent is about to take and then
+# the turn ends: 'Verifico la firma y que corra.', 'Starting it and loading
+# the judge.' 199 en + 139 es hits over 5276 real messages, and 286 of those
+# no other pattern saw. Low confidence on purpose - the same shape is also a
+# report ('Corro la suite: 2090 verdes.'), so the model reads it.
+announce?: (?:^|[.!?]\s)(Starting|Building|Running|Wiring|Fixing|Adding|Checking|Loading|Installing|Rebuilding|Re-running)\b[^.!?\n]{0,70}[.!?]?\s*$
+announce?: (?:^|[.!?]\s)(arreglo|limpio|fuerzo|busco|saco|cierro|agrego|conecto|cableo|borro|escribo|ajusto|separo|muevo|mido|paso|dejo|hago|sigo|verifico|reviso|compruebo|corro|levanto|instalo|armo|pruebo|arranco)\b[^.!?\n]{0,150}[.!?]?\s*$
+
+# Refusing to run the thing, with a reason. Rare and unambiguous.
+announce: \b(i'?m not|i am not|no voy a|no pienso)\s+(re-?)?(running|run|correr|volver a correr|ejecutar)\b
+
+# Work skipped for being too big to bother with now.
+defer?: \b(a bigger change than|m[aá]s grande de lo que|excede lo que)\b[^.\n]{0,40}\b(justif|amerit|warrant)
+
+# A debt named as a debt.
+announce: \b(what remains|lo que queda abierto|deudas? abiertas?|queda como deuda)\b
+
+# A plan of two steps, and the turn ends on it: 'Now the PRD, then build and
+# run on the device.' 23 hits over 5280 real messages, none of them caught by
+# anything else, and not one of them was a report. This one condemns.
+announce: (?:^|[.!?]\s)Now\b[^.\n]{0,60}?,?\s*then\b[^.!?\n]{0,150}[.!?]?\s*$
+
+# The work named with a pronoun and left there: 'Lo arreglo.', 'Los borro.'
+# 59 unseen hits. Low confidence: the same words also report work in flight
+# ('Lo reviso mientras te contesto').
+announce?: (?:^|[.!?]\s)(L[oa]s?|Les?)\s+(arreglo|limpio|fuerzo|busco|saco|cierro|agrego|conecto|cableo|borro|escribo|ajusto|separo|muevo|mido|paso|dejo|hago|sigo|verifico|reviso|compruebo|corro|levanto|instalo|armo|pruebo|arranco)\b[^.!?\n]{0,150}[.!?]?\s*$
+
+# 'Let me check', 'let me run' - permission asked for a thing already allowed,
+# 274 unseen hits. Low confidence: it also shows up mid-report before the
+# agent goes and does it in the same turn.
+ask?: \blet me (check|see|look|try|run|verify|confirm|fix)\b
+
+# 'Now build the APK and run it on the emulator.' - the same plan without
+# the word then. Low confidence: 'Now it prints once.' is a report.
+announce?: (?:^|[.!?]\s)Now\b[^.!?\n]{0,150}[.!?]?\s*$
+
+# ---- hunted out of the live session with watch-escapes.py, 2026-08-28
+# Six closings walked past every pattern and the model called all six a stop.
+
+# A debt admitted and left. One hit in 5306 messages and it is unmistakable.
+announce: \b(te l[oa]s? debo|queda(n)? a deber|lo dejo a deber|i owe you)\b
+
+# The whole message is a shrug. Twelve hits, none caught by anything else.
+idle: ^\s*(No response requested\.?|Sin novedad\.?|Nada que reportar\.?|Sin cambios\.?)\s*$
+
+# 'the move stays unpriced', 'sigue vacio' - a thing left broken in the
+# report. Low: it is also how you honestly describe state you cannot change.
+announce?: \b(stays|remains|sigue|queda|siguen|quedan)\s+(unpriced|unfixed|unwired|broken|empty|open|sin\s+\w+|vac[ií][oa]s?|roto|abiert[oa]s?)\b
+
+# More closings that name the move: 'Moving straight to Stage 7 now.',
+# 'Writing plan.v2.md now.', 'Abro el aviso completo:', 'Leo resultados:'
+announce?: (?:^|[.!?]\s)(Going|Dropping|Moving|Switching|Turning|Heading|Pulling|Pushing|Writing|Reading|Testing)\b[^.!?\n]{0,150}[.!?]?\s*$
+announce?: (?:^|[.!?]\s)(Miro|Leo|Abro|Cambio|Quito|Sumo|Uso|Copio|Mando|Traigo|Vuelvo|Aplico|Corrijo|Agrego|Arreglo|Escribo|Ajusto)\b[^.!?\n]{0,150}[.!?]?\s*$
+
+# 'still depends on', 'sigue dependiendo de' - the thing it did not fix,
+# named at the end of a report.
+announce?: \b(still depends on|sigue dependiendo de|todavía depende de)\b
+
+# 'will recheck PR39 in ~8 minutes' - a check postponed to a clock instead
+# of made, with the wait handed to the reader.
+announce: \bwill (?:recheck|re-check|check back|revisit|follow up)\b
+announce: I(?:'ll| will) check (?:back|again|the results)
+announce: I(?:'ll| will) merge as soon as
+announce: I(?:'ll| will) be notified when
+announce: Checking CI status
+announce: checking again shortly
+announce: Queda,\s*por impacto
+
+handoff: yours to add
+handoff: I can'?t touch it
+announce: stages closed
+wait: Final run is
+wait: Control run started
+announce: ^Starting with the
+ask: [Ss]i las quer[eé]s
+announce: crash (est[aá] arreglado|is fixed)
+wait: in flight over
+handoff: I did not merge
+announce: \bahora mido\b
+
+ask: Confirm and I start
+ask: reply with the number
+announce: loop stops here
+announce: I did not wipe
+announce: <proposed_plan>
+announce: ^(\*\*)?Pushed\.
+announce: PR \*\*#\d+
+announce: ya se arma solo
+announce: Listo\.\s+Agreg
+wait: Waiting on the app
+announce: ^P25 hit
+announce: llega al FCFF
+announce: selector de abajo
+announce: fallas viejas
+announce: Quant Engine ya no mueve
+announce: Commit, push y PR del playbook
+announce: expansi[oó]n del bar
+announce: Tests stay required
+announce: QA-002 is fixed
+announce: now writes
+announce: 20.4 GB libres
+announce: OpenCode est[aá] haciendo prefill
+announce: llama-panel profiles
+announce: Commit[eé] todo el workspace

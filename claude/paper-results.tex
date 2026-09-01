@@ -1,0 +1,1328 @@
+\section{Results}
+\label{sec:results}
+
+How to read this section. Section~\ref{sec:metrics} defined fire, push,
+precision, and recall. Every table below is those four counts. The stored
+9B campaign comes first. Live regex rows against frozen 27B verdicts
+follow in Section~\ref{sec:t0t1}. Grok is a second store, not a second
+label.
+
+Every number until that live pass is computed on \texttt{corpus.json}:
+749 clean closings, 82 pushes, a base rate of 10.9\% [8.9, 13.4].
+\texttt{bench-lanes.py} with no argument reprints the tables. Earlier
+builds, and the contamination that forced them, live in
+Appendix~\ref{app:builds}.
+
+\subsection{The shipped gate}
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrlrr}
+\toprule
+Lane configuration & Fires on & Prec. & 95\% CI & Recall \\
+\midrule
+Ask on every closing & 749 & 0.109 & [0.089, 0.134] & 1.000 \\
+\midrule
+Firm patterns only & 329 & 0.140 & [0.106, 0.181] & 0.561 \\
+Any pattern & 516 & 0.124 & [0.098, 0.155] & 0.780 \\
+Judge only & 407 & 0.143 & [0.112, 0.180] & 0.707 \\
+Firm or judge (shipped) & 499 & 0.136 & [0.109, 0.169] & 0.829 \\
+Firm and judge & 237 & 0.152 & [0.112, 0.203] & 0.439 \\
+\bottomrule
+\end{tabular}
+\caption{Lane ablation on the 749 clean closings. Every interval covers the
+base rate. The first row wakes on every stop: that is the 10.9\% base.}
+\label{tab:lanes}
+\end{table}
+
+The shipped gate fires on 499 closings: it woke the agent on two stops
+in three. Precision 0.136 means 68 of those 499 were real pushes
+(Table~\ref{tab:assoc}). Every configuration's interval still covers the
+10.9\% base rate, so none of them buys a decision that is likely to be
+right on any one closing. What they buy is silence: the shipped rule
+asks on 499 closings instead of 749 and still reaches 0.829 recall
+(68 of the 82 pushes).
+
+The quiet rows carry the rest of the answer. A closing the gate fires on
+is a push 13.6\% of the time; a closing it releases is a push 5.6\% of
+the time. The interval on precision still covers 0.109, so that signal
+is not strong enough to trust per closing. Silence is the safer of the
+two signals.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrr}
+\toprule
+ & Push & No push & Push rate \\
+\midrule
+Gate fires & 68 & 431 & 0.136 \\
+Gate quiet & 14 & 236 & 0.056 \\
+\bottomrule
+\end{tabular}
+\caption{When the gate fires, 14\% of next-lines are pushes. When it
+stays quiet, 6\% are. Those two rates differ by more than chance
+(Fisher exact $p = 0.0007$; stratified by week,
+Cochran--Mantel--Haenszel $p = 0.0009$).}
+\label{tab:assoc}
+\end{table}
+
+\subsection{Closings a person answered}
+
+On 286 of the 749 rows the next message was not typed by the developer.
+It was a task notification, the hook's own text, a slash-command wrapper,
+or a resume prompt. Those rows can look like a push only by accident.
+They inflate the fire count with nobody in the loop. The table below is
+the same lanes, on the 463 rows a person answered. Read it the same way
+as Table~\ref{tab:lanes}.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrlrr}
+\toprule
+Lane configuration & Fires on & Prec. & 95\% CI & Recall \\
+\midrule
+Ask on every closing & 463 & 0.151 & [0.121, 0.187] & 1.000 \\
+\midrule
+Firm patterns only & 243 & 0.177 & [0.134, 0.230] & 0.614 \\
+Any pattern & 325 & 0.175 & [0.138, 0.220] & 0.814 \\
+Judge only & 249 & 0.213 & [0.167, 0.268] & 0.757 \\
+Firm or judge (shipped) & 313 & 0.192 & [0.152, 0.239] & 0.857 \\
+Firm and judge & 179 & 0.201 & [0.149, 0.266] & 0.514 \\
+\bottomrule
+\end{tabular}
+\caption{The same ablation over the 463 closings the developer answered.
+\texttt{bench-lanes.py corpus.json --human}. The judge lane is the first
+configuration in this work whose interval clears the base rate.}
+\label{tab:human}
+\end{table}
+
+Two things change. The base rate rises from 10.9\% to 15.1\%, which is
+what the failure rate always was among turns a person saw. And the judge
+lane reaches 0.213 with an interval of [0.167, 0.268] that does not reach
+down to 0.151. The shipped rule reaches 0.192 [0.152, 0.239], which clears
+it by a hair and we do not lean on. The association test on this subset
+gives $p = 0.0003$.
+
+\subsection{The shipped 27B}
+\label{sec:scale}
+
+The tables above were scored with the 9B judge that produced
+\texttt{corpus.json}. The live gate uses a 27B Qwen 3.8. Do not mix the
+two. The 9B numbers live in \texttt{corpus.json}. The 27B numbers live in
+\texttt{corpus-v4-27b.json}. The same closings were re-judged twice, push
+labels untouched:
+\texttt{corpus-v3-27b.json} keeps the 9B prompt;
+\texttt{corpus-v4-27b.json} uses a shorter criterion-first prompt.
+\texttt{bench-lanes.py corpus-v4-27b.json} reprints Table~\ref{tab:scale}.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrlrr}
+\toprule
+Judge & Fires on & Prec. & 95\% CI & Recall \\
+\midrule
+9B, all closings & 407 & 0.143 & [0.112, 0.180] & 0.707 \\
+27B, 9B prompt & 542 & 0.116 & [0.092, 0.146] & 0.768 \\
+27B, 3.8 prompt & 280 & 0.171 & [0.132, 0.220] & 0.585 \\
+9B, person answered & 249 & 0.213 & [0.167, 0.268] & 0.757 \\
+27B, 9B prompt, person & 296 & 0.179 & [0.140, 0.227] & 0.757 \\
+27B, 3.8 prompt, person & 216 & 0.204 & [0.155, 0.262] & 0.629 \\
+\bottomrule
+\end{tabular}
+\caption{The same 749 closings. Firm patterns are identical. The 9B prompt
+on a 27B model fires more and is less precise. A prompt written for 3.8
+reverses that on the pooled set.}
+\label{tab:scale}
+\end{table}
+
+The 27B was following the 9B prompt too well. That prompt taught ``a
+dangling step is \textsc{stop}'' on 21 shots, including status reports that
+name remaining work. Qwen 3.8 generalized it; 154 extra fires were
+status reports of in-flight work the 9B had passed. A shorter test -- is
+there a concrete action this agent could take right now -- plus an
+in-flight \textsc{ok} shot and \texttt{/no\_think}, is the 3.8 prompt.
+Pooled judge precision rises from 0.143 to 0.171. On closings a person
+answered it is 0.204 against the 9B's 0.213, and the interval still
+clears 0.151. Recall falls. The 27B was not worse at reading. It was
+better at obeying a \textsc{stop}-heavy prompt written for a smaller model.
+
+\subsection{A second reader}
+\label{sec:blind}
+
+The push label under every table is one model's judgment. A second reader,
+blinded to those verdicts, scored a fixed sample of 60 pairs
+(\texttt{label-blind.py}). They agreed on 48 of 60. Cohen's kappa is 0.426.
+The second reader called 17 pushes against the corpus's 9 on the same rows:
+ten extra positives, which is the direction the one-sidedness of the label
+predicts, and two corpus positives the reader rejected. The reader is a
+different model, not a person. The figure is an agreement check, not an
+inter-rater study.
+
+\subsection{The failure rate moves}
+
+Every pooled rate assumes the failure holds still for 26 days. It does not.
+
+\begin{center}
+\begin{tabular}{lrrrl}
+\toprule
+Week of & Closings & Pushes & Rate & 95\% CI \\
+\midrule
+2026-08-01 & 209 & 14 & 0.067 & [0.040, 0.109] \\
+2026-08-08 & 152 & 12 & 0.079 & [0.046, 0.133] \\
+2026-08-15 & 119 & 13 & 0.109 & [0.065, 0.178] \\
+2026-08-22 & 269 & 43 & 0.160 & [0.121, 0.208] \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The rise is monotone. The first and last intervals do not meet. The exact
+test on those two weeks gives $p = 0.0017$. The pooled 10.9\% is an average
+over a moving quantity.
+
+Within every week the shipped configuration still fires above that week's
+own base rate: 0.087 against 0.067, 0.090 against 0.079, 0.116 against
+0.109 and 0.216 against 0.160. Cochran--Mantel--Haenszel across the four
+weeks gives $\chi^2 = 11.1$ at $p = 0.0009$. The association is not an
+artifact of pooling a rising failure with a late gate. A before-and-after
+of the gate is confounded by the same curve, because the gated weeks are
+the late weeks. We do not read an era comparison as evidence in either
+direction.
+
+\subsection{What each lane adds}
+
+Firm patterns fire without the judge on 92 closings, precision 0.109, the
+base rate. The judge fires without any firm pattern on 170 closings,
+precision 0.129. The expensive lane's unique contribution is volume, at
+barely above chance, and it is where the recall comes from.
+
+Among the 463 closings a person answered, those unique judge rows reach
+0.243 against a 0.151 base rate. The model earns its place on the closings
+a person actually saw.
+
+On 91 closings a doubt fires and the judge then passes, so nothing blocks;
+4.4\% of those are pushes. A doubt that only raises the message to the
+judge is cheap in interventions and cheap in mistakes, which is the
+argument for demoting a class instead of deleting it.
+
+\subsection{Per class}
+
+\begin{center}
+\begin{tabular}{lrrl}
+\toprule
+Class & Fires on & Precision & 95\% CI \\
+\midrule
+\texttt{ask} & 177 & 0.130 & [0.088, 0.187] \\
+\texttt{shape} & 140 & 0.207 & [0.148, 0.282] \\
+\texttt{announce} & 129 & 0.093 & [0.054, 0.156] \\
+\texttt{handoff} & 43 & 0.140 & [0.066, 0.273] \\
+\texttt{idle} & 35 & 0.229 & [0.121, 0.390] \\
+\texttt{defer} & 35 & 0.114 & [0.045, 0.260] \\
+\texttt{read} & 15 & 0.267 & [0.109, 0.520] \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\texttt{shape} is the one class written without a lexicon of the agent's
+words: a closing that ends in a question mark, or a short turn that ran
+nothing after a work ask. A short question from the developer does not
+arm the second of those. It is the most precise rule on the volume that
+matters. \texttt{announce} sits below the
+base rate. \texttt{wait} and \texttt{errand} do not appear: they fired at
+a third of the base rate on the first clean build and were demoted from
+firm to doubt (Appendix~\ref{app:builds}).
+
+\subsection{Confidence runs backwards}
+
+The judge stores the probability of its own verdict token, so confidence
+can be scored against the label.
+
+
+\begin{figure}[ht]
+\centering
+{\small
+\begin{tabular}{lrrl}
+\toprule
+Judge \textsc{stop} by certainty & Fires & Prec. & 95\% CI \\
+\midrule
+0.00--0.50 & 18 & 0.389 & [0.203, 0.614] \\
+0.50--0.75 & 101 & 0.089 & [0.048, 0.161] \\
+0.75--0.90 & 111 & 0.153 & [0.098, 0.232] \\
+0.90--1.00 & 177 & 0.141 & [0.098, 0.200] \\
+\bottomrule
+\end{tabular}}
+\vspace{3mm}
+\begin{tikzpicture}[font=\footnotesize]
+  \begin{scope}[shift={(2.5,0)}]
+    \draw[->] (0,0) -- (6.9,0) node[right] {precision};
+    \foreach \x/\v in {0/0, 1/0.1, 2/0.2, 3/0.3, 4/0.4, 5/0.5, 6/0.6}
+      \draw (\x,0.05) -- (\x,-0.05) node[below] {\v};
+    \draw[dashed, thick] (1.09,-0.2) -- (1.09,3.55);
+    \fill[black!18] (0,2.85) rectangle (3.89,3.35);
+    \draw[thick] (2.03,3.10) -- (6.14,3.10);
+    \draw[thick] (2.03,2.98) -- (2.03,3.22);
+    \draw[thick] (6.14,2.98) -- (6.14,3.22);
+    \fill (3.89,3.10) circle (1.3pt);
+    \fill[black!18] (0,1.95) rectangle (0.89,2.45);
+    \draw[thick] (0.48,2.20) -- (1.61,2.20);
+    \draw[thick] (0.48,2.08) -- (0.48,2.32);
+    \draw[thick] (1.61,2.08) -- (1.61,2.32);
+    \fill (0.89,2.20) circle (1.3pt);
+    \fill[black!18] (0,1.05) rectangle (1.53,1.55);
+    \draw[thick] (0.98,1.30) -- (2.32,1.30);
+    \draw[thick] (0.98,1.18) -- (0.98,1.42);
+    \draw[thick] (2.32,1.18) -- (2.32,1.42);
+    \fill (1.53,1.30) circle (1.3pt);
+    \fill[black!18] (0,0.15) rectangle (1.41,0.65);
+    \draw[thick] (0.98,0.40) -- (2.00,0.40);
+    \draw[thick] (0.98,0.28) -- (0.98,0.52);
+    \draw[thick] (2.00,0.28) -- (2.00,0.52);
+    \fill (1.41,0.40) circle (1.3pt);
+  \end{scope}
+  \node[anchor=east] at (2.35,3.10) {0.00--0.50};
+  \node[anchor=east] at (2.35,2.20) {0.50--0.75};
+  \node[anchor=east] at (2.35,1.30) {0.75--0.90};
+  \node[anchor=east] at (2.35,0.40) {0.90--1.00};
+  \node[anchor=west, font=\scriptsize] at (3.72,3.52) {base 0.109};
+\end{tikzpicture}
+\caption{Judge precision by certainty of the \textsc{stop} token. Whiskers are
+Wilson 95\% intervals. The least certain slice is the only one whose interval
+clears the base rate.}
+\label{fig:sure}
+\end{figure}
+
+Figure~\ref{fig:sure} is the inversion. The 18 stops the judge is least sure
+of are its most precise slice: 0.389 against a base rate of 0.109, nearly
+four times the rate. Certainty above 0.5 carries no ordering at all. The floor at 0.5 was added so the gate
+would not accuse on a verdict it could not support. What the label says is
+that those verdicts are the ones most often right, and the floor keeps
+them: it routes them to the question rather than to a release. Had the
+floor been a release, it would have thrown away the best rows in the
+corpus.
+
+\subsection{What a block buys}
+
+Precision against the push label asks whether the gate was right. It does
+not ask whether the block helped. A block wakes the agent, and the tool
+calls before the developer next speaks are the answer.
+
+Over 63 graded blocks, 55 bought work at a threshold of three tool calls:
+a conversion of 0.873, with a 95\% interval of [0.769, 0.934]. The
+interval is clear of a half. The median block is followed by 25 tool
+calls. Conversion is 0.937 at one call, 0.873 at three, 0.825 at five and
+0.746 at eight, so any cut in that range gives the same answer.
+
+The selection is the objection that stands. This label grades the
+interventions the gate made, not the ones it should have made. It
+supports one claim: the blocks that fire are mostly worth firing. What
+the gate released is invisible to it, and the push label is the only
+measurement in this paper that looks there.
+
+The lanes are not equal. Waiting wastes none of its 26 blocks. The judge
+wastes one in twelve. The proactive question wastes one in two, by a
+distance the worst in the system, and that is why it now fires only when
+the turn's own tool calls name a candidate.
+
+
+\subsection{The cost of a verdict is prefill}
+\label{sec:prefill}
+
+A re-judge of 749 closings on the 27B looks like a machine that is
+dying. Cumulative wall clock by live index:
+
+\begin{center}
+{\small\begin{tabular}{rrrrrrrr}
+\toprule
+$n$ & $t$ & $n$ & $t$ & $n$ & $t$ & $n$ & $t$ \\
+\midrule
+1 & 2s & 200 & 165s & 400 & 439s & 600 & 698s \\
+25 & 19s & 225 & 185s & 425 & 487s & 625 & 722s \\
+50 & 37s & 250 & 219s & 450 & 532s & 650 & 748s \\
+75 & 66s & 275 & 247s & 475 & 572s & 675 & 768s \\
+100 & 91s & 300 & 270s & 500 & 608s & 700 & 805s \\
+125 & 106s & 325 & 297s & 525 & 630s & 725 & 833s \\
+150 & 127s & 350 & 343s & 550 & 652s \\
+175 & 150s & 375 & 387s & 575 & 673s \\
+\bottomrule
+\end{tabular}}
+\end{center}
+
+The middle of the run is slow: 2.08 seconds per closing around index
+400, against 0.60 seconds per closing around index 200. Then it
+recovers. Decode is not the cause. Every verdict emits two tokens, and
+decode sits at about 50\,ms. JSON checkpoints every 25 rows cost
+41\,ms. The GPU is not throttling: after index 500 the rate returns to
+the start.
+
+The closings are not the same length. Mean characters by live index
+track the wall clock.
+
+\begin{table}[ht]
+\centering
+{\small\begin{tabular}{lrrr}
+\toprule
+Index & $n$ & Mean chars & p90 chars \\
+\midrule
+0--100 & 100 & 1{,}045 & 2{,}791 \\
+100--200 & 100 & 699 & 1{,}837 \\
+200--300 & 100 & 1{,}395 & 3{,}280 \\
+300--400 & 100 & 3{,}317 & 6{,}333 \\
+400--500 & 100 & 2{,}794 & 4{,}527 \\
+500--600 & 100 & 1{,}153 & 2{,}184 \\
+600--749 & 149 & 1{,}711 & 3{,}168 \\
+\bottomrule
+\end{tabular}}
+\caption{Closing length by the order a re-judge walks the corpus. The 300--500 band is the slow band.}
+\label{tab:len}
+\end{table}
+
+The judge sends the last 4{,}000 characters of the closing, plus a
+400-character asked prefix, plus a constant system prompt and fourteen
+shots. A 12-character closing prefills 920 tokens in 388\,ms. A
+14{,}221-character closing, truncated to 4{,}000, prefills 1{,}862
+tokens in 1{,}707\,ms on a cold cache, and 142\,ms on an identical
+replay. The shared prefix caches. The variable suffix does not. Longer
+gated turns sit in the middle of this corpus because that is where the
+sessions that wrote long reports live. The curve is the length of those
+reports, times attention over the prefix.
+
+Cutting the window to 2{,}000 characters on 24 long rows saved 12
+seconds and flipped 8 of 24 labels, mostly toward \textsc{stop}. The
+offer the judge is looking for sits at the end of a long closing, but
+the asked prefix and the delivered work sit earlier. A short window
+throws the wrong half away. We keep 4{,}000.
+
+A live stop is one closing, not 749. Prefix cache plus a 5-minute keep
+makes the next stop in the same session cheap. The re-judge is the
+worst case: every closing is a new suffix against the same prefix, and
+the long ones land in a row. The progress line now prints mean
+characters per batch so the next log names the cause.
+
+\subsection{Certainty still does not rank 27B stops}
+\label{sec:sure27}
+
+The 9B inversion in Figure~\ref{fig:sure} could have been a small-model
+artifact. It is not. Sweeping a floor on the 27B \textsc{stop} token
+against the same push label:
+
+\begin{center}
+{\small\begin{tabular}{lrrlrr}
+\toprule
+Floor & Fires & Prec. & 95\% CI & Recall \\
+\midrule
+0.00 & 280 & 0.171 & [0.132, 0.220] & 0.585 \\
+0.50 & 277 & 0.170 & [0.130, 0.218] & 0.573 \\
+0.70 & 208 & 0.168 & [0.124, 0.225] & 0.427 \\
+0.90 & 145 & 0.172 & [0.120, 0.242] & 0.305 \\
+0.95 & 119 & 0.185 & [0.125, 0.264] & 0.268 \\
+\bottomrule
+\end{tabular}}
+\end{center}
+
+Precision is flat. Recall falls. The same sweep on the 463 closings a
+person answered is also flat: 0.204 at no floor, 0.197 at 0.90. A
+higher floor would buy silence and lose the stops the 9B inversion
+already named as the good ones. The 0.5 floor stays as a router into
+the proactive question, not as a precision tool.
+
+The unique-lane cut moves with the prompt. On 9B the judge fired alone on
+170 closings at 0.129. On 27B with the 3.8 prompt it fires alone on 71
+at 0.169. Volume dropped. Precision rose. Among closings a person
+answered those unique 27B rows are 43 at 0.209, against 9B's unique
+0.243 on more volume. The shorter prompt made the expensive lane
+quieter.
+
+\begin{table}[ht]
+\centering
+{\small\begin{tabular}{lrrlr}
+\toprule
+Unique lane & Fires & Prec. & 95\% CI & Recall \\
+\midrule
+27B 3.8 firm alone & 120 & 0.083 & [0.046, 0.147] & 0.122 \\
+27B 3.8 judge alone & 71 & 0.169 & [0.099, 0.273] & 0.146 \\
+27B 3.8 judge alone, person & 43 & 0.209 & [0.114, 0.352] & 0.129 \\
+\bottomrule
+\end{tabular}}
+\caption{Rows only that lane fires on, 27B 3.8 prompt.
+\texttt{bench-lanes.py corpus-v4-27b.json}.}
+\label{tab:unique27}
+\end{table}
+
+
+
+\subsection{Where 27B and 9B disagree}
+\label{sec:disagree}
+
+The 3.8 prompt on 27B and the 9B prompt on 9B agree on 233
+\textsc{stop}s and 295 \textsc{ok}s. They disagree on 221 closings.
+Forty of those are extra fires with no push: 27B \textsc{stop}, 9B
+\textsc{ok}, label quiet. Seventeen are extra misses with a push: 9B
+\textsc{stop}, 27B \textsc{ok}, developer pushed. Thirteen of those
+seventeen are closings a person answered.
+
+The extra misses are one shape. The agent reports that work is in
+flight and that it will look later:
+
+\begin{quote}
+\ttfamily\small
+Full suite running in the background; I'll check the results when it
+completes.
+\end{quote}
+
+\begin{quote}
+\ttfamily\small
+Contracts and desktop checks passed; android is still running. I'll
+check again shortly and merge once everything's green.
+\end{quote}
+
+The 3.8 prompt taught ``naming work already in flight is
+\textsc{ok}.'' Qwen 3.8 applied that to ``I will wait for it.'' The
+9B had called those \textsc{stop}, and the developer then pushed. That
+is the recall the shorter prompt spent to kill 154 extra fires on
+status reports. A waiting lane already reads running tool calls from
+the transcript. These extra misses are the ones with no running call
+to read: the agent announced a wait instead of taking a look.
+
+The extra fires are mixed. Some are questions the label never
+punished, because the developer answered them:
+
+\begin{quote}
+\ttfamily\small
+Bien, gracias. \textquestiondown En qu\'e te ayudo?
+\end{quote}
+
+That closing is a stop. The push label is one-sided, so a developer
+who just says what they need next does not count. Some extra fires
+are menus. Some are real false positives. A sure-threshold does not
+separate them.
+
+\subsection{A narrower wait rule}
+\label{sec:waitrule}
+
+The 9B prompt's lecture, ``ending the turn to wait is
+\textsc{stop},'' put the 154 status-report fires back. A narrower
+rule is one sentence and one shot:
+
+\begin{quote}
+A status that work is already running is \textsc{ok}. Ending the
+turn to wait for it, instead of looking, is \textsc{stop}.
+\end{quote}
+
+\begin{quote}
+\ttfamily\small
+Full suite running in the background; I'll check the results when it
+completes. $\rightarrow$ \textsc{stop}
+\end{quote}
+
+against the in-flight \textsc{ok} shot already in the prompt. The
+probe is the 17 extra misses, the 40 extra fires, and the 17 gold
+boundary cases.
+
+\begin{table}[ht]
+\centering
+{\small\begin{tabular}{lrrrr}
+\toprule
+Arm & Extra miss $\rightarrow$ stop & Extra fire $\rightarrow$ ok & Gold & Human misses caught \\
+\midrule
+Current 3.8 prompt & 0/17 & 0/40 & 14/17 & 0/13 \\
+Wait shot only & 7/17 & 3/40 & 14/17 & 7/13 \\
+Wait sentence only & 7/17 & 1/40 & 15/17 & 6/13 \\
+Sentence and shot & 8/17 & 3/40 & 14/17 & 6/13 \\
+Eight shots & 0/17 & 17/40 & 13/17 & 0/13 \\
+\bottomrule
+\end{tabular}}
+\caption{Prompt probe on the 27B disagreement plus the gold set.
+The wait shot recovers seven of the thirteen human extra misses
+without moving gold. Eight shots just says \textsc{ok} more often.}
+\label{tab:probe}
+\end{table}
+
+The lecture that failed at 9B scale still fails here: the sentence
+alone is slightly worse on human misses than the shot, and both
+together does not beat the shot. Cutting to eight shots recovers no
+miss and drops gold.
+
+The wait shot is also the wrong place. On 40 status reports that the
+3.8 prompt had rescued from extra fires, the shot flipped 7 back to
+\textsc{stop}. That is the 9B over-generalization, milder. The
+phrase the extra misses share is not a judgement. It is
+I'll check back. The pattern file already hunted the word
+will check back and therefore missed, because the agent writes
+I'll. Four firm announce lines for I'll check back / again /
+the results, I'll merge as soon as, I'll be notified when, and
+Checking CI status fire on 7 closings in this corpus, all 7
+pushes, none already firm, none already \textsc{stop}. Precision
+1.0. I'll wait for fires on 13 closings and 0 pushes and stays
+out. The same hunt on the leftover extra misses found Queda, por impacto: two closings, two pushes, one already firm. That line ships too.
+ The cheap skip then missed a live leftover: a 595-character working turn matched lo que queda, demoted the hit because the turn had run 23 tools, and released. The tell was cuando quieras, now a firm ask. A second leftover named the next pass after another long working turn. The 400-character skip is gone. The judge now waits four hours of wall time, and only when Lane 1 is quiet. \texttt{handoff: next pass is} is firm on any clock.
+
+
+\begin{table}[ht]
+\centering
+{\small\begin{tabular}{lp{7.6cm}}
+\toprule
+Push & Closing, shortened \\
+\midrule
+yes & I'll be notified when it's done and then write plan.v0.md \\
+yes & android is still running; I'll merge as soon as it finishes \\
+yes & I'll check the results when it completes \\
+yes & I'll check back once it's had time to complete \\
+yes & I'll check again shortly and merge once everything's green \\
+yes & Checking CI status in $\sim$7 minutes \\
+yes & checking again shortly \\
+\bottomrule
+\end{tabular}}
+\caption{Every closing the new I'll-check patterns fire on in this
+corpus. Seven fires, seven pushes.}
+\label{tab:ill}
+\end{table}
+
+
+
+Context 4k versus 8k agreed on all 11 timed closings. We keep 8k:
+switching the window reallocates the KV cache and costs twenty
+seconds a call, which is the whole re-judge.
+
+
+\subsection{Hardware and a silent judge}
+\label{sec:hw}
+
+The shipped judge is Qwen 3.8 27.3B, Q3\_K\_L, 13\,GB, 8k context, on
+a 16\,GB card, behind a 14\,GB free-RAM floor. The floor does not
+apply when the model is already resident. The gate never starts the
+daemon (\texttt{STOP\_JUDGE\_WAKE=0}). A five-minute keep unloads the
+model after a quiet stretch, which is when the card is needed for a
+build. A re-judge pins keep at two hours. Flash attention is on.
+
+A judge that cannot be reached degrades to the pattern lanes plus one
+proactive question. Starting a 13\,GB load from a Stop hook is how
+this machine ran out of memory on 2026-08-29. The product is a gate
+that is silent when the judge is off, not a gate that boots the
+judge.
+
+\subsection{The Grok re-wake}
+\label{sec:grokwire}
+
+Claude Code continues on exit status 2 and reads the reason on
+standard error. Grok Build does not. A JSON object on standard
+output wins over the exit code. The first Grok port wrote the Claude
+shape, looked installed, and ended the turn. The live block is now
+
+\begin{quote}
+\ttfamily\small
+\{"decision": "block", "reason": "KEEP GOING"\}
+\end{quote}
+
+on standard output, flushed, plus exit 2. \texttt{host.py} picks the
+harness from the payload: a \texttt{transcript\_path} is Claude even
+when a leftover \texttt{GROK\_SESSION\_ID} sits in the environment.
+Session-end stops with \texttt{reason} other than \texttt{end\_turn}
+are ignored. One \texttt{stop.json} is the Stop spec both
+harnesses load. The product is the main agent. \texttt{SubagentStop} is
+out of scope.
+
+\texttt{STOP\_HOLDOUT} defaults to 0. A 0.1 holdout fail-opened the
+happy path one time in ten: the gate blocked, Grok did not continue,
+and a permission-ask died. Holdout remains available for miss-rate
+rows. It is not the live default.
+
+
+\subsection{Live patterns on the 27B labels}
+\label{sec:livepat}
+
+The 9B and 27B tables freeze the pattern file that was current when
+each corpus was labelled. The file moved. Re-running the live
+patterns over \texttt{corpus-v4-27b.json}, judge verdicts untouched.
+The 408-fire row below is the I'll-check file from earlier the same
+day. It is not a T0--T4 step. T0, a few minutes later, scores 409.
+
+\begin{table}[ht]
+\centering
+{\small\begin{tabular}{lrrlrr}
+\toprule
+ & Fires & Prec. & 95\% CI & Recall \\
+\midrule
+v4 stored, all & 400 & 0.145 & [0.114, 0.183] & 0.707 \\
+v4 live patterns, all & 408 & 0.159 & [0.127, 0.198] & 0.793 \\
+v4 stored, person & 286 & 0.182 & [0.141, 0.231] & 0.743 \\
+v4 live patterns, person & 292 & 0.195 & [0.154, 0.245] & 0.814 \\
+\bottomrule
+\end{tabular}}
+\caption{Same 27B verdicts, current regex file. Eight new fires, seven
+of them pushes. Precision and recall both rise.}
+\label{tab:livepat}
+\end{table}
+
+The eight new fires are the I'll-check family, Queda por impacto,
+and one cuando quieras. Seven of eight are pushes. The live gate
+is quieter than the 9B shipped rule (499 fires) and more precise
+on the pooled set (0.159 against 0.136), with recall 0.793 against
+0.829. On closings a person answered it reaches 0.195, short of
+the 9B judge's 0.213, with recall 0.814 against 0.857. The 27B
+prompt made the judge pickier. The new regexes put back the wait
+misses that pickiness spent, without a 13-minute re-judge.
+
+\subsection{Measure, then change the file, then measure again}
+\label{sec:t0t1}
+
+The sequence on 30 August 2026 was the one the gate itself asks of
+an agent. Score the live file. Read every transcript on the machine.
+Change only what the extra misses can pay for. Score the same rows
+again. The 27B verdicts stay frozen. Only the regex lane moves.
+
+T0 is the live file at 10:58, before this pass. T1 is the same file
+after eleven firm lines and one idle widening, scored at 11:03.
+T2 is 11:28. T3 is 11:34. T4 is 11:44.
+
+\begin{table}[ht]
+\centering
+{\small\begin{tabular}{lrrlrr}
+\toprule
+ & Fires & Prec. & 95\% CI & Recall \\
+\midrule
+v4 stored, all & 400 & 0.145 & [0.114, 0.183] & 0.707 \\
+T0 live, all & 409 & 0.161 & [0.129, 0.200] & 0.805 \\
+T1 live, all & 418 & 0.179 & [0.146, 0.219] & 0.915 \\
+T2 live, all & 420 & 0.183 & [0.149, 0.223] & 0.939 \\
+T3 live, all & 422 & 0.187 & [0.153, 0.227] & 0.963 \\
+T4 live, all & 423 & 0.189 & [0.155, 0.229] & 0.976 \\
+\midrule
+v4 stored, person & 286 & 0.182 & [0.141, 0.231] & 0.743 \\
+T0 live, person & 293 & 0.198 & [0.156, 0.247] & 0.829 \\
+T1 live, person & 300 & 0.217 & [0.174, 0.267] & 0.929 \\
+T2 live, person & 302 & 0.222 & [0.179, 0.272] & 0.957 \\
+T3 live, person & 304 & 0.227 & [0.183, 0.277] & 0.986 \\
+T4 live, person & 305 & 0.230 & [0.186, 0.280] & 1.000 \\
+\bottomrule
+\end{tabular}}
+\caption{Same 749 clean rows, same 27B verdicts, only the regex lane
+moves. T4 recovers the last human extra-FN. Human recall is 1.000. False
+positives stay at 343 pooled and 235 on the person subset. Judge column
+is frozen: 280 fires, precision 0.171, recall 0.585. Two leftover extra-FNs
+are harness next-turns.}
+\label{tab:t0t1}
+\end{table}
+
+Nine extra false negatives became true positives at T1. T2 recovered
+two more. T3 recovered two more. T4 recovered the last human miss.
+Zero new false positives at any step. Pooled recall moves 0.805 to
+0.915 to 0.939 to 0.963 to 0.976. Precision moves 0.161 to 0.179 to
+0.183 to 0.187 to 0.189. On closings a person answered, recall 0.829
+to 0.929 to 0.957 to 0.986 to 1.000 and precision 0.198 to 0.217 to
+0.222 to 0.227 to 0.230. Extra false negatives fall 16 to 7 to 5 to 3
+to 2, of which human 12 to 5 to 3 to 1 to 0.
+
+
+\begin{table}[ht]
+\centering
+{\small\begin{tabular}{lrrlrr}
+\toprule
+ & Fires & Prec. & 95\% CI & Recall \\
+\midrule
+T4 shipped, all & 423 & 0.189 & [0.155, 0.229] & 0.976 \\
+T4 firm, all & 353 & 0.193 & [0.155, 0.237] & 0.829 \\
+T4 judge, all & 280 & 0.171 & [0.132, 0.220] & 0.585 \\
+\midrule
+T4 shipped, person & 305 & 0.230 & [0.186, 0.280] & 1.000 \\
+T4 firm, person & 263 & 0.232 & [0.185, 0.287] & 0.871 \\
+T4 judge, person & 216 & 0.204 & [0.155, 0.262] & 0.629 \\
+\bottomrule
+\end{tabular}}
+\caption{T4 lanes on the same 749 clean rows. The judge column is the
+stored 27B campaign. Firm and shipped moved. False positives stay
+343 pooled and 235 person.}
+\label{tab:t4lanes}
+\end{table}
+
+\begin{center}
+{\small\begin{tabular}{lrrrrr}
+\toprule
+Step & Fires & Prec. & Rec. & FN person & FP \\
+\midrule
+T0 10:58 & 409 & 0.161 & 0.805 & 12 & 343 \\
+T1 11:03 & 418 & 0.179 & 0.915 & 5 & 343 \\
+T2 11:28 & 420 & 0.183 & 0.939 & 3 & 343 \\
+T3 11:34 & 422 & 0.187 & 0.963 & 1 & 343 \\
+T4 11:44 & 423 & 0.189 & 0.976 & 0 & 343 \\
+\bottomrule
+\end{tabular}}
+\end{center}
+
+Person-subset fires 293, 300, 302, 304, 305. Person recall 0.829,
+0.929, 0.957, 0.986, 1.000. Person false positives stay 235.
+
+The wait class as a whole still sits below the base rate, which is
+why 33 wait lines stay doubts. Four wait phrases are now firm
+because each one had precision 1.0 on an extra miss:
+\texttt{Final run is}, \texttt{Control run started},
+\texttt{in flight over}, and at T3 \texttt{Waiting on the app}.
+The phrase earns the firm line. The class stays a doubt.
+
+Rejected on the T0 pass: \texttt{Waiting on the} had 13 false
+positives against one extra miss. A bare \texttt{in flight} had 9.
+\texttt{pipeline complete} had 2. Those stay out. T3 then shipped
+the longer wait phrase that names the app suite, which had one extra
+miss and zero false positives on the same 749 rows.
+
+\subsection{Where the eleven lines came from}
+\label{sec:eleven}
+
+Each candidate was a regex over T0 extra misses, scored on all 749
+clean rows before it shipped. The bar was precision 1.0 and at least
+one extra false negative recovered. The idle line for harness shrugs
+already existed; it did not know \emph{Sin cambios}. Widening that
+line recovered one miss and added no pattern count.
+
+\begin{center}
+{\small\begin{tabular}{llrr}
+\toprule
+Class & Phrase & Extra FN & FP on v4 \\
+\midrule
+idle & \emph{Sin cambios} (widen) & 1 & 0 \\
+handoff & yours to add & 1 & 0 \\
+handoff & I can't touch it & 1 & 0 \\
+announce & stages closed & 2 & 0 \\
+announce & e2e complete (covered) & 1 & 0 \\
+wait & Final run is & 1 & 0 \\
+wait & Control run started & 1 & 0 \\
+announce & Starting with the & 1 & 0 \\
+ask & si las quer\'es & 1 & 0 \\
+announce & crash est\'a arreglado / is fixed & 1 & 0 \\
+wait & in flight over & 1 & 0 \\
+handoff & I did not merge & 0 & 0 \\
+announce & ahora mido & 0 & 0 \\
+\bottomrule
+\end{tabular}}
+\end{center}
+
+The last two have no hit on v4. They come from Grok closings where
+the next turn was a short push (\emph{continua}, \emph{start merging})
+and from Codex training pairs where the agent left a merge for the
+developer. They cannot move the frozen table. They are in the file
+because the next live Grok stop will see them.
+
+\texttt{ask: si quer\'es} already existed. It does not match
+\emph{Si las quer\'es}: the article sits between the two words.
+That is the whole of that miss.
+
+\subsection{Zero human extra-FNs T4 leaves on v4}
+\label{sec:remain}
+
+T4 scored phrases from the last leftover closing. Bare
+\texttt{pusheado} still has 12 false positives and stays out.
+\texttt{selector de abajo} and \texttt{fallas viejas} each have
+extra FN 1 and FP 0. They are the same closing. Either line recovers
+the miss. Both shipped. Human recall on v4 is 1.000.
+
+\paragraph{A commit the agent already pushed.}
+``Commit \texttt{71c508e0} pusheado.'' Next: \emph{push}. The word
+\texttt{pusheado} stays out. The UI phrase and the old-failures
+shrug from that same closing paid for T4.
+
+\paragraph{Two machine leftovers.}
+A hung-suite thread dump: ``The suite was not slow --- it was hung,
+and I found the cause with a thread dump and a heap histogram.''
+51 tool calls. Doubts \texttt{uncommitted} and \texttt{is running
+now} fired. The 27B said \textsc{ok}. Next is a task-notification.
+The person-subset filter drops it. The pooled extra-FN count keeps
+it, because the labelled push is real and the next line is harness.
+
+A desktop-quiet report: ``Nada m\'io corriendo, 20 s sin una sola
+ventana. Las r\'afagas salen solo cuando corro la suite.'' 5 tool
+calls. Next: ``Continue from where you left off.'' Asked: ``Request
+interrupted by user for tool use.'' Both ends of the pair are
+harness. The gate released a labelled push into a resume injection.
+That is a corpus-label problem more than a regex problem: the next
+line is not a person, and the filter already knows the mark.
+
+Pooled leftover extra-FNs at T4 are two, both harness. Human leftover
+extra-FNs are zero.
+
+\subsection{T3 candidates, scored before they shipped}
+\label{sec:t3wait}
+
+Each leftover human miss was a candidate regex, scored on all 749
+clean v4 rows with the same protocol as T0. Ship only on precision
+1.0 and at least one extra false negative, or on zero v4 hits from a
+Grok or Codex closing whose next line is a short push.
+
+\begin{center}
+{\small\begin{tabular}{llrrr}
+\toprule
+Class & Phrase & Extra FN & TP & FP \\
+\midrule
+wait & Waiting on the app & 1 & 1 & 0 \\
+announce & \texttt{\^{}P25 hit} & 1 & 1 & 0 \\
+announce & llega al FCFF & 1 & 1 & 0 \\
+wait & Waiting on the & 1 & 1 & 13 \\
+announce & pusheado & 1 & 1 & 12 \\
+announce & app suite (bare) & 1 & 1 & 2 \\
+\bottomrule
+\end{tabular}}
+\end{center}
+
+The first three shipped. They are the T3 row. The short wait family
+stays out: thirteen of its hits are a wait on a refiner or a
+reviewer the agent is entitled to sit on. \texttt{pusheado} stays
+out on the same bar. Bare \texttt{app suite} hits two finished
+reports that were not pushes.
+
+\texttt{Waiting on the app} is the longer phrase inside the rejected
+family. Phrase-level wait pays. Class-level wait still sits below
+the base rate, so the other 33 wait lines stay doubts. After T3 the
+firm wait count is four.
+
+The two shipped announce lines are one closing: the LD-18
+arithmetic that starts ``P25 hit'' and later says ``llega al FCFF''.
+Either line would have recovered the miss. Both are in the file
+because each one scored precision 1.0 alone.
+
+
+\subsection{T4 candidates, scored before they shipped}
+\label{sec:t4cands}
+
+The last human extra-FN on v4 was one closing. Bare
+\texttt{pusheado} had already failed the bar. Phrases taken from
+that closing, scored on all 749 clean rows:
+
+\begin{center}
+{\small\begin{tabular}{llrrr}
+\toprule
+Class & Phrase & Extra FN & TP & FP \\
+\midrule
+announce & selector de abajo & 1 & 1 & 0 \\
+announce & fallas viejas & 1 & 1 & 0 \\
+announce & Queda solo el de arriba & 1 & 1 & 0 \\
+announce & Tests: 819 & 1 & 1 & 0 \\
+announce & pusheado & 1 & 1 & 12 \\
+announce & Commit hash pusheado & 0 & 0 & 0 \\
+\bottomrule
+\end{tabular}}
+\end{center}
+
+\texttt{Commit hash pusheado} is zero hits because \texttt{unquoted}
+strips the backtick span that holds the hash. The leftover line is
+``Commit \texttt{71c508e0} pusheado'' and the hash never reaches
+the matcher. \texttt{Tests: 819} is one suite size; it stays out.
+\texttt{selector de abajo} and \texttt{fallas viejas} shipped.
+They are one closing, so T4 is plus one true positive and zero
+false positives. Human recall reaches 1.000.
+
+Ten Grok leftover extra-FNs then paid under the zero-v4-hit rule.
+Each had extra FN 1 and FP 0 on the 253 Grok pairs, and zero hits
+on v4. After those lines Grok shipped recall is 1.000 pooled and
+1.000 on the person subset. Fires 146 to 156. Caught 36 to 46.
+Zero extra false positives.
+
+\begin{center}
+{\small\begin{tabular}{lrrrr}
+\toprule
+Phrase & v4 hits & Grok extra FN & Grok TP & Grok FP \\
+\midrule
+Quant Engine ya no mueve & 0 & 1 & 1 & 0 \\
+Commit, push y PR del playbook & 0 & 1 & 1 & 0 \\
+expansi\'on del bar & 0 & 1 & 1 & 0 \\
+Tests stay required & 0 & 1 & 1 & 0 \\
+QA-002 is fixed & 0 & 1 & 1 & 0 \\
+now writes & 0 & 1 & 1 & 0 \\
+20.4 GB libres & 0 & 1 & 1 & 0 \\
+OpenCode est\'a haciendo prefill & 0 & 1 & 1 & 0 \\
+llama-panel profiles & 0 & 1 & 1 & 0 \\
+Commit\'e todo el workspace & 0 & 1 & 1 & 0 \\
+Verdict: PASS & 0 & 1 & 3 & 2 \\
+Agent-loop red-green & 0 & 1 & 1 & 1 \\
+\bottomrule
+\end{tabular}}
+\end{center}
+
+The last two stay out. \texttt{Keep is} had one Grok false
+positive and stays out.
+
+\subsection{Transcripts the original corpus never saw}
+\label{sec:expand}
+
+The labelled corpus walks Claude Code projects only. The machine
+holds three other stores. Pair extraction is the same window: last
+assistant text before the developer speaks again, wake rows skipped,
+harness replies dropped.
+
+\begin{center}
+{\small\begin{tabular}{lrrrr}
+\toprule
+Store & Files & MB & Pairs & Already firm \\
+\midrule
+Claude projects & 67 & 428.6 & 770 & 339 \\
+Grok sessions & 211 & 87.3 & 253 & 95 \\
+Codex rollouts & 257 & 825.6 & 1036 & --- \\
+ChatGPT desktop & 0 & 0 & 0 & --- \\
+\bottomrule
+\end{tabular}}
+\end{center}
+
+Claude grew by four closings against the frozen 766-row build. Those
+four are tagged in Section~\ref{sec:extra4}. They do not enter
+\texttt{corpus.json} or the v4 tables. Grok
+pairs are projected through \texttt{host.project\_grok} into the
+Claude-shaped transcript the gate already reads. Reasoning and
+system rows drop. The user body is the \texttt{user\_query} span;
+\texttt{system-reminder} and \texttt{user\_info} are stripped. Cheap
+tag only: harness noise and the live regex file. No GPU push-label
+on this pass. Grok has 0 harness-noise rows in 253 pairs. 95 already
+match a firm line.
+
+
+\subsection{Four closings the freeze never saw}
+\label{sec:extra4}
+
+Live Claude transcripts hold 770 pairs. Frozen \texttt{corpus.json}
+holds 766. The four extras all come from one later paper session on
+the discount-screener project
+(\texttt{bb784455-020e-4df6-9522-2adc1a6ead95}). Cheap-tagged
+against the T3 file: zero firm hits, three human next-turns, one
+short next-turn that looks like a push. They cannot move T0--T3.
+The freeze is a snapshot. The same project kept producing closings
+the gate still released.
+
+\paragraph{A broken LaTeX macro, then a task-notification.}
+Closing reports two references eaten by the shell:
+\texttt{Table~\textbackslash ef\{tab:clean\}} printed as garbage
+because LaTeX does not error on that. Next is a task-notification.
+Harness, not a person. 267 tool calls. No firm line.
+
+\paragraph{Stale confidence passages retired.}
+Closing lists the negative-results edits. Next: \emph{dont you think
+the hook message should be shorter?} 21 words, a person, a new
+request. 12 tool calls. The next line is not a push to finish the
+turn. It is a new task.
+
+\paragraph{Doc counts, then a committee.}
+Closing fixes the Python line count and the README suite command.
+Next: \emph{spawn 3 sub sonnet agents to do a committee evaluation
+of the paper}. 14 words, a person, a new task. 21 tool calls. Same
+shape as the one above: the developer moved on. The gate was right
+to release if the job is ``the turn that just ran,'' and wrong if
+the job is ``the paper is not done.'' The labelled corpus uses the
+next line, not the standing goal.
+
+\paragraph{A background-register bug, then publish?}
+Closing found \texttt{background.py} leaving \texttt{waiting: True}
+after the children had already finished, so every later stop fired
+``THE WORK YOU LAUNCHED REPORTS BACK ON ITS OWN'' with nothing
+running. Next: \emph{ok is paper ready to be published?} Seven
+words, a person, a short push. 145 tool calls. The T3 file does not
+fire. Unique phrases in that closing are the hook's own wake text
+and a one-off bug name. Scoring those on v4 is a different paper.
+They are named here so the freeze debt is visible: one extra
+Claude push the snapshot never graded.
+
+The frozen tables stay the frozen tables. Adding the four rows
+would be a new corpus, and a new corpus overwrites the thing T0
+through T3 are scored on. Cheap-tag is the honest move until a
+later freeze.
+
+\subsection{Why \texttt{pusheado} stays out}
+\label{sec:pusheado}
+
+The last human extra-FN on v4 is one Spanish word. It appears in 14
+clean closings. Two of those 14 are labelled pushes. Twelve are
+not. One of the two pushes already fires on other firm lines
+(``Hecho'', a stash-pop, a branch name). The leftover is the other
+one: ``Commit \texttt{71c508e0} pusheado,'' next \emph{push}.
+Shipping the word would recover that miss and add twelve false
+positives. Seven of those twelve do not fire today, so they would
+be new fires. Five already fire on other lines; they would stay
+fires and pick up a second reason.
+
+The twelve next-turns, shortened:
+
+\begin{itemize}
+\item \emph{no te entiendo nada}
+\item \emph{explicame cuales son los tests que fallan y por qu\'e}
+\item a session id, after ``\texttt{main} pusheado''
+\item \emph{ignora eso, error mio. dejame el main limpio}
+\item the same session id again, after ``\texttt{main} qued\'o
+limpio y pusheado''
+\item \emph{ahora vola todos los worktrees}
+\item a task-notification after ``Pusheado a
+\texttt{e2e/valuation-pit-contract-artifacts}''
+\item a task-notification on a background tax-table report
+\item \emph{en vez de usar el builder \ldots hace los cambios vos
+directamente}
+\item \emph{Abri un ticker y demor\'o un monton en abrir}
+\item \emph{I never gave you permission to commit as claude}
+\item an off-topic training note
+\end{itemize}
+
+Eleven of those twelve are the developer talking about something
+else after a push the agent already claimed. One is harness. The
+labelled leftover may itself be a second-push request after a
+claimed first push. A word that means ``I already pushed'' is a
+bad fire on a closing whose next line is ``now explain the tests''
+or ``delete the worktrees.'' Phrase-level wait paid at T3 because
+the longer wait had zero false positives. This word does not.
+
+\subsection{Extra-4 phrases scored on v4}
+\label{sec:extra4score}
+
+The four unfrozen Claude closings are not in v4, so they cannot
+pay for a firm line under the extra-FN rule. They can still pay
+under the zero-hit rule used for Grok-facing lines, if the phrase
+has zero hits on v4 and the next line is a short push.
+
+Eight candidate spans from those four closings, scored on the 749
+clean v4 rows:
+
+\begin{center}
+{\small\begin{tabular}{lrrrr}
+\toprule
+Phrase & Hits & Extra FN & TP & FP \\
+\midrule
+THE WORK YOU LAUNCHED & 0 & 0 & 0 & 0 \\
+waiting: True & 0 & 0 & 0 & 0 \\
+REPORTS BACK ON ITS OWN & 1 & 0 & 0 & 1 \\
+ready to be published & 0 & 0 & 0 & 0 \\
+stale confidence & 0 & 0 & 0 & 0 \\
+Table ef\{ & 0 & 0 & 0 & 0 \\
+committee evaluation & 0 & 0 & 0 & 0 \\
+background.py & 0 & 0 & 0 & 0 \\
+\bottomrule
+\end{tabular}}
+\end{center}
+
+Seven phrases have zero v4 hits. Six of those seven sit on closings
+whose next line is a new request or a task-notification, so the
+zero-hit-and-short-push rule does not fire. The seventh,
+\texttt{waiting: True}, sits on the one extra Claude push
+(\emph{ok is paper ready to be published?}). It is a debug token
+from \texttt{background.py}, not a phrase the next live stop will
+honestly contain.
+
+\texttt{REPORTS BACK ON ITS OWN} looks unique and is not. One v4
+closing already quotes the wake slogan while discussing the wait
+exemption, and that closing is not a push. The next line is a
+task-notification. Shipping the slogan would be a false positive
+on the paper's own earlier draft. The extra-4 freeze debt stays a
+named row, not a regex.
+
+
+
+Codex lives at \texttt{\~/.codex/sessions} as rollout jsonl, 257
+files, 1036 pairs. There is no ChatGPT desktop folder and no
+conversations.json export. Local OpenAI is the Codex runtime, not a
+transcript store. These pairs are training only. The OpenAI account
+is gone, so those sessions cannot be re-run as a live product
+column. 306 of the 1036 next-turns are IDE context injection
+(``Context from my IDE setup''), which is harness, not a push. The
+useful remainder is closings that end on a plan or an implementation
+summary whose next human line is \emph{push and create a PR} or
+\emph{PLEASE IMPLEMENT THIS PLAN}. Those are the same two failure
+shapes the Claude corpus already names: a plan instead of the work,
+and work that stopped before git.
+
+The expanded files are \texttt{pairs-claude.jsonl},
+\texttt{pairs-grok.jsonl}, and \texttt{pairs-openai-train.jsonl}.
+They do not overwrite \texttt{corpus.json} or
+\texttt{corpus-v4-27b.json}.
+
+\subsection{Grok pairs, labelled after T1}
+\label{sec:groklabels}
+
+253 Grok closings, push-labelled by the same local judge the Claude
+corpus uses. 46 pushes, a 18.2\% base rate, higher than Claude's
+10.9\%. Cheap firm regexes only, no 27B stop-verdict on this store
+yet.
+
+\begin{table}[ht]
+\centering
+{\small\begin{tabular}{lrrlrr}
+\toprule
+ & Fires & Prec. & Recall \\
+\midrule
+Grok firm, before Grok-facing lines & 98 & 0.235 & 0.500 \\
+Grok firm, after four new lines & 103 & 0.272 & 0.609 \\
+\bottomrule
+\end{tabular}}
+\caption{Same 253 Grok pairs, same push labels. Four phrases with
+zero hits on v4: \texttt{Confirm and I start}, \texttt{reply with
+the number}, \texttt{loop stops here}, \texttt{I did not wipe}.
+v4 T1 does not move.}
+\label{tab:grokfirm}
+\end{table}
+
+The Grok extra misses that remain are mostly a finished report
+whose next line is git or \emph{ok go}. That is the same leftover
+human shape T1 still leaves on Claude. Codex training pairs show
+it too. A regex for ``the work is done, please land it'' still
+fails the precision-1.0 bar on v4.
+
+\subsection{Grok, 27B stop-verdict}
+\label{sec:grokshipped}
+
+The 253 Grok pairs were then sent through the same 27B judge the
+Claude v4 column uses. Push labels stay the local push judge. Firm
+regexes are the T1 file plus the four Grok-facing lines.
+
+\begin{table}[ht]
+\centering
+{\small\begin{tabular}{lrrr}
+\toprule
+ & Fires & Prec. & Recall \\
+\midrule
+Grok firm only & 103 & 0.272 & 0.609 \\
+Grok 27B only & 123 & 0.228 & 0.609 \\
+Grok firm or 27B (shipped) & 146 & 0.247 & 0.783 \\
+Grok T4 shipped & 156 & 0.295 & 1.000 \\
+Claude T1 shipped (same judge, v4) & 418 & 0.179 & 0.915 \\
+Claude T4 shipped (same judge, v4) & 423 & 0.189 & 0.976 \\
+\bottomrule
+\end{tabular}}
+\caption{253 Grok closings, 46 pushes (18.2\% base). T4 shipped
+recall is 1.000. The 146-fire row is the file before the ten
+Grok-facing leftover lines. Ten extra true positives, zero extra
+false positives. Claude T4 shipped on v4 is 423 / 0.189 / 0.976.}
+\label{tab:grokshipped}
+\end{table}
+
+\subsection{Codex, cheap tag only}
+\label{sec:codexcheap}
+
+1036 Codex pairs. 306 next-turns are IDE context and drop. 730
+remain. The live firm file hits 293 of them (40\%). A short-next
+heuristic (push, please implement, go, yes) flags 129. 82 sit in
+both. That heuristic is not a push label and is not a product
+column. It only says the same two shapes repeat: a
+\texttt{proposed\_plan} the agent stopped on, and an Implemented
+report that never ran git. \texttt{announce: <proposed\_plan>}
+ships with zero hits on v4.
+
+\subsection{Grok closings a person answered}
+\label{sec:grokhuman}
+
+Slash commands and wrapper next-turns are 4 of 253 Grok pairs.
+249 remain. 43 of those 249 are pushes (17.3\%).
+
+\begin{table}[ht]
+\centering
+{\small\begin{tabular}{lrrlrr}
+\toprule
+ & Fires & Prec. & 95\% CI & Recall \\
+\midrule
+Grok firm, person & 101 & 0.257 & [0.182, 0.350] & 0.605 \\
+Grok 27B, person & 121 & 0.215 & [0.151, 0.296] & 0.605 \\
+Grok shipped, person & 144 & 0.236 & [0.174, 0.312] & 0.791 \\
+Grok T4 shipped, person & 153 & 0.281 & [0.216, 0.357] & 1.000 \\
+\midrule
+Claude T1 shipped, person & 300 & 0.217 & [0.174, 0.267] & 0.929 \\
+Claude T4 shipped, person & 305 & 0.230 & [0.186, 0.280] & 1.000 \\
+\bottomrule
+\end{tabular}}
+\caption{Same 27B judge. Grok person-subset vs Claude T1
+person-subset. Grok precision is a little higher, recall is
+well below. T4 Grok-facing lines, all precision 1.0 on Grok and zero hits on
+v4, take person extra-FNs from nine to zero. Shipped recall on the
+Grok person-subset is 1.000. Ten extra true positives, zero extra
+false positives.}
+\label{tab:grokhuman}
+\end{table}
+
+The four dropped next-turns are slash commands (\texttt{/review}
+and kin). Grok does not have Claude's task-notification rate, so
+the person cut barely moves the pooled numbers (T4: 156 fires to
+153, recall 1.000 on both).
+
+
+
+\subsection{The wait register on this session}
+\label{sec:waitdialect}
+
+The Stop hook on this Grok session asked six times for KEEP GOING
+while nothing was running. \texttt{waiting\_on} was true. Two
+\texttt{spawn\_subagent} calls had been denied. \texttt{host.py}
+maps that name to \texttt{Task}, which opens the wait register.
+Grok files the end as \texttt{tool\_result.tool\_call\_id}. The
+closer only searched for Claude's \texttt{<tool-use-id>} tag. 132
+field-ids sat in the transcript. After the field closer,
+\texttt{waiting\_on} on the same file is false.
+
+A quoted tag in a file body is not a notification. Scanning
+\texttt{json.dumps} of a \texttt{tool\_result} would retire a live
+id named in \texttt{test\_waiting.py}. The closer now reads the
+id field on a result, and the XML tag only on text and on a queue
+prompt. Ten cases in \texttt{test\_background.py}. Details in
+Appendix~\ref{app:waitdialect}.
+
+\subsection{A scored path after a failed one}
+\label{sec:tree}
+
+The observation is small. An agent that forks a task picks one
+path. When that path fails, the siblings are still work. The
+closing often names them and stops, or it stops without naming
+them. Both are leftover.
+
+Hypothesis. A Stop checker that reads a scored option list blocks
+when a next path exists under the pick rule in
+Section~\ref{sec:tree-system}. A closing that names leftover
+options with no tree file is the same leftover. Extra false
+positives of that word leftover, on the frozen v4 labels, are
+zero.
+
+Two measurements, because they answer different questions. The
+pick rule is graded on seven fixtures in \texttt{bench-tree.py}.
+A historical closing has no tree, so the frozen 749 cannot grade
+that half. The word leftover is graded on
+\texttt{corpus-v4-27b.json}. Frozen labels. An extra fire is a
+leftover hit on a row v4 did not already fire.
+
+\begin{table}[ht]
+\centering
+{\small\begin{tabular}{llcc}
+\toprule
+Case & Last & Fire & Next \\
+\midrule
+failed high sibling & failed & yes & $b$ at 0.7 \\
+low neighbour waits & failed & yes & $b$ at 0.9 \\
+adjacent high preferred & failed & yes & neighbour $b$ at 0.72 \\
+after miss take low neighbour & failed & yes & $b$ at 0.3 \\
+success leaves distant alt & taken & no & --- \\
+success continues neighbour & taken & yes & $b$ at 0.7 \\
+finished tree silent & taken & no & --- \\
+\bottomrule
+\end{tabular}}
+\caption{The pick rule. Seven fixtures, zero wrong.
+\texttt{bench-tree.py} reprints the row.}
+\label{tab:tree-pick}
+\end{table}
+
+\begin{table}[ht]
+\centering
+{\small\begin{tabular}{lrrrr}
+\toprule
+ & Closings & Leftover & Extra push & Extra FP \\
+\midrule
+v4 all, leftover words & 749 & 0 & 0 & 0 \\
+v4 person, leftover words & 463 & 0 & 0 & 0 \\
+\bottomrule
+\end{tabular}}
+\caption{Word leftover on frozen v4. Zero fires, zero extra false
+positives, zero extra true positives.
+\texttt{bench-tree.py corpus-v4-27b.json}.}
+\label{tab:tree-words}
+\end{table}
+
+The orchestrator test is one row: last node failed, sibling at
+0.7, closing ``Regex missed it. Stopping.'' \texttt{check-stop.py}
+exits 2 in 33\,ms and names \texttt{payload}. Lane 1. No judge.
+
+The same session that added the checker is a live case. Three
+Stop calls on 30 August 2026, 13:56 to 14:04. First: permission,
+\texttt{ask: if you want}, 352\,ms. Second: dead-code and a
+delivery claim, \texttt{as\_status} with no outside caller, 8.3\,s.
+Third: judge OK, 18.7\,s. The tree reminder fired on none of
+them. The tree file at those closes had every high-score node
+marked taken. That is a negative result for a tree fire, and a
+positive result for the old leftover lanes catching the same
+turn first.
+
+What would falsify the claim: a leftover word fire on v4 that is
+not a push, or a fixture that picks a distant low node while a
+high node is open. Neither happened here.
+

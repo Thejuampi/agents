@@ -1,5 +1,26 @@
 param()
 
+<#
+  install/common.ps1 — shared generation primitives for every harness installer
+  (install/claude.ps1, grok.ps1, codex.ps1, opencode.ps1, vscode.ps1).
+
+  Get-RoleMeta is the single source of truth for model tier / effort / permission
+  metadata across all five harnesses (D4/D14, plan.v3.md section 1.4a). Its output
+  schema is FROZEN as of wave-1's merge: exactly these seven keys, no more, no
+  fewer —
+      tier, effortLevel, capabilityIntent, pathPolicy, claudeColor, claudeMaxTurns, opencodeTaskPolicy
+  Adding, removing, or renaming a key is a schema amendment, not a sibling edit:
+  it goes through the orchestrator (never a wave's own builder) via the amendment
+  protocol in plan.v3.md section 1.4a, which also updates the frozen key list
+  below and in install/common.tests.ps1's executable frozen-key-list test (I25).
+
+  `verify-sync` (Makefile target, install/verify-sync.ps1) is expected to report
+  DRIFT for the entire span between task 1.1 and task 7.6a/7.6b landing — that is
+  by design (the generator is meant to diverge from already-installed harnesses
+  mid-rollout). No wave 2-6 may treat a non-zero verify-sync exit as a wave-level
+  gate; it is a wave-7-only gate.
+#>
+
 function Get-AgentFiles {
   param([string]$Repo)
   $d = Join-Path $Repo 'agents'
@@ -47,6 +68,67 @@ function Get-DisplayAgentName {
   if ([string]::IsNullOrWhiteSpace($Name)) { return 'agent' }
   if ($Name.Length -le 2) { return $Name.ToUpper() }
   return $Name.Substring(0, 1).ToUpper() + $Name.Substring(1)
+}
+
+$script:RoleMetaFrozenKeys = @('tier', 'effortLevel', 'capabilityIntent', 'pathPolicy', 'claudeColor', 'claudeMaxTurns', 'opencodeTaskPolicy')
+
+function Get-EffortLevelForTier {
+  param([string]$Tier)
+  # Single derivation function (D4) — effort is never hand-picked per role;
+  # it is always a pure function of tier.
+  switch ($Tier) {
+    'Highest' { return 'max' }
+    'High'    { return 'high' }
+    'Mid'     { return 'medium' }
+    default   { throw "Get-EffortLevelForTier: unknown tier '$Tier' (expected Highest|High|Mid)" }
+  }
+}
+
+function Get-RoleMeta {
+  [CmdletBinding()]  # enables -WarningVariable for W1-N01's silent-fallthrough test
+  param([string]$Name)
+  # tier / capabilityIntent / pathPolicy / opencodeTaskPolicy: frozen per the
+  # patched tables in README.md "Model tiers" and agents/orchestrator.md "Model
+  # tier map" (task 1.0b), and the full field spec in plan.v3.md section 1.4a.
+  # claudeColor / claudeMaxTurns values below are wave-2's assignment (task 2.7,
+  # plan.v3.md 1.4a: "schema slots owned by wave-1, values assigned once by
+  # wave-2's builder and left as-is after merge" — a named carve-out on top of
+  # the file-level "wave-1 only" row, scoped to exactly these two fields).
+  # Colors are a cosmetic per-role UI hint (9 distinct values for operator
+  # legibility across concurrent transcripts); Claude Code has no documented
+  # strict enum for this field, so an unrecognized name is inert, not fatal.
+  # maxTurns is a runaway-guard ceiling; only sensei/refiner (zero tool access,
+  # single-turn judgment/output roles) get a value — see Get-ClaudeAgentFrontmatter.
+  $table = @{
+    orchestrator = @{ tier = 'Highest'; capabilityIntent = 'dispatch';        pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'orchestrator'; claudeColor = 'red';    claudeMaxTurns = $null }
+    planner      = @{ tier = 'Highest'; capabilityIntent = 'shellReadOnly';   pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf';         claudeColor = 'blue';   claudeMaxTurns = $null }
+    sensei       = @{ tier = 'Highest'; capabilityIntent = 'noRepoAccess';    pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf';         claudeColor = 'purple'; claudeMaxTurns = 4 }
+    reviewer     = @{ tier = 'High';    capabilityIntent = 'shellReadOnly';   pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf';         claudeColor = 'yellow'; claudeMaxTurns = $null }
+    qa           = @{ tier = 'High';    capabilityIntent = 'shellReadOnly';   pathPolicy = 'noProductSource'; opencodeTaskPolicy = 'leaf';         claudeColor = 'orange'; claudeMaxTurns = $null }
+    refiner      = @{ tier = 'High';    capabilityIntent = 'noRepoAccess';    pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf';         claudeColor = 'pink';   claudeMaxTurns = 4 }
+    advisor      = @{ tier = 'Mid';     capabilityIntent = 'docsReadOnly';    pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf';         claudeColor = 'cyan';   claudeMaxTurns = $null }
+    builder      = @{ tier = 'Mid';     capabilityIntent = 'shellEdit';       pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf';         claudeColor = 'green';  claudeMaxTurns = $null }
+    curator      = @{ tier = 'Mid';     capabilityIntent = 'curatorReadOnly'; pathPolicy = 'unrestricted';    opencodeTaskPolicy = 'leaf';         claudeColor = 'gray';   claudeMaxTurns = $null }
+  }
+  if ($table.ContainsKey($Name)) {
+    $row = $table[$Name]
+  }
+  else {
+    Write-Warning "Get-RoleMeta: unknown role '$Name' — no frozen row for it; returning a conservative default (Mid tier, noRepoAccess, unrestricted path, leaf task policy). Add a real row (via the amendment protocol) before shipping a 10th role."
+    $row = @{ tier = 'Mid'; capabilityIntent = 'noRepoAccess'; pathPolicy = 'unrestricted'; opencodeTaskPolicy = 'leaf' }
+  }
+  # claudeColor / claudeMaxTurns: populated per-role above by wave-2 (task 2.7);
+  # $row won't have these keys for the unknown-role fallback path, which
+  # resolves to $null here exactly like the other conservative defaults.
+  return [ordered]@{
+    tier               = $row.tier
+    effortLevel        = Get-EffortLevelForTier -Tier $row.tier
+    capabilityIntent   = $row.capabilityIntent
+    pathPolicy         = $row.pathPolicy
+    claudeColor        = $row.claudeColor
+    claudeMaxTurns     = $row.claudeMaxTurns
+    opencodeTaskPolicy = $row.opencodeTaskPolicy
+  }
 }
 
 function Get-OpenCodeAgentMeta {
@@ -172,13 +254,45 @@ function Get-CommandTask {
   return $content.Trim()
 }
 
+function Get-CommandArgumentHint {
+  param([string]$Path)
+  # Returns $null when absent (I4) — callers must skip the frontmatter key
+  # entirely rather than emit an empty `argument-hint:` line.
+  $content = Get-Content -Raw -LiteralPath $Path
+  $match = [regex]::Match($content, '(?m)^Argument-Hint:\s*(.+)$')
+  if ($match.Success) { return $match.Groups[1].Value.Trim() }
+  return $null
+}
+
+$script:SkillDescriptionMaxLength = 1024
+
 function Get-CommandSkillDescription {
+  [CmdletBinding()]  # enables -WarningVariable for W1-E01's truncation-warning test
   param([string]$Path, [string]$CommandName, [string]$AgentName)
   $content = Get-Content -Raw -LiteralPath $Path
   $skillDescMatch = [regex]::Match($content, '(?m)^Skill-Description:\s*(.+)$')
-  if ($skillDescMatch.Success) { return $skillDescMatch.Groups[1].Value.Trim() }
-  $display = Get-DisplayAgentName -Name $AgentName
-  return "Delegate the current request to the $display custom agent. Use when the user invokes `$$CommandName or asks to run the $CommandName workflow."
+  if ($skillDescMatch.Success) {
+    $desc = $skillDescMatch.Groups[1].Value.Trim()
+  }
+  else {
+    # Fallback (F-13): lead with what the skill does, not the mechanism, and
+    # never embed a harness-specific invocation sigil (e.g. Codex's `$name`).
+    # Command names follow a `<verb>-this` convention, so the verb itself
+    # doubles as the trigger word — no task-specific text is available here.
+    $display = Get-DisplayAgentName -Name $AgentName
+    $verb = (($CommandName -replace '-this$', '') -replace '-', ' ').Trim()
+    if (-not $verb) { $verb = $CommandName }
+    $verbCap = if ($verb.Length -le 3) { $verb.ToUpper() } else { $verb.Substring(0, 1).ToUpper() + $verb.Substring(1) }
+    $desc = "$verbCap the current request as the $display specialist. Use when the user asks to $verb, wants the $display role, or runs /$CommandName."
+  }
+  if ($desc.Length -gt $script:SkillDescriptionMaxLength) {
+    $truncated = $desc.Substring(0, $script:SkillDescriptionMaxLength)
+    $lastSpace = $truncated.LastIndexOf(' ')
+    if ($lastSpace -gt 0) { $truncated = $truncated.Substring(0, $lastSpace) }
+    Write-Warning "Get-CommandSkillDescription: '$CommandName' description is $($desc.Length) chars (max $($script:SkillDescriptionMaxLength)); truncated at a word boundary to $($truncated.Length) chars."
+    $desc = $truncated
+  }
+  return $desc
 }
 
 function New-PlaybookSkillMarkdown {
@@ -188,26 +302,38 @@ function New-PlaybookSkillMarkdown {
     [string]$Task,
     [string]$SkillDescription,
     [string]$SyncCommand,
-    [string]$Repo
+    [string]$Repo,
+    [switch]$Global,
+    [System.Collections.Specialized.OrderedDictionary]$ExtraFrontmatter
   )
-  $agentsSourceDir = Join-Path $Repo 'agents'
-  $agentSourcePath = Join-Path $agentsSourceDir "$AgentName.md"
   $generated = "<!-- generated by ``$SyncCommand``; source: commands/$CommandName.md. Do not edit here; edit the source and re-run ``$SyncCommand`` -->"
+
+  # Roles are named, never located by this build machine's absolute repo path
+  # (F-2/I1): a personal/-Global install isn't tied to one repo checkout and a
+  # baked path breaks silently if the repo moves. -Global installs get pure
+  # name-based guidance; in-repo installs may additionally point at a
+  # repo-relative `agents/<role>.md` fallback for harnesses with no named-agent
+  # concept. {0} is substituted with the role name by each call site below.
+  $roleFallbackHint = if ($Global) {
+    "ask which project's canonical ``agents/{0}.md`` to load (a personal/global install is not tied to one specific repo checkout)"
+  }
+  else {
+    "load the canonical role definition at ``agents/{0}.md`` (repo-relative) in this project"
+  }
 
   if ($CommandName -eq 'e2e' -or $CommandName -eq 'e2e-resume') {
     # Main session IS the orchestrator — never nest another orchestrator (context loss).
     # Applies to both the fresh pipeline (/e2e) and re-entry into a stopped session (/e2e-resume):
     # both run in the main conversation under the same identity rule.
+    $orchestratorHint = ($roleFallbackHint -f 'orchestrator')
     $skillBody = @"
 # /$CommandName — main agent is the Orchestrator
 
 **YOU** run this pipeline in the **current** conversation. Do **not** spawn an ``orchestrator`` subagent, do not fork a second E2E brain, and do not re-invoke ``/e2e`` or ``/e2e-resume``.
 
-1. Load and follow the orchestrator playbook yourself:
-   - ``$agentSourcePath``
-   - Specialists directory: ``$agentsSourceDir``
+1. Load and follow the orchestrator playbook yourself: role ``orchestrator`` — if this harness has no named-agent concept, $orchestratorHint.
 2. Execute the task guidance below as that Orchestrator (full E2E pipeline, resuming from the reconstructed state when invoked as /e2e-resume).
-3. Spawn **only** leaf specialists when needed: ``refiner``, ``planner``, ``sensei``, ``advisor``, ``builder``, ``reviewer``, ``curator``, ``qa``.
+3. Spawn **only** leaf specialists when needed: ``refiner``, ``planner``, ``sensei``, ``advisor``, ``builder``, ``reviewer``, ``curator``, ``qa`` — same name-based lookup rule as above, substituting each specialist's name.
 4. Preserve the same Sensei/Advisor/Reviewer threads across review iterations (resume; do not reset).
 5. Apply Correctness over delivery convenience; you write plan revisions after v0 yourself.
 
@@ -217,52 +343,96 @@ $Task
 "@
   }
   else {
+    $agentHint = ($roleFallbackHint -f $AgentName)
     $skillBody = @"
 Spawn the ``$AgentName`` custom agent / subagent to handle the current request when the harness supports named agents.
 Give it the relevant conversation and repository context plus this task guidance:
 
 $Task
 
-If the harness cannot spawn a named ``$AgentName`` agent, **you** must load and follow the canonical agent file and execute that role yourself:
-- Agent source: ``$agentSourcePath``
-- Related agents directory: ``$agentsSourceDir``
+If the harness cannot spawn a named ``$AgentName`` agent, **you** must $agentHint and execute that role yourself.
 
 When you are already acting as orchestrator (e.g. mid-``/e2e``), do **not** spawn another orchestrator — only leaf specialists (refiner, planner, sensei, advisor, builder, reviewer, curator, qa). Preserve the same Sensei/Advisor/Reviewer threads across review iterations (resume; do not reset). Wait for each specialist step to finish before applying its output; do not redo specialist work with weaker judgment.
 
 Apply Correctness over delivery convenience when the target project defines it: complete and durable work over velocity shortcuts.
 "@
   }
-  return "---`n" +
-         "name: $CommandName`n" +
-         "description: $SkillDescription`n" +
-         "---`n`n" +
+
+  # D2: name/description always first; -ExtraFrontmatter (Claude's argument-hint,
+  # disable-model-invocation, etc. — wired up starting wave-2) appends after, in
+  # caller-supplied order. Install-PlaybookSkillsTo enforces the agentskills.io
+  # six-field ceiling for every non-Claude caller before this function ever runs.
+  $fmLines = @('---', "name: $CommandName", "description: $SkillDescription")
+  if ($ExtraFrontmatter) {
+    foreach ($k in $ExtraFrontmatter.Keys) { $fmLines += "$($k): $($ExtraFrontmatter[$k])" }
+  }
+  $fmLines += '---'
+
+  return ($fmLines -join "`n") + "`n`n" +
          $generated + "`n`n" +
          $skillBody + "`n"
 }
 
 function Get-ClaudeAgentFrontmatter {
   param([string]$Name, [string]$Description)
-  # tools / model tuned for Claude Code subagent frontmatter
+  # tools / model tuned for Claude Code subagent frontmatter. Every grant below
+  # is hand-authored and commented per plan.v3.md wave-2's doc deliverable
+  # ("inline comments for every tool-restriction decision") — none of it is
+  # mechanically derived from Get-RoleMeta's capabilityIntent; that pure-
+  # function rule is wave-4/5's (VS Code / OpenCode), not Claude's.
+  #
+  # F-15 (task 2.3): PowerShell is on by default on Windows without Git Bash,
+  # and this repo's own installers are pwsh — Bash alone leaves a role
+  # shell-less on such a machine. Added alongside Bash for builder/qa/reviewer/
+  # planner. orchestrator is deliberately excluded from this policy (see its
+  # case below — 2.4' carve-out). sensei/refiner/advisor/curator have no shell
+  # need under their own agents/*.md contracts and get neither.
+  $roleMeta = Get-RoleMeta -Name $Name
+
   $meta = switch ($Name) {
     'orchestrator' {
+      # 2.4' orchestrator carve-out (plan.v3.md 1.4a; widened I26): the
+      # orchestrator's tool grant is hand-authored and FIXED, never derived
+      # from capabilityIntent ('dispatch') the way a general per-role policy
+      # would. Deriving it (or layering F-15's PowerShell-parity policy onto
+      # it) would drift the grant away from the exact, audited literal this
+      # carve-out exists to pin. This literal reproduces this session's own
+      # live-loaded Claude agent registry grant (Agent, Read, Write, Edit,
+      # Grep, Glob, Bash, Skill; no SendMessage) with Agent removed — a
+      # spawned orchestrator subagent must be able to return a recommendation
+      # to the parent, never dispatch further work itself (README "NEVER spawn
+      # orchestrator"). SendMessage stays absent too. See the wave-2 report
+      # for the before/after diff against the live grant.
       @{
-        tools = 'Agent, Read, Write, Edit, Grep, Glob, Bash, Skill'
+        tools = 'Read, Write, Edit, Grep, Glob, Bash, Skill'
         model = 'opus'
         permissionMode = 'acceptEdits'
       }
     }
     'planner' {
       @{
-        tools = 'Read, Grep, Glob, Bash'
+        tools = 'Read, Grep, Glob, Bash, PowerShell'
         model = 'opus'
         permissionMode = 'plan'
       }
     }
     'sensei' {
+      # F-4 close (task 2.1): `tools: ''` used to skip the `tools:` line
+      # entirely (empty string is falsy in the emitter below), which Claude
+      # Code resolves as "inherits every tool" — silently defeating the
+      # disallowedTools denylist that sat next to it, which itself omitted
+      # Agent/Skill/SendMessage/PowerShell/TaskStop/... (any tool a background
+      # subagent retains that this file's authors hadn't enumerated). Fixed
+      # here with an explicit, non-empty ALLOWLIST instead of a denylist that
+      # would need to be kept in sync with every new tool Anthropic ships:
+      # agents/sensei.md forbids all tool use ("Do not spawn tools. Do not
+      # read files."), so TodoWrite — the one harmless bookkeeping tool — is
+      # the entire grant; everything else is excluded by omission, fail-closed
+      # against future tool additions too.
       @{
-        tools = ''  # no tools — judgment from provided context only
+        tools = 'TodoWrite'
         model = 'opus'
-        disallowedTools = 'Read, Write, Edit, Bash, Grep, Glob, WebFetch, WebSearch'
+        maxTurns = $roleMeta.claudeMaxTurns
       }
     }
     'advisor' {
@@ -276,7 +446,7 @@ function Get-ClaudeAgentFrontmatter {
     }
     'builder' {
       @{
-        tools = 'Read, Write, Edit, Grep, Glob, Bash'
+        tools = 'Read, Write, Edit, Grep, Glob, Bash, PowerShell'
         model = 'sonnet'
         permissionMode = 'acceptEdits'
         # Note: long/integration tests are policy-forbidden in builder.md (orchestrator runs them).
@@ -284,22 +454,27 @@ function Get-ClaudeAgentFrontmatter {
     }
     'reviewer' {
       @{
-        tools = 'Read, Grep, Glob, Bash'
+        tools = 'Read, Grep, Glob, Bash, PowerShell'
         model = 'sonnet'
       }
     }
     'refiner' {
+      # F-4 close (task 2.1): same failure mode and same fix as sensei above —
+      # agents/refiner.md forbids all tool use ("Do not read files. Do not
+      # inspect the repository. Do not browse the web."). Explicit
+      # TodoWrite-only allowlist replaces the empty-tools + partial-denylist
+      # pattern.
       @{
-        tools = ''
+        tools = 'TodoWrite'
         model = 'sonnet'
-        disallowedTools = 'Read, Write, Edit, Bash, Grep, Glob, WebFetch, WebSearch'
+        maxTurns = $roleMeta.claudeMaxTurns
       }
     }
     'qa' {
       @{
         # Stage 6: may read docs + run app; must not write product or notebooks.
         # Product-source oracle forbid is policy in agents/qa.md (degraded detect if needed).
-        tools = 'Bash, Read, Grep, Glob'
+        tools = 'Bash, Read, Grep, Glob, PowerShell'
         model = 'sonnet'
         disallowedTools = 'Write, Edit, NotebookEdit'
       }
@@ -325,9 +500,35 @@ function Get-ClaudeAgentFrontmatter {
   if ($meta.tools) { $lines += "tools: $($meta.tools)" }
   if ($meta.disallowedTools) { $lines += "disallowedTools: $($meta.disallowedTools)" }
   if ($meta.model) { $lines += "model: $($meta.model)" }
+  # effort (task 2.2, D4/D5): sourced from Get-RoleMeta's tier-derived
+  # effortLevel for every role. Declared as a DEFAULT, not a verified optimum —
+  # this repo has no eval harness, so claiming a tuned value would be false
+  # precision (D5); override manually once real-run evidence justifies a
+  # different value (an effort sweep, not carried-over guesswork).
+  if ($roleMeta.effortLevel) { $lines += "effort: $($roleMeta.effortLevel)" }
   if ($meta.permissionMode) { $lines += "permissionMode: $($meta.permissionMode)" }
+  # color (task 2.7): cosmetic per-role UI hint for operator legibility across
+  # 9 concurrent transcripts — Claude Code documents no strict enum for this
+  # field, so an unrecognized value is inert rather than an error.
+  if ($roleMeta.claudeColor) { $lines += "color: $($roleMeta.claudeColor)" }
+  # maxTurns (task 2.7): cheap runaway guard, sensei/refiner only — both are
+  # zero-tool, single-turn judgment/output roles, so a low ceiling catches a
+  # hung/looping session without constraining legitimate use.
+  if ($meta.maxTurns) { $lines += "maxTurns: $($meta.maxTurns)" }
   $lines += '---'
   return ($lines -join "`n")
+}
+
+$script:AgentSkillsIoFrontmatterFields = @('name', 'description', 'license', 'compatibility', 'metadata', 'allowed-tools')
+
+function Get-DefaultSkillFrontmatter {
+  # D2 per-harness default. Claude may grow extra keys (argument-hint,
+  # disable-model-invocation, ...) starting wave-2 task 2.5; every other harness
+  # is pinned to the agentskills.io six-field subset so packaging/upload never
+  # hard-errors on an unknown key. Wave-1 ships no per-role extra values yet —
+  # {} is already a valid subset of the six-field spec for every harness.
+  param([string]$HarnessLabel)
+  return [ordered]@{}
 }
 
 function Install-PlaybookSkillsTo {
@@ -335,8 +536,18 @@ function Install-PlaybookSkillsTo {
     [string]$SkillsRoot,
     [string]$Repo,
     [string]$SyncCommand,
-    [string]$HarnessLabel
+    [string]$HarnessLabel,
+    [switch]$Global,
+    [System.Collections.Specialized.OrderedDictionary]$ExtraFrontmatter
   )
+  if ($null -eq $ExtraFrontmatter) { $ExtraFrontmatter = Get-DefaultSkillFrontmatter -HarnessLabel $HarnessLabel }
+  if ($HarnessLabel -ne 'claude') {
+    foreach ($k in $ExtraFrontmatter.Keys) {
+      if ($script:AgentSkillsIoFrontmatterFields -notcontains $k) {
+        throw "Install-PlaybookSkillsTo: '$HarnessLabel' extra frontmatter key '$k' is outside the agentskills.io six-field spec ($($script:AgentSkillsIoFrontmatterFields -join ', ')) — see plan.v3.md D2/I3."
+      }
+    }
+  }
   New-Item -ItemType Directory -Path $SkillsRoot -Force | Out-Null
   $genFiles = @()
   foreach ($c in (Get-CommandFiles -Repo $Repo)) {
@@ -353,7 +564,9 @@ function Install-PlaybookSkillsTo {
       -Task $task `
       -SkillDescription $skillDesc `
       -SyncCommand $SyncCommand `
-      -Repo $Repo
+      -Repo $Repo `
+      -Global:$Global `
+      -ExtraFrontmatter $ExtraFrontmatter
 
     $skillDir = Join-Path $SkillsRoot $c.Name
     New-Item -ItemType Directory -Path $skillDir -Force | Out-Null

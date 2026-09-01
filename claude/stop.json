@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:/Python314/python.exe -u C:/Users/Juan/.claude/hooks/check-stop.py",
+            "timeout": 90,
+            "env": {
+              "HOME": "C:/Users/Juan",
+              "STOP_HOLDOUT": "0"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -115,7 +115,7 @@ flowchart TB
 | **0 Session** | Orchestrator | `.agents/workspace/tmp/e2e/<slug>/` | One session root · open `session-registry.md` |
 | **1 Refine** | `refiner` | `refine.md` | Max 8 questions · P0/P1/… · **no file reads** |
 | **2 Plan** | `planner` | `plan.v0.md` | Every wave has **`depends_on`** · **Independent** (`[]`) and/or **Serial** (non-empty) · BDD · **docs are deliverables** |
-| **3 Plan review** | `sensei` ∥ `advisor` | `plan.v1…vN.md` + `plan-review/*` | **P0 must fix**; iters 1–5 full; **6+ delta-only / no boy scout**; P1+ one pre-build sweep; **LESSONS-LEARNED** + predicted P0s; **same Sensei∥Advisor chains**; orchestrator applies revisions |
+| **3 Plan review** | `sensei` ∥ `advisor` | `plan.v1…vN.md` + `plan-review/*` | **P0 must fix**; iters 1–5 full; **6+ delta-only intake — report everything, only delta-scope P0s block**; P1+ one pre-build sweep; **LESSONS-LEARNED** + predicted P0s; **same Sensei∥Advisor chains**; orchestrator applies revisions |
 | **4 Build** | `builder` × waves | `build/wave-*.md` | **Topo schedule** · max **3** concurrent **Independent** · Serial = `same_session` resume · mid-tier · **fast tests only (≤~10s)** · Continuity **⊥** isolation · **dispatch checklist + exact base SHA** · prefer **manual worktrees with commit** off default branch (harness `isolation: worktree` often births from `main`) · builder **STEP 0** verifies SHA |
 | **5 Code review** | `reviewer` → **orchestrator merge** → `builder` | `review/reviewer-rN.md` + **`review/fix-package-rN.md`** | Merge **before** builders fix · **same Reviewer thread** · **MUST resume original builder chain** per owner · also used after Stage 6 product P0 fixes |
 | **6 Black-box QA** | Orchestrator probe → `qa` → orchestrator gate | `qa/plan.md`, `qa/findings.md`, `qa/p0-ledger.md`, `qa/probe.md`, `qa/provenance.md` | After Stage 5 **approve** (or Juan named Stage 5 waiver) · D2 package only · **copy-only** persist · **agent-green** vs **pipeline-continue** · product P0 → `fix-package-qa-rN` → Builder (resume chain) → Stage 5 → re-QA · cap 3 product rounds · P0 hard; P1 discretionary; P2 optional · suites ≠ Stage 6 · law: [`docs/findings.md`](docs/findings.md) · role: [`agents/qa.md`](agents/qa.md) · prefer same QA chain (Continuity) |
@@ -125,6 +125,8 @@ flowchart TB
 ### Continuity (cross-stage)
 
 When task B depends on A, **reuse the same role-session** (resume when the harness can; else structured **reconstitute**). Closed outcomes: `resumed` \| `reconstituted` \| `cold_start_waived` \| else **BLOCK**. **Silent cold start is forbidden.** Registry: `session-registry.md`. Full law: [`agents/orchestrator.md`](agents/orchestrator.md) **Global Continuity**.
+
+**Claude Serial edges can now reach `resumed`.** Claude Code documents resuming a prior subagent by ID via the `SendMessage` tool, with the transcript persisted under `~/.claude/projects/{project}/{sessionId}/subagents/`; `adapters/claude.md` now asserts `resume_supported: true` (previously `false`) and walks the mechanism end to end. Until the deferred `~/.claude` personal sync (task 7.6b, post-retro) lands, this is **sandboxed-and-provisional**: proven against generated/sandbox targets, not yet against the operator's live `~/.claude` install — so a Claude Serial edge in the current live session still lands on `reconstituted` until 7.6b closes. Details: [`adapters/claude.md`](adapters/claude.md).
 
 **Continuity ⊥ isolation:** workspace isolation (worktrees, exclusive trees) does not create or erase Continuity chains; resume never skips STEP 0 / `expected_base_sha`.
 
@@ -177,7 +179,7 @@ When task B depends on A, **reuse the same role-session** (resume when the harne
 └── retro.md
 ```
 
-Stage 3 exits when Sensei and Advisor both `approve` **or** the open **P0 ledger is empty** (P1/P2 may remain for a one-time pre-build sweep). From iteration **6+**, review is **delta-only / no boy scout** (P0 only).
+Stage 3 exits when Sensei and Advisor both `approve` **or** the open **P0 ledger is empty** (P1/P2 may remain for a one-time pre-build sweep). From iteration **6+**, review stays **delta-scoped**: Sensei and Advisor report everything they see (they no longer filter to P0-only); only a **delta-scope P0** — new in the diff, or a claimed fix that failed/regressed — enters the ledger and blocks the round. Everything else (new P1/P2, drive-by notes, re-litigation) routes to `LESSONS-LEARNED.md` without escalation, not silently dropped.
 
 Always pass **latest** plan revision downstream. Stale `plan.v{k}` after `plan.v{k+1}` exists is a bug.
 
@@ -190,9 +192,11 @@ If `/e2e` stops before Stage 8 retro (crash, context loss, new conversation, man
 | Role | Tier |
 | --- | --- |
 | Orchestrator, Planner, Sensei | Highest (Opus / Sol / Grok max) |
-| Builder, Advisor | Mid (Sonnet / Terra) when available |
-| Reviewer | High preferred for correctness-critical work |
+| Reviewer, QA, Refiner | High — Stage 5/6 correctness gates (Reviewer, QA) and one-shot session-scoping (Refiner) |
+| Builder, Advisor, Curator | Mid (Sonnet / Terra) when available |
 | One model only | Use that model for every role — do not invent a weaker path |
+
+`qa`'s row closes a pre-existing documentation gap; `refiner`'s and `curator`'s rows resolve this repo's own previously-documented "Mid or high" range. Full rationale: [`agents/orchestrator.md`](agents/orchestrator.md) § Model tier map.
 
 ---
 
@@ -225,6 +229,8 @@ Canonical definitions: [`agents/`](agents/).
 | `/plan-this` | Planner only |
 | `/build-this` | Builder only |
 | `/review-this` | Reviewer only |
+| `/sensei-this` | Sensei only |
+| `/advisor-this` | Advisor only |
 | `/qa-this` | QA only |
 | `/curate-this` | Curator only |
 
@@ -239,9 +245,23 @@ agents/           # canonical agent prompts
 commands/         # slash / skill entrypoints
 adapters/         # harness notes (claude, grok, codex, opencode, vscode)
 install/          # PowerShell projectors
+claude/           # the stop guard: a Stop hook that sends an early finish back
 Makefile          # install / sync targets
 AGENTS.md         # rules for editing this repo
 ```
+
+---
+
+## The stop guard
+
+`claude/` holds a `Stop` hook that reads the closing message of a turn. When the
+agent named the next step instead of doing it, claimed a number it never
+measured, or said BLOCKED with a path still open, the hook sends the turn back.
+Patterns decide first; a local model settles what they leave open.
+
+It runs on Claude Code and Grok Build from the same block. Install it with
+[`claude/install.ps1`](claude/install.ps1); the why and the knobs are in
+[`claude/README.md`](claude/README.md) and [`claude/INSTALL.md`](claude/INSTALL.md).
 
 ---
 
@@ -260,17 +280,21 @@ make install-grok   TARGET=C:/path/to/project
 make install-opencode        # in-repo OpenCode references
 make list
 make help
+
+make verify-sync             # drift check: regenerated projections vs. live ~/.claude, ~/.grok, ~/.codex, ~/.agents — exits non-zero on drift, IN SYNC/DRIFT/NOT INSTALLED per harness
 ```
 
 | Harness | Personal install |
 | --- | --- |
 | **Claude Code** | `~/.claude/skills/<name>/SKILL.md` + `~/.claude/agents/<name>.md` |
-| **Grok Build** | `~/.grok/skills/<name>/SKILL.md` |
-| **Codex** | `~/.codex/agents/*.toml` + `~/.agents/skills/` |
+| **Grok Build** | `~/.grok/skills/<name>/SKILL.md` — also reads Claude Code's skills/agents/instructions natively, zero config (see `adapters/grok.md`); no separate role-definition dump |
+| **Codex** | `~/.codex/agents/*.toml` (`name`/`description`/**`model`**/**`model_reasoning_effort`**/`sandbox_mode`/`developer_instructions`) + `~/.agents/skills/` + `~/.codex/prompts/*.md` (deprecated by Codex, kept one more cycle with a banner) |
 | **OpenCode** | In-repo references (see `adapters/opencode.md`) |
-| **VS Code** | Project `.github/prompts` + `.github/instructions` |
+| **VS Code** | Project `.github/agents/*.agent.md` (roles) + `.github/prompts/*.prompt.md` (entrypoints) + exactly one always-on `.github/instructions/*.instructions.md` file (Principles table only) |
 
-Details: [`adapters/claude.md`](adapters/claude.md) · [`adapters/grok.md`](adapters/grok.md) · [`adapters/codex.md`](adapters/codex.md).
+Every path above exists after a real sync: confirmed for Claude Code/Grok/Codex/OpenCode/VS Code via task 7.6a's in-session `make sync` / `make sync-opencode` / `make install-codex-global` / `make install-grok-global` run; Claude Code's **personal** (`~/.claude`) tree specifically is `~/.claude/agents`/`~/.claude/skills` **pending task 7.6b** (deferred until after this session's retro — see Continuity section above), stated as such rather than implied complete. `docs/harness-conformance.md` is the row-by-row proof ledger.
+
+Details: [`adapters/claude.md`](adapters/claude.md) · [`adapters/grok.md`](adapters/grok.md) · [`adapters/codex.md`](adapters/codex.md) · [`adapters/vscode.md`](adapters/vscode.md) · [`adapters/opencode.md`](adapters/opencode.md).
 
 **Do not hand-edit generated skills/agents.** Edit `agents/` or `commands/`, then `make sync-personal`.
 
